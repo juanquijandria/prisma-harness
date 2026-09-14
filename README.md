@@ -61,7 +61,7 @@ Inside Claude Code, two commands. Updates arrive with `claude plugin update pris
 /plugin install prisma-harness@prisma-harness
 ```
 
-Steps 1 and 2 of the method invoke skills from Matt Pocock's `mattpocock-skills` plugin. They are not copied here. Install that plugin next to this one, or run the same sequence by hand as `METHOD.md` describes.
+Steps 1 and 2 of the method invoke skills from Matt Pocock's `mattpocock-skills` plugin. They are not copied here and this plugin cannot install another one, so install it next to this one with `/plugin install mattpocock-skills@claude-plugins-official`. If it is missing, PRISMA tells you at session start and the method still runs, by hand, as `METHOD.md` describes.
 
 Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, and `python3` for the command parser. Linux is not tested yet.
 
@@ -81,10 +81,11 @@ Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`,
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
 | `hooks/session-voice.sh` | injects the eight writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
+| `hooks/session-deps.sh` | tells the agent, at session start, if the `mattpocock-skills` plugin that steps 1 and 2 invoke is not installed, with the install command. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-The five hooks that act on their own, the index gate, the format gate, the sync check, the blind replica and the session voice, have a `--selftest`, and so does the command parser, with 16 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
+The six hooks that act on their own, the index gate, the format gate, the sync check, the blind replica, the session voice and the dependency check, have a `--selftest`, and so does the command parser, with 16 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -102,6 +103,7 @@ Environment variables, all optional.
 | `PRISMA_SKIP_REPOS` | empty | absolute paths where the push gates do not apply |
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
 | `PRISMA_VOICE` | 1 | set to 0 to stop injecting the writing rules at session start |
+| `PRISMA_DEPS_CHECK` | 1 | set to 0 to stop the dependency notice at session start |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 

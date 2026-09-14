@@ -61,7 +61,7 @@ Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plug
 /plugin install prisma-harness@prisma-harness
 ```
 
-Los pasos 1 y 2 del método invocan skills del plugin `mattpocock-skills` de Matt Pocock. No están copiadas acá. Instala ese plugin junto a este, o corre la misma secuencia a mano como describe `METHOD.md`.
+Los pasos 1 y 2 del método invocan skills del plugin `mattpocock-skills` de Matt Pocock. No están copiadas acá y este plugin no puede instalar otro, así que instálalo junto a este con `/plugin install mattpocock-skills@claude-plugins-official`. Si falta, PRISMA te lo dice al arrancar la sesión y el método corre igual, a mano, como describe `METHOD.md`.
 
 Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, y `python3` para el parser de comandos. Linux no está probado todavía.
 
@@ -81,10 +81,11 @@ Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `g
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
 | `hooks/session-voice.sh` | inyecta las ocho reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
+| `hooks/session-deps.sh` | le dice al agente, al arrancar la sesión, si el plugin `mattpocock-skills` que invocan los pasos 1 y 2 no está instalado, con el comando para instalarlo. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Los cinco hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega y la voz de sesión, tienen `--selftest`, y también el parser de comandos, con 16 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
+Los seis hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión y el chequeo de dependencia, tienen `--selftest`, y también el parser de comandos, con 16 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Configurar
 
