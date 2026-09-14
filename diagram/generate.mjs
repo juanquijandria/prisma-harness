@@ -25,10 +25,6 @@ const texto = (x, y, s, o = {}) =>
   `font-size="${o.t || 11}"${o.peso ? ` font-weight="${o.peso}"` : ''}${o.esp ? ` letter-spacing="${o.esp}"` : ''} ` +
   `fill="${o.c || T.tinta}">${esc(s)}</text>`
 
-// ---------------------------------------------------------------------------
-// 1. La banda de ruteo. Bifurcacion de verdad, no cinco cajas en fila: cinco
-// cajas en fila se leen como una secuencia y son caminos EXCLUYENTES.
-// ---------------------------------------------------------------------------
 const CHW = (W - 2 * M - 4 * 16) / 5
 const chipX = (i) => M + i * (CHW + 16)
 const Y_BARRA = G.Y_RUTEO + 74, Y_CHIP = G.Y_RUTEO + 84, H_CHIP = 62
@@ -39,7 +35,6 @@ svg.push(texto(M, G.Y_RUTEO + 14, 'ROUTE FIRST · WHEN IN DOUBT, THE MORE EXPENS
   { mono: true, t: 9, esp: 1.1, c: T.medio }))
 svg.push(texto(W / 2, G.Y_RUTEO + 42, PREGUNTA_RUTEO, { an: 'middle', t: 14.5, peso: 600 }))
 svg.push(texto(W / 2, G.Y_RUTEO + 58, SUB_RUTEO, { an: 'middle', mono: true, t: 9.5, c: T.medio }))
-// la barra que reparte, con su bajada a cada chip
 svg.push(`<path d="M ${chipX(0) + CHW / 2} ${Y_BARRA} H ${chipX(4) + CHW / 2}" fill="none" stroke="${T.linea}" stroke-width="1"/>`)
 svg.push(`<path d="M ${W / 2} ${G.Y_RUTEO + 64} V ${Y_BARRA}" fill="none" stroke="${T.linea}" stroke-width="1"/>`)
 CARRILES.forEach((c, i) => {
@@ -48,7 +43,6 @@ CARRILES.forEach((c, i) => {
   svg.push(`<rect x="${x}" y="${Y_CHIP}" width="${CHW}" height="${H_CHIP}" rx="6" fill="${c.pasos ? T.carta : 'rgba(26,26,24,.02)'}" stroke="${c.pasos ? T.tinta : T.linea}" stroke-width="${c.pasos ? 1.8 : 1}"/>`)
   svg.push(texto(cx, Y_CHIP + 26, c.nom, { an: 'middle', t: 13, peso: c.pasos ? 700 : 500 }))
   svg.push(texto(cx, Y_CHIP + 46, c.que, { an: 'middle', mono: true, t: 9.5, c: T.medio }))
-  // los cuatro que NO siguen terminan con una barra de cierre. El de codigo baja.
   if (!c.pasos) {
     svg.push(`<path d="M ${cx} ${Y_CHIP + H_CHIP} V ${Y_CHIP + H_CHIP + 11}" stroke="${T.suave}" stroke-width="1"/>`)
     svg.push(`<path d="M ${cx - 20} ${Y_CHIP + H_CHIP + 12} H ${cx + 20}" stroke="${T.medio}" stroke-width="2.4" stroke-linecap="round"/>`)
@@ -56,8 +50,6 @@ CARRILES.forEach((c, i) => {
 })
 svg.push(texto(W - M, Y_CHIP + H_CHIP + 37, 'The other four end at their bar. Only the middle one goes down to the five steps.',
   { an: 'end', mono: true, t: 9, c: T.suave }))
-// La bajada entra por PLAN, que es donde el metodo dice que arranca el flujo.
-// Baja por el canal del gutter para no cruzar el carril de JD.
 const p1 = CAJAS.p1
 const yBaja = Y_CHIP + H_CHIP + 34   // por DEBAJO de las barras de cierre, que van a +12
 const canalIzq = G.CANAL_IZQ
@@ -65,9 +57,6 @@ const bajada = `M ${xCod} ${Y_CHIP + H_CHIP} V ${yBaja} H ${canalIzq} V ${p1.cy}
 svg.push(`<path class="e" data-de="l-code" data-a="p1" d="${bajada}" fill="none" stroke="${T.tinta}" stroke-width="1.4" marker-end="url(#fi)"/>`)
 svg.push(`<path class="flujo" data-de="l-code" data-a="p1" d="${bajada}" pointer-events="none"/>`)
 
-// ---------------------------------------------------------------------------
-// 2. El eje del tiempo y los carriles
-// ---------------------------------------------------------------------------
 COLUMNAS.forEach((c, i) => {
   const x = G.colX(i), w = G.ANCHOS[i]
   svg.push(texto(x + G.PAD, G.Y_EJE + 20, c.nom, { mono: true, t: 10.5, esp: .8, peso: 600, c: T.medio }))
@@ -82,10 +71,6 @@ ACTORES.forEach((a, i) => {
 })
 svg.push(`<path d="M ${M} ${G.Y_FIN_CARRILES} H ${W - M}" stroke="${T.linea}" stroke-width="1"/>`)
 
-// ---------------------------------------------------------------------------
-// 3. Las aristas. Dos capas: la flecha siempre visible, y los puntos que viajan
-// encima solo en el camino real.
-// ---------------------------------------------------------------------------
 const ESTILO = {
   flujo:    { c: T.medio, w: 1.15, guion: '',        puntos: true,  marker: 'f'  },
   puerta:   { c: T.tinta, w: 1.6,  guion: '',        puntos: true,  marker: 'fi' },
@@ -93,9 +78,6 @@ const ESTILO = {
   retorno:  { c: T.medio, w: 1.3,  guion: '5 4',     puntos: false, marker: 'f'  },
   paralelo: { c: T.medio, w: 1.3,  guion: '9 5',     puntos: true,  marker: 'f'  },
 }
-// Coloca la etiqueta sobre el tramo mas largo y prueba varias posiciones hasta
-// dar con una que no pise ninguna caja. La version anterior la ponia siempre en
-// el punto medio del recorrido y tres de ellas cayeron encima de un nodo.
 const ANCHO_CHAR = 8.5 * 0.60 + 0.4
 function libre(x, y, ancho, deId, aId) {
   const x0 = x - ancho / 2, x1 = x + ancho / 2
@@ -104,7 +86,6 @@ function libre(x, y, ancho, deId, aId) {
 }
 function etiquetaLibre(pts, txt, deId, aId) {
   const ancho = txt.length * ANCHO_CHAR
-  // tramos ordenados de mas largo a mas corto
   const tramos = []
   for (let i = 0; i < pts.length - 1; i++) {
     const [x1, y1] = pts[i], [x2, y2] = pts[i + 1]
@@ -114,9 +95,6 @@ function etiquetaLibre(pts, txt, deId, aId) {
   for (const t of tramos) {
     for (const f of [0.5, 0.32, 0.68]) {
       const mx = t.x1 + (t.x2 - t.x1) * f, my = t.y1 + (t.y2 - t.y1) * f
-      // las dos ultimas mandan la etiqueta al aire del carril, arriba o abajo de
-      // la fila de cajas. Hacen falta para los tramos cortos entre cajas vecinas,
-      // donde el hueco es de 12px y ninguna etiqueta cabe en linea.
       for (const dy of t.horiz ? [-9, 15, -(G.NH / 2 + 14), G.NH / 2 + 16] : [0]) {
         const x = t.horiz ? mx : mx + 8 + ancho / 2
         const y = my + (t.horiz ? dy : -6)
@@ -138,9 +116,6 @@ for (const a of ARISTAS) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// 4. Las cajas, encima de las aristas
-// ---------------------------------------------------------------------------
 for (const n of NODOS) {
   const b = CAJAS[n.id]
   const esPuerta = PUERTAS.some((g) => g.id === n.id)
@@ -150,8 +125,6 @@ for (const n of NODOS) {
   svg.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="6" fill="${fill}" stroke="${trazo}" stroke-width="${n.fuerte ? 1.6 : 1}"${n.desvio ? ' stroke-dasharray="4 3"' : ''}/>`)
   const et = (n.num ? n.num + '. ' : '') + n.titulo
   svg.push(texto(b.cx, b.y + 19, et, { an: 'middle', t: 11.5, peso: n.fuerte ? 700 : 550 }))
-  // El subtitulo se parte por ANCHO real, no por conteo de caracteres. Cortarlo
-  // a 34 caracteres dejo tres subtitulos desbordando su caja y pisando al vecino.
   const maxC = Math.floor((b.w - 14) / ANCHO_CHAR)
   const lineas = []; let cur = ''
   for (const pal of n.sub.split(' ')) {
@@ -164,9 +137,6 @@ for (const n of NODOS) {
   svg.push(`</g>`)
 }
 
-// ---------------------------------------------------------------------------
-// 5. La leyenda, que ahora explica lo unico que hace falta: los tipos de arista
-// ---------------------------------------------------------------------------
 const LEY = [
   ['puerta',   'Gate. Crosses lanes and blocks'],
   ['retorno',  'If a gate fails, back to the step'],
@@ -181,11 +151,6 @@ LEY.forEach(([k, txt], i) => {
   svg.push(texto(xLey + 34, y + 3.5, txt, { mono: true, t: 9, c: T.medio }))
 })
 
-// ---------------------------------------------------------------------------
-// 6. Las tres reglas transversales. Banda con filete, NO una caja flotante.
-// La caja anterior tenia relleno #faf9f7 sobre fondo #f2f0ed (contraste 1.04:1,
-// se veia invisible) y su borde pisaba 2.3px el rotulo de abajo.
-// ---------------------------------------------------------------------------
 svg.push(`<path d="M ${M} ${G.Y_TRANS} H ${W - M}" stroke="${T.tinta}" stroke-width="1.4"/>`)
 svg.push(texto(M, G.Y_TRANS + 18, 'THE THREE TRANSVERSAL RULES · THEY HOLD OVER EVERY LANE, THEY ARE NOT ANOTHER STEP',
   { mono: true, t: 9, esp: 1.1, c: T.medio }))
@@ -197,7 +162,6 @@ TRANSVERSALES.forEach((t, i) => {
   mitad.forEach((ln, j) => svg.push(texto(x + 18, G.Y_TRANS + 40 + j * 15, ln, { t: 11.5 })))
 })
 
-// ---------------------------------------------------------------------------
 const RELAC = {}
 for (const n of NODOS) {
   const s = new Set([n.id])
