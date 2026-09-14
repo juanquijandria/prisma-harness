@@ -1,0 +1,13 @@
+# Prisma Harness format gate. Copy to <docs root>/.prisma-format.conf and edit. 1 is on, 0 is off.
+RULE_KEBAB_CASE=1
+RULE_H1_FIRST_LINE=1
+RULE_EM_DASH=1
+RULE_COLON_IN_PROSE=1
+RULE_HEADING_COUNTS=1
+RULE_VOSEO=1
+RULE_LINE_CEILING=150
+RULE_SOURCES_FOOTER=0
+RULE_WIKILINKS=0
+RULE_VERIFY_TAG=0
+EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md SKILL.md log.md"
+EXEMPT_DIRS="raw archive inbox Clippings"

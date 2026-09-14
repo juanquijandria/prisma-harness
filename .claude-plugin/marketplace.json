@@ -1,0 +1,13 @@
+{
+  "name": "prisma-harness",
+  "owner": {
+    "name": "Prisma Harness"
+  },
+  "plugins": [
+    {
+      "name": "prisma-harness",
+      "source": "./",
+      "description": "PRISMA, a verification method for agent-written work, as Claude Code hooks, a skill and a written method."
+    }
+  ]
+}
