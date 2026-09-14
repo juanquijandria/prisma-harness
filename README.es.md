@@ -21,9 +21,11 @@
 
 ## Por qué existe
 
-PRISMA nació el 15/08/2026, el día que un pull request pasó sus dieciséis tests y su gate de merge y rompió producción igual. Nada lo agarró. Se vio mirando el panel, porque ninguno de los tres filtros cubría la vista que estaba rota. Diez días después una entrega pasó treinta y dos chequeos en verde y estaba mal igual, porque los chequeos compartían la premisa del código que verificaban. Un test no puede refutar la premisa que comparte con lo que verifica. PRISMA es el método que salió de esos dos días, y este plugin es la parte que una máquina puede hacer cumplir. Se dice "esto pasó PRISMA" o "eso no pasa PRISMA".
+Un agente escribe el código y escribe también la afirmación de que el código funciona. Elige los tests, lee su salida y decide que pasaron. De ese círculo no se sale desde adentro, porque un test no puede refutar la premisa que comparte con lo que verifica. Las fallas que llegan a producción son justo aquellas en las que todos los chequeos estuvieron de acuerdo, y el verde casi siempre significa que ninguno cubría lo que se rompió.
 
-Así se ve dentro de una sesión. El agente intentó escribir una página del wiki sin abrir el índice, y después intentó empujar un diff con un comentario suelto y 1.202 líneas cambiadas.
+PRISMA agrega los chequeos que un agente no puede darse a sí mismo. Puertas que frenan de forma mecánica antes de un push, un paso que obliga a mirar la superficie real, un refutador cuyo trabajo es tumbar el hallazgo, y una réplica ciega que recibe la afirmación y las fuentes pero nunca el razonamiento. Cada regla del método la pagó una falla real, y una nueva entra solo si da rojo sobre el caso que la paga.
+
+Así se ve dentro de una sesión. El agente intentó escribir una página de documentación sin abrir el índice, y después intentó empujar un cambio de 1.202 líneas.
 
 ```
 INDEX GATE: you are about to write a page under wiki/ without having opened
@@ -116,7 +118,7 @@ Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las 
 - **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto.
 - **Los selftests.** Cambias una puerta, reintroduces el defecto exacto por el que existe, la ves frenar, lo quitas, la ves pasar. El silencio no prueba nada.
 
-## Cosas que te van a morder
+## Trampas conocidas
 
 - **Un hook registrado en esta sesión no corre en esta sesión.** La configuración se lee al arrancar. Prueba un hook nuevo en una sesión nueva.
 - **`hooks/hooks.json` y `skills/` se cargan por convención.** Nombrarlos otra vez en `plugin.json` hace que Claude Code rechace el plugin como duplicado. Medido el 14/09/2026 instalando desde GitHub, donde la carga local con `--plugin-dir` no se había quejado.

@@ -21,9 +21,11 @@
 
 ## Why it exists
 
-PRISMA was born on 2026-08-15, the day a pull request passed its sixteen tests and its merge check and still broke production. Nothing caught it. It was seen by looking at the panel, because none of the three checks covered the view that was broken. Ten days later a delivery passed thirty-two checks in green and was wrong anyway, because the checks shared the premise of the code they verified. A test cannot refute the premise it shares with what it verifies. PRISMA is the method that grew out of those two days, and this plugin is the part of it that a machine can enforce. You say "this passed PRISMA" or "that does not pass PRISMA".
+An agent writes the code and also writes the claim that the code works. It picks the tests, reads their output and decides they passed. That loop has no way out from the inside, because a test cannot refute the premise it shares with what it verifies. The failures that reach production are the ones every check agreed about, and green usually means the checks never covered the thing that broke.
 
-This is what it looks like inside a session. The agent tried to write a wiki page without opening the index, and then tried to push a diff with a stray comment and 1,202 changed lines.
+PRISMA adds the checks an agent cannot give itself. Gates that block mechanically before a push, a step that forces someone to look at the real surface, a refuter whose job is to knock the finding down, and a blind replica that gets the claim and the sources but never the reasoning. Every rule in it was paid for by a real failure, and a new one only enters if it turns red on the case that pays for it.
+
+This is what it looks like inside a session. The agent tried to write a documentation page without opening the index, and then tried to push a change of 1,202 lines.
 
 ```
 INDEX GATE: you are about to write a page under wiki/ without having opened
@@ -132,7 +134,7 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 - **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict.
 - **The selftests.** Change a gate, reintroduce the exact defect it exists for, watch it block, remove it, watch it pass. Silence proves nothing.
 
-## Things that will bite you
+## Gotchas
 
 - **A hook registered in this session does not run in this session.** Settings are read at startup. Test a new hook in a new session.
 - **`hooks/hooks.json` and `skills/` load by convention.** Naming them again in `plugin.json` makes Claude Code refuse the plugin as a duplicate. Measured on 2026-09-14 installing from GitHub, where the local `--plugin-dir` load had not complained.
