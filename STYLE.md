@@ -6,7 +6,7 @@ Every text that leaves the machine follows these rules, and `hooks/format-gate.s
 
 | Rule | Config key | What it catches | Why |
 |---|---|---|---|
-| No em-dashes in prose | `RULE_EM_DASH` | a `—` outside headings, tables, code and backticks | an em-dash hides a decision about how two ideas relate. A comma, a period or "and" states it |
+| No em-dashes in prose | `RULE_EM_DASH` | a `—` outside headings, code and backticks; inside a table only an empty `—` cell is allowed | an em-dash hides a decision about how two ideas relate. A comma, a period or "and" states it |
 | No colons in prose | `RULE_COLON_IN_PROSE` | `word: Word` in a prose line, ignoring URLs, clock times, tables and code | a colon introduces a list or a label; in prose it stands in for a verb that should be there |
 | Headings count what follows | `RULE_HEADING_COUNTS` | "## Three details" followed by four bold numbered items, in English or Spanish numerals | a stated count is a claim a diff can disprove |
 | File names in kebab-case | `RULE_KEBAB_CASE` | `Bad_Name.md`, `badName.md` | one name convention means links never break on case |
@@ -41,8 +41,8 @@ These are how the method's author writes to a reader, and they are the reason th
 Copy `.prisma-format.conf.example` to `<docs root>/.prisma-format.conf`, or set `PRISMA_<KEY>` in the environment. The docs root is `PRISMA_DOCS_ROOT`, defaulting to the project directory, and pages are looked up under `PRISMA_DOCS_DIR`, defaulting to `wiki`. `EXEMPT_NAMES` and `EXEMPT_DIRS` list what the gate skips.
 
 ```
-hooks/format-gate.sh --strict page.md      one page, warnings become failures
-hooks/format-gate.sh --changed             every page under the docs dir touched today, strict
+hooks/format-gate.sh --strict page.md      one page; em-dash and voseo become failures, the rest stay warnings
+hooks/format-gate.sh --changed             every page under the docs dir touched today, strict, exits 2 so the Stop hook blocks
 hooks/format-gate.sh --debt                inventory of the whole docs dir, counted and not shouted
 hooks/format-gate.sh --debt-freeze         freeze today's inventory as the regression baseline
 hooks/format-gate.sh --match page.md       inject five defects into a copy of a REAL page and check they get caught

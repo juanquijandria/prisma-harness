@@ -6,7 +6,7 @@ Todo texto que sale de la máquina sigue estas reglas, y `hooks/format-gate.sh` 
 
 | Regla | Clave de config | Qué caza | Por qué |
 |---|---|---|---|
-| Sin em-dashes en la prosa | `RULE_EM_DASH` | un `—` fuera de encabezados, tablas, código y backticks | un em-dash esconde la decisión de cómo se relacionan dos ideas. Una coma, un punto o una "y" la dicen |
+| Sin em-dashes en la prosa | `RULE_EM_DASH` | un `—` fuera de encabezados, código y backticks; dentro de una tabla solo se permite la celda vacía `—` | un em-dash esconde la decisión de cómo se relacionan dos ideas. Una coma, un punto o una "y" la dicen |
 | Sin dos puntos en la prosa | `RULE_COLON_IN_PROSE` | `palabra: Palabra` en una línea de prosa, ignorando URLs, horas, tablas y código | los dos puntos abren una lista o una etiqueta; en prosa reemplazan a un verbo que debería estar |
 | El encabezado cuenta lo que sigue | `RULE_HEADING_COUNTS` | "## Tres detalles" seguido de cuatro items numerados en negrita, en numerales de español o inglés | un conteo escrito es una afirmación que un diff puede desmentir |
 | Nombres de archivo en kebab-case | `RULE_KEBAB_CASE` | `Nombre_Malo.md`, `nombreMalo.md` | una sola convención de nombres y los enlaces no se rompen por mayúsculas |
@@ -41,8 +41,8 @@ Son la forma en que el autor del método le escribe a quien lee, y son la razón
 Copia `.prisma-format.conf.example` a `<raíz de docs>/.prisma-format.conf`, o define `PRISMA_<CLAVE>` en el entorno. La raíz de docs es `PRISMA_DOCS_ROOT`, por defecto la carpeta del proyecto, y las páginas se buscan bajo `PRISMA_DOCS_DIR`, por defecto `wiki`. `EXEMPT_NAMES` y `EXEMPT_DIRS` listan lo que el gate salta.
 
 ```
-hooks/format-gate.sh --strict pagina.md    una página, los avisos se vuelven fallas
-hooks/format-gate.sh --changed             toda página bajo la carpeta de docs tocada hoy, estricto
+hooks/format-gate.sh --strict pagina.md    una página; em-dash y voseo se vuelven fallas, el resto queda en aviso
+hooks/format-gate.sh --changed             toda página bajo la carpeta de docs tocada hoy, estricto, sale 2 para que el hook de Stop frene
 hooks/format-gate.sh --debt                inventario de toda la carpeta, contado y no gritado
 hooks/format-gate.sh --debt-freeze         congela el inventario de hoy como baseline de regresión
 hooks/format-gate.sh --match pagina.md     inyecta cinco defectos en una copia de una página REAL y comprueba que los caza

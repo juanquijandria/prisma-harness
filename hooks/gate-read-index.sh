@@ -36,7 +36,7 @@ if [ "$1" = "--selftest" ]; then
   exit 1
 fi
 
-command -v jq >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || { echo "WARN: the index gate did not run, jq is missing." >&2; exit 0; }
 
 payload=$(cat)
 file_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
@@ -47,7 +47,7 @@ case "$file_path" in
   *) exit 0 ;;
 esac
 
-[ -n "$transcript" ] && [ -f "$transcript" ] || exit 0
+[ -n "$transcript" ] && [ -f "$transcript" ] || { echo "WARN: the index gate could not read the transcript, nothing was verified." >&2; exit 0; }
 
 if jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | .input.file_path // empty' "$transcript" 2>/dev/null | grep -qx "$INDEX_PATH"; then
   exit 0

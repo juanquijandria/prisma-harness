@@ -17,7 +17,7 @@ Inside Claude Code, two commands. Updates arrive with `claude plugin update pris
 
 Steps 1 and 2 of the method invoke skills from Matt Pocock's `mattpocock-skills` plugin. They are not copied here. Install that plugin next to this one, or run the same sequence by hand as `METHOD.md` describes.
 
-Requirements, measured on macOS on 2026-09-14: `sh`, `jq`, `awk`, `git`, and `python3` for the command parser. Linux is not tested yet.
+Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, and `python3` for the command parser. Linux is not tested yet.
 
 ## What is inside
 
@@ -36,7 +36,7 @@ Requirements, measured on macOS on 2026-09-14: `sh`, `jq`, `awk`, `git`, and `py
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-Every hook that decides something has a `--selftest`, and `tests/run-selftests.sh` runs them all. A gate whose selftest never fails is decoration.
+The four hooks that decide on their own, the index gate, the format gate, the sync check and the blind replica, have a `--selftest`. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -48,18 +48,18 @@ Environment variables, all optional.
 | `PRISMA_DOCS_DIR` | `wiki` | the pages folder under the root that the index gate and the format gate watch |
 | `PRISMA_INDEX_FILE` | `index.md` | the file a session must read before writing a page |
 | `PRISMA_FORMAT_CONFIG` | `<docs root>/.prisma-format.conf` | rule switches, see `STYLE.md` and `.prisma-format.conf.example` |
-| `PRISMA_CANONICAL`, `PRISMA_CANONICAL_COPIES` | the plugin's Spanish block, and any `CLAUDE.md` that carries the markers | what the sync check compares |
+| `PRISMA_CANONICAL`, `PRISMA_CANONICAL_COPIES` | the plugin's Spanish block, and `~/.claude/CLAUDE.md` plus the project `CLAUDE.md` when they carry the markers | what the sync check compares |
 | `PRISMA_SIZE_WARN_OVER`, `PRISMA_SIZE_BLOCK_OVER` | 400, 1000 | the size gate thresholds |
 | `PRISMA_COMMENTS_MAX_PCT`, `PRISMA_COMMENTS_MAX_BLOCK` | 0, 0 | the comments gate ceilings |
 | `PRISMA_SKIP_REPOS` | empty | absolute paths where the push gates do not apply |
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
 
-Every gate has a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate.
+The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 
 ## What not to change without writing the reason
 
 - **The canonical block in `docs/es/METHOD.md`.** Every registered copy is compared against it; editing it here makes every copy drift on purpose.
-- **A gate's exit codes.** `0` passes, `2` blocks, and a gate that cannot measure says so and exits `0`. A gate that fails silently fabricates a verdict.
+- **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict.
 - **The selftests.** Change a gate, reintroduce the exact defect it exists for, watch it block, remove it, watch it pass. Silence proves nothing.
 
 ## Things that will bite you
@@ -67,7 +67,7 @@ Every gate has a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `P
 - **A hook registered in this session does not run in this session.** Settings are read at startup. Test a new hook in a new session.
 - **The comments gate skips files whose extension it does not know**, and it counts only lines your diff adds.
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
-- **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it says so and does not measure.
+- **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it prints a `WARN` and does not measure.
 
 ## Where the rest is
 
@@ -94,7 +94,7 @@ Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plug
 
 Los pasos 1 y 2 del método invocan skills del plugin `mattpocock-skills` de Matt Pocock. No están copiadas acá. Instala ese plugin junto a este, o corre la misma secuencia a mano como describe `METHOD.md`.
 
-Requisitos, medidos en macOS el 14/09/2026: `sh`, `jq`, `awk`, `git`, y `python3` para el parser de comandos. Linux no está probado todavía.
+Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, y `python3` para el parser de comandos. Linux no está probado todavía.
 
 ## Qué hay adentro
 
@@ -113,16 +113,16 @@ Requisitos, medidos en macOS el 14/09/2026: `sh`, `jq`, `awk`, `git`, y `python3
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Todo hook que decide algo tiene `--selftest`, y `tests/run-selftests.sh` los corre todos. Una puerta cuyo selftest nunca falla es decoración.
+Los cuatro hooks que deciden solos, el gate de índice, el de formato, la sincronía y la réplica ciega, tienen `--selftest`. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Configurar
 
-Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista con su default; las claves son las mismas. Toda puerta tiene un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta.
+Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
 
 ## Lo que no se toca sin escribir la razón
 
 - **El bloque canónico en `docs/es/METHOD.md`.** Toda copia registrada se compara contra él; editarlo acá hace derivar todas las copias a propósito.
-- **Los códigos de salida de una puerta.** `0` pasa, `2` frena, y una puerta que no puede medir lo dice y sale `0`. Una puerta que falla callada fabrica un veredicto.
+- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto.
 - **Los selftests.** Cambias una puerta, reintroduces el defecto exacto por el que existe, la ves frenar, lo quitas, la ves pasar. El silencio no prueba nada.
 
 ## Cosas que te van a morder
@@ -130,7 +130,7 @@ Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista 
 - **Un hook registrado en esta sesión no corre en esta sesión.** La configuración se lee al arrancar. Prueba un hook nuevo en una sesión nueva.
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
-- **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, lo dice y no mide.
+- **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, imprime un `WARN` y no mide.
 
 ## Dónde está el resto
 

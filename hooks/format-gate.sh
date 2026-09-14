@@ -193,6 +193,7 @@ case "$1" in
       exit 0
     fi
     [ -z "$F" ] && { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
+    HOOK_MODE=1
     for f in $F; do exempt "$f" || review "$f"; done
     ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 2 ;;
@@ -202,5 +203,12 @@ esac
 printf '\n'
 FAILS=$(grep -c '^F$' "$TALLY" 2>/dev/null); FAILS=${FAILS:-0}
 WARNS=$(grep -c '^W$' "$TALLY" 2>/dev/null); WARNS=${WARNS:-0}
-if [ "$FAILS" -gt 0 ]; then printf 'FAIL: %d blocking, %d warnings\n' "$FAILS" "$WARNS"; exit 1; fi
+if [ "$FAILS" -gt 0 ]; then
+  printf 'FAIL: %d blocking, %d warnings\n' "$FAILS" "$WARNS"
+  if [ "${HOOK_MODE:-0}" = "1" ]; then
+    printf 'FORMAT GATE: %d page(s) touched today break the writing rules. Fix them before stopping. Run hooks/format-gate.sh --strict <page> to see each finding.\n' "$FAILS" >&2
+    exit 2
+  fi
+  exit 1
+fi
 printf 'PASS: 0 blocking, %d warnings\n' "$WARNS"; exit 0

@@ -58,8 +58,9 @@ done
 cd "$dir" 2>/dev/null || exit 0
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-mb=$("$BASE_DE_COMPARACION") || exit 0
-[ -n "$mb" ] || exit 0
+mb=$("$BASE_DE_COMPARACION"); rc=$?
+if [ "$rc" = "2" ]; then echo "WARN: the size gate measures HEAD and HEAD has nothing over its base, so nothing was measured. If you are pushing another branch from here, check it out first." >&2; exit 0; fi
+[ "$rc" = "0" ] && [ -n "$mb" ] || { echo "WARN: the size gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
 
 lineas=$("$MEDIDOR" "$(pwd)" "$mb" HEAD)
 case "$lineas" in
