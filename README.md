@@ -54,7 +54,7 @@ Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`,
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-The five hooks that act on their own, the index gate, the format gate, the sync check, the blind replica and the session voice, have a `--selftest`, and so does the command parser, with 14 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
+The five hooks that act on their own, the index gate, the format gate, the sync check, the blind replica and the session voice, have a `--selftest`, and so does the command parser, with 16 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -87,7 +87,7 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 - **`hooks/hooks.json` and `skills/` load by convention.** Naming them again in `plugin.json` makes Claude Code refuse the plugin as a duplicate. Measured on 2026-09-14 installing from GitHub, where the local `--plugin-dir` load had not complained.
 - **The comments gate skips files whose extension it does not know**, and it counts only lines your diff adds.
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
-- **The command parser, `command-invokes.sh`, is not a shell parser.** It respects quotes, escapes, comments and redirections, and it never drops content. Its one declared limit, measured on 2026-09-14: if a path with spaces sits in SINGLE quotes and a stray apostrophe comes before it, the second sweep splits the path. The convention is double quotes.
+- **The command parser, `command-invokes.sh`, is not a shell parser.** It respects quotes, escapes, comments and redirections, and it never drops content. It does not resolve expansions, aliases, `eval` or globbing. When a command leaves a quote unbalanced the reading is ambiguous, and it returns the UNION of the plausible readings instead of one, so a gate may block a command it did not need to block; the fix is to split the command in two. Measured on 2026-09-14 over 744 real commands, 13 had an odd number of quotes.
 - **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it prints a `WARN` and does not measure.
 
 ## Where it sits
@@ -163,7 +163,7 @@ Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `g
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Los cinco hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega y la voz de sesión, tienen `--selftest`, y también el parser de comandos, con 14 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
+Los cinco hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega y la voz de sesión, tienen `--selftest`, y también el parser de comandos, con 16 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Configurar
 
@@ -181,7 +181,7 @@ Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista 
 - **`hooks/hooks.json` y `skills/` se cargan por convención.** Nombrarlos otra vez en `plugin.json` hace que Claude Code rechace el plugin como duplicado. Medido el 14/09/2026 instalando desde GitHub, donde la carga local con `--plugin-dir` no se había quejado.
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
-- **El parser de comandos, `command-invokes.sh`, no es un parser de shell.** Respeta comillas, escapes, comentarios y redirecciones, y nunca borra contenido. Su único límite declarado, medido el 14/09/2026: si una ruta con espacios va entre comillas SIMPLES y antes hay un apóstrofo suelto, el segundo barrido parte la ruta. La convención es comillas dobles.
+- **El parser de comandos, `command-invokes.sh`, no es un parser de shell.** Respeta comillas, escapes, comentarios y redirecciones, y nunca borra contenido. No resuelve expansiones, alias, `eval` ni globbing. Cuando un comando deja una comilla sin cerrar la lectura es ambigua, y devuelve la UNIÓN de las lecturas plausibles en vez de una sola, así que una puerta puede frenar un comando que no tenía que frenar; el arreglo es partir el comando en dos. Medido el 14/09/2026 sobre 744 comandos reales, 13 traían un número impar de comillas.
 - **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, imprime un `WARN` y no mide.
 
 ## Dónde se ubica

@@ -40,7 +40,20 @@ B"
   case_check "12 REDIRECTION before the program, still detected" "$(printf '%s' '>/dev/null mv "inbox/Reunion HI LUCA 1 DE 5" raw/x' | "$SELF" --arguments mv)" "$PATHS"
   case_check "13 a redirection target is not a program" "$(printf '%s' 'echo hola > mv' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   case_check "14 redirection after the arguments" "$(printf '%s' 'mv "inbox/Reunion HI LUCA 1 DE 5" raw/x >/dev/null' | "$SELF" --arguments mv)" "$PATHS"
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 14/14" && exit 0
+  stray_double="cat >> log.md <<'EOF'
+la tabla dice 5\" de ancho
+EOF
+mv \"inbox/Reunion HI LUCA 1 DE 5\" raw/x"
+  stray_single="cat >> log.md <<'EOF'
+el clip de O'Reilly
+EOF
+mv 'inbox/Reunion HI LUCA 1 DE 5' raw/x"
+  case_contains() {
+    case "$2" in *"$3"*) echo "PASS case $1";; *) echo "FAIL case $1, expected it to contain [$3] and got [$2]"; ok=0;; esac
+  }
+  case_contains "15 stray DOUBLE QUOTE with the path in double quotes" "$(printf '%s' "$stray_double" | "$SELF" --arguments mv)" "$PATHS"
+  case_contains "16 stray APOSTROPHE with the path in single quotes" "$(printf '%s' "$stray_single" | "$SELF" --arguments mv)" "$PATHS"
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 16/16" && exit 0
   echo "SELFTEST FAILED"; exit 1
 fi
 
@@ -141,10 +154,15 @@ def segments_by_hand(text, quotes=QUOTES):
     return output
 
 
+def segments_reversed(text):
+    inverted = segments_by_hand(text[::-1])
+    return [[token[::-1] for token in reversed(tokens)] for tokens in reversed(inverted)]
+
+
 try:
     segments = segments_with_shlex(command)
 except ValueError:
-    segments = segments_by_hand(command)
+    segments = segments_by_hand(command) + segments_reversed(command)
 
 found = []
 for tokens in segments:
