@@ -42,7 +42,13 @@ Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. 
 
 ![PRISMA: primero se rutea a uno de cinco carriles; el código con lógica corre cinco pasos por cuatro carriles de actor, la persona, el agente, las puertas y la réplica ciega; cinco puertas cruzan carriles y frenan](assets/method-map.png)
 
-El mapa de arriba está dibujado a mano en `diagram/method-map/`. Una segunda edición, `assets/prisma-flow.svg`, se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarla si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones; el mismo chequeo lee el mapa a mano y reporta lo que el método declara y el mapa omite. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
+Tres reglas valen sobre todos los carriles y no son un paso más.
+
+1. Toda afirmación es hipótesis hasta que se mida por una vía independiente.
+2. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó.
+3. Una línea entra al método solo si da rojo sobre su caso histórico.
+
+El mapa está dibujado a mano en `diagram/method-map/`. Una segunda edición, `assets/prisma-flow.svg`, se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarla si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones; el mismo chequeo lee el mapa a mano y reporta cualquier carril, paso o puerta que omita. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
 
 ## Cómo lo usa una persona
 
@@ -54,16 +60,20 @@ El mapa de arriba está dibujado a mano en `diagram/method-map/`. Una segunda ed
 
 ## Instalar
 
-Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`. Una actualización solo se ve cuando cambia la `version` de `plugin.json`, así que cada cambio publicado la sube.
+Dentro de Claude Code, dos comandos.
 
 ```
 /plugin marketplace add juanquijandria/prisma-harness
 /plugin install prisma-harness@prisma-harness
 ```
 
-Los pasos 1 y 2 del método invocan skills del plugin `mattpocock-skills` de Matt Pocock. No están copiadas acá y este plugin no puede instalar otro, así que instálalo junto a este con `/plugin install mattpocock-skills@claude-plugins-official`. Si falta, PRISMA te lo dice al arrancar la sesión y el método corre igual, a mano, como describe `METHOD.md`.
+Los pasos 1 y 2 usan las skills del plugin de Matt Pocock. Instálalo junto a este; si falta, PRISMA te lo dice al arrancar la sesión.
 
-Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, y `python3` para el parser de comandos. Linux no está probado todavía.
+```
+/plugin install mattpocock-skills@claude-plugins-official
+```
+
+Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`. Requisitos en macOS, medidos el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, `python3`. Linux no está probado todavía.
 
 ## Qué hay adentro
 

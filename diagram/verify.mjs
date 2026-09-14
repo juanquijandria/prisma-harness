@@ -111,18 +111,9 @@ export function verifyHandMap(sourceText, htmlText) {
   for (const g of S.gates) if (!visible.includes(g.toLowerCase())) missing.push(`gate "${g}"`)
   for (const l of S.lanes) if (!visible.includes(l.toLowerCase())) missing.push(`lane "${l}"`)
   for (const p of S.steps) if (!visible.includes(`${p.num}. `.toLowerCase()) && !visible.includes(`${p.num}.`.toLowerCase())) missing.push(`step ${p.num}`)
-  for (const r of TRANSVERSAL_RULES(sourceText)) if (!visible.includes(r.toLowerCase())) missing.push(`transversal rule "${r}"`)
   return missing
 }
 
-function TRANSVERSAL_RULES(sourceText) {
-  const rules = []
-  for (const l of sourceText.split('\n')) {
-    const m = l.match(/^## (Every claim is a hypothesis until it is measured|How the method grows|The instrument comes before the hypothesis)/)
-    if (m) rules.push(m[1])
-  }
-  return rules
-}
 
 if (process.argv[2] === '--selftest') process.exit(selftest())
 if (import.meta.url === `file://${process.argv[1]}`) {
