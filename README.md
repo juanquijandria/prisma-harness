@@ -84,6 +84,7 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 ## Things that will bite you
 
 - **A hook registered in this session does not run in this session.** Settings are read at startup. Test a new hook in a new session.
+- **`hooks/hooks.json` and `skills/` load by convention.** Naming them again in `plugin.json` makes Claude Code refuse the plugin as a duplicate. Measured on 2026-09-14 installing from GitHub, where the local `--plugin-dir` load had not complained.
 - **The comments gate skips files whose extension it does not know**, and it counts only lines your diff adds.
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
 - **The command parser, `command-invokes.sh`, has a known defect as of 2026-09-14.** When a command leaves a quote unbalanced for the parser, an apostrophe inside a heredoc body for example, it falls back to a regex that drops every quoted segment. Detecting `git push` still works in the cases measured; extracting quoted arguments with `--arguments` does not. Its author is fixing it upstream and the fixed version replaces this one.
@@ -177,6 +178,7 @@ Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista 
 ## Cosas que te van a morder
 
 - **Un hook registrado en esta sesión no corre en esta sesión.** La configuración se lee al arrancar. Prueba un hook nuevo en una sesión nueva.
+- **`hooks/hooks.json` y `skills/` se cargan por convención.** Nombrarlos otra vez en `plugin.json` hace que Claude Code rechace el plugin como duplicado. Medido el 14/09/2026 instalando desde GitHub, donde la carga local con `--plugin-dir` no se había quejado.
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
 - **El parser de comandos, `command-invokes.sh`, tiene un defecto conocido al 14/09/2026.** Cuando un comando deja una comilla sin cerrar para el parser, un apóstrofo dentro del cuerpo de un heredoc por ejemplo, cae a una expresión regular que borra todo segmento entrecomillado. Detectar `git push` sigue funcionando en los casos medidos; extraer argumentos entrecomillados con `--arguments` no. Su autor lo está arreglando y la versión arreglada reemplaza a esta.
