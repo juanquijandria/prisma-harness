@@ -1,6 +1,23 @@
 # Prisma Harness
 
+*Your agent says it is done. PRISMA makes it prove it, route by route, before anything leaves the machine.*
+
 **English** below. **Español** más abajo, en [la segunda mitad](#prisma-harness-español).
+
+## The problem
+
+An agent that writes code also writes the claim that the code works, and a test cannot refute the premise it shares with what it verifies. The failures that reach production are the ones nobody looked at from outside the model. PRISMA is a method for looking from outside, and this plugin is the part of it that a machine can enforce.
+
+This is what it looks like inside a session. The agent tried to write a wiki page without opening the index, and then tried to push a diff with a stray comment and 1,202 changed lines.
+
+```
+INDEX GATE: you are about to write a page under wiki/ without having opened
+index.md in this session. Read <docs root>/index.md first so you do not create
+a duplicate page or leave the index stale, then retry.
+
+SIZE GATE: 1202 lines changed, the push is blocked.
+Over 1000 lines, defect detection in review drops below half.
+```
 
 PRISMA is a verification method for work that an agent produces, and this repository is the method packaged as a Claude Code plugin. Five lanes decide how much verification a request needs, five steps run for code with logic, and five gates with distinct names decide whether the work leaves the machine. The hooks block what the method says must not pass; the skill runs the steps; the written method says why.
 
@@ -69,6 +86,13 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
 - **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it prints a `WARN` and does not measure.
 
+## What Prisma Harness refuses to be
+
+- **Not an eval framework.** No datasets, no scores, no dashboards. Five gates with names, each with the case that pays for it.
+- **Not a second model watching the first.** It runs on one model and says out loud what that costs.
+- **Not a reviewer of taste.** The format gate reads how a page is written; nothing here grades code quality.
+- **Not silent.** A gate that cannot measure prints a warning. Silence never means clean.
+
 ## Where the rest is
 
 The method has a history of dated failures behind every rule. This repository ships the rules; the history stays with its author. Contributions are welcome under the same rule the method applies to itself. A new control enters only if it turns red on a real case.
@@ -78,6 +102,23 @@ License MIT.
 ---
 
 # Prisma Harness (español)
+
+*Tu agente dice que terminó. PRISMA lo obliga a probarlo, vía por vía, antes de que nada salga de la máquina.*
+
+## El problema
+
+Un agente que escribe código escribe también la afirmación de que el código funciona, y un test no puede refutar la premisa que comparte con lo que verifica. Las fallas que llegan a producción son las que nadie miró desde afuera del modelo. PRISMA es un método para mirar desde afuera, y este plugin es la parte que una máquina puede hacer cumplir.
+
+Así se ve dentro de una sesión. El agente intentó escribir una página del wiki sin abrir el índice, y después intentó empujar un diff con un comentario suelto y 1.202 líneas cambiadas.
+
+```
+INDEX GATE: you are about to write a page under wiki/ without having opened
+index.md in this session. Read <docs root>/index.md first so you do not create
+a duplicate page or leave the index stale, then retry.
+
+SIZE GATE: 1202 lines changed, the push is blocked.
+Over 1000 lines, defect detection in review drops below half.
+```
 
 PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar; la skill corre los pasos; el método escrito dice por qué.
 
@@ -131,6 +172,13 @@ Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista 
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
 - **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, imprime un `WARN` y no mide.
+
+## Lo que Prisma Harness se niega a ser
+
+- **No es un framework de evals.** Sin datasets, sin puntajes, sin dashboards. Cinco puertas con nombre, cada una con el caso que la paga.
+- **No es un segundo modelo vigilando al primero.** Corre con un solo modelo y dice en voz alta lo que eso cuesta.
+- **No es un revisor de gusto.** El gate de formato lee cómo está escrita una página; nada acá califica la calidad del código.
+- **No es silencioso.** Una puerta que no puede medir imprime un aviso. El silencio nunca significa limpio.
 
 ## Dónde está el resto
 
