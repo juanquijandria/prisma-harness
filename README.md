@@ -25,7 +25,7 @@ It runs on a single model. There is no second engine, no external service, no ac
 
 ## Install
 
-Inside Claude Code, two commands. Updates arrive with `claude plugin update prisma-harness`, or automatically if you enable auto-update for this marketplace in `/plugin`.
+Inside Claude Code, two commands. Updates arrive with `claude plugin update prisma-harness`, or automatically if you enable auto-update for this marketplace in `/plugin`. An update is only seen when the `version` in `plugin.json` changes, so every published change bumps it.
 
 ```
 /plugin marketplace add juanquijandria/prisma-harness
@@ -134,7 +134,7 @@ Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. 
 
 ## Instalar
 
-Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`.
+Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`. Una actualización solo se ve cuando cambia la `version` de `plugin.json`, así que cada cambio publicado la sube.
 
 ```
 /plugin marketplace add juanquijandria/prisma-harness
