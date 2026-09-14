@@ -48,7 +48,7 @@ Three rules hold over every lane and are not another step.
 2. The instrument is calibrated on the real corpus, and whoever calibrates says what was not tested.
 3. A line enters the method only if it turns red on its historical case.
 
-The map is drawn by hand in `diagram/method-map/`. A second edition, `assets/prisma-flow.svg`, is generated from `diagram/content.mjs`, and `diagram/verify.mjs` refuses to publish it unless it declares the same lanes, steps and gates as `METHOD.md`, in both directions; the same check reads the hand-drawn map and reports any lane, step or gate it omits. An interactive version with a card per node is `diagram/index.html`.
+The order the agent follows is written, not drawn. It lives in `METHOD.md` and in `skills/prisma/SKILL.md`, which is what runs when you say PRISMA.
 
 ## How a person uses it
 
@@ -93,7 +93,6 @@ Requirements: `jq`, `python3`, `git`, `awk`, `cmp`, `bash`. If any is missing, P
 | `docs/es/METHOD.md` | the canonical block in Spanish, the reference this plugin ships | `check-canonical-sync.sh` compares your copies against it at session start |
 | `STYLE.md`, `docs/es/STYLE.md` | the writing rules and which ones the format gate enforces | you read it |
 | `skills/prisma/SKILL.md` | the operating order of the method, invoked as `prisma` | when you say "PRISMA" |
-| `diagram/` | the drawing of the method, its geometry, its gate against `METHOD.md` and its layout test; outputs `assets/prisma-flow.svg` and `diagram/index.html` | `node diagram/generate.mjs` |
 | `hooks/gate-read-index.sh` | blocks a write under the docs dir if the session never read the index | `PreToolUse` on Write and Edit |
 | `hooks/pre-push-comments.sh` | blocks a push or PR whose diff adds comment lines, figures in comments, or `file:line` references | `PreToolUse` on Bash |
 | `hooks/pre-push-size.sh` | warns over 400 changed lines, blocks over 1000, and tells a stale branch apart from a big change | `PreToolUse` on Bash |

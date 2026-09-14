@@ -48,7 +48,7 @@ Tres reglas valen sobre todos los carriles y no son un paso más.
 2. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó.
 3. Una línea entra al método solo si da rojo sobre su caso histórico.
 
-El mapa está dibujado a mano en `diagram/method-map/`. Una segunda edición, `assets/prisma-flow.svg`, se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarla si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones; el mismo chequeo lee el mapa a mano y reporta cualquier carril, paso o puerta que omita. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
+El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD.md` y en `skills/prisma/SKILL.md`, que es lo que corre cuando dices PRISMA. El dibujo está en inglés.
 
 ## Cómo lo usa una persona
 
@@ -93,7 +93,6 @@ Requisitos: `jq`, `python3`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISM
 | `docs/es/METHOD.md` | el bloque canónico en español, la referencia que trae este plugin | `check-canonical-sync.sh` compara tus copias contra él al arrancar la sesión |
 | `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura y cuáles hace cumplir el gate de formato | lo lees |
 | `skills/prisma/SKILL.md` | el orden operativo del método, se invoca como `prisma` | cuando dices "PRISMA" |
-| `diagram/` | el dibujo del método, su geometría, su puerta contra `METHOD.md` y su prueba de trazado; produce `assets/prisma-flow.svg` y `diagram/index.html` | `node diagram/generate.mjs` |
 | `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs si la sesión nunca leyó el índice | `PreToolUse` en Write y Edit |
 | `hooks/pre-push-comments.sh` | frena un push o PR cuyo diff agrega comentarios, cifras en comentarios o referencias `archivo:línea` | `PreToolUse` en Bash |
 | `hooks/pre-push-size.sh` | avisa sobre 400 líneas cambiadas, frena sobre 1000, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |
