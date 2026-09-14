@@ -102,7 +102,7 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 - **`hooks/hooks.json` and `skills/` load by convention.** Naming them again in `plugin.json` makes Claude Code refuse the plugin as a duplicate. Measured on 2026-09-14 installing from GitHub, where the local `--plugin-dir` load had not complained.
 - **The comments gate skips files whose extension it does not know**, and it counts only lines your diff adds.
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
-- **The command parser, `command-invokes.sh`, is not a shell parser.** It respects quotes, escapes, comments and redirections, and it never drops content. It does not resolve expansions, aliases, `eval` or globbing. When a command leaves a quote unbalanced the reading is ambiguous, and it returns the UNION of the plausible readings instead of one, so a gate may block a command it did not need to block; the fix is to split the command in two. Measured on 2026-09-14 over 744 real commands, 13 had an odd number of quotes.
+- **The command parser, `command-invokes.sh`, is not a shell parser.** It respects quotes, escapes, comments and redirections, and it never drops content. It does not resolve expansions, aliases, `eval` or globbing. When a command leaves a quote unbalanced the reading is ambiguous, and it returns the UNION of the plausible readings instead of one, so a gate may block a command it did not need to block; the fix is to split the command in two. It is rare, and deterministic when it happens.
 - **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it prints a `WARN` and does not measure.
 
 ## Where it sits
