@@ -28,7 +28,7 @@ It runs on a single model. There is no second engine, no external service, no ac
 Inside Claude Code, two commands. Updates arrive with `claude plugin update prisma-harness`, or automatically if you enable auto-update for this marketplace in `/plugin`.
 
 ```
-/plugin marketplace add <github-owner>/prisma-harness
+/plugin marketplace add juanquijandria/prisma-harness
 /plugin install prisma-harness@prisma-harness
 ```
 
@@ -86,6 +86,10 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
 - **The size gate measures HEAD**, not the ref you are pushing. If you push another branch from `main`, it prints a `WARN` and does not measure.
 
+## Where it sits
+
+Remove the model from the diagram of an agent system and what remains is the harness, the tools, permissions, state and evaluators around it. Prisma Harness lives in that layer. It is not a loop, it does not retry work until something passes, and it is not a graph, it does not decide which step runs next. It gives the loop its evidence and the graph its gates, and it only speaks when a gate fails. Steps 1 and 2 of the method use the skills of Matt Pocock, the interview, test-first build and code review; steps 3, 4 and 5 are the part his flow ends before, and the part that this harness exists for.
+
 ## What Prisma Harness refuses to be
 
 - **Not an eval framework.** No datasets, no scores, no dashboards. Five gates with names, each with the case that pays for it.
@@ -129,7 +133,7 @@ Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. 
 Dentro de Claude Code, dos comandos. Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`.
 
 ```
-/plugin marketplace add <github-owner>/prisma-harness
+/plugin marketplace add juanquijandria/prisma-harness
 /plugin install prisma-harness@prisma-harness
 ```
 
@@ -172,6 +176,10 @@ Variables de entorno, todas opcionales. La tabla en inglés de arriba las lista 
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
 - **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, imprime un `WARN` y no mide.
+
+## Dónde se ubica
+
+Quita el modelo del diagrama de un sistema de agentes y lo que queda es el harness, las herramientas, los permisos, el estado y los evaluadores que lo rodean. Prisma Harness vive en esa capa. No es un loop, no reintenta el trabajo hasta que algo pase, y no es un grafo, no decide qué paso corre después. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 del método usan las skills de Matt Pocock, la entrevista, la construcción con tests primero y la revisión; los pasos 3, 4 y 5 son la parte donde su flujo termina antes, y la parte por la que existe este harness.
 
 ## Lo que Prisma Harness se niega a ser
 

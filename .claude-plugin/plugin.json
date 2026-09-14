@@ -5,5 +5,7 @@
   "description": "PRISMA, a verification method for agent-written work, packaged as Claude Code hooks, a skill and a written method. Five lanes, five steps, five gates, single-model.",
   "license": "MIT",
   "hooks": "./hooks/hooks.json",
-  "skills": "./skills"
+  "skills": "./skills",
+  "homepage": "https://github.com/juanquijandria/prisma-harness",
+  "repository": "https://github.com/juanquijandria/prisma-harness"
 }
