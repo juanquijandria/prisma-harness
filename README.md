@@ -50,10 +50,11 @@ Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`,
 | `hooks/pre-push-lint.sh` | runs the repo's own linter, `php-cs-fixer` or `eslint`, on the diff before the push | `PreToolUse` on Bash |
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
+| `hooks/session-voice.sh` | injects the eight writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-The four hooks that decide on their own, the index gate, the format gate, the sync check and the blind replica, have a `--selftest`. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
+The five hooks that act on their own, the index gate, the format gate, the sync check, the blind replica and the session voice, have a `--selftest`. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -70,6 +71,7 @@ Environment variables, all optional.
 | `PRISMA_COMMENTS_MAX_PCT`, `PRISMA_COMMENTS_MAX_BLOCK` | 0, 0 | the comments gate ceilings |
 | `PRISMA_SKIP_REPOS` | empty | absolute paths where the push gates do not apply |
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
+| `PRISMA_VOICE` | 1 | set to 0 to stop injecting the writing rules at session start |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 
@@ -155,10 +157,11 @@ Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `g
 | `hooks/pre-push-lint.sh` | corre el linter del propio repo, `php-cs-fixer` o `eslint`, sobre el diff antes del push | `PreToolUse` en Bash |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
+| `hooks/session-voice.sh` | inyecta las ocho reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Los cuatro hooks que deciden solos, el gate de índice, el de formato, la sincronía y la réplica ciega, tienen `--selftest`. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
+Los cinco hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega y la voz de sesión, tienen `--selftest`. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Configurar
 

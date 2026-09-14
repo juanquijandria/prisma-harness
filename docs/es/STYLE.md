@@ -26,7 +26,7 @@ Son de un wiki en Obsidian y se encienden en `.prisma-format.conf` cuando ese es
 
 ## Las reglas que el gate no puede hacer cumplir
 
-Son la forma en que el autor del método le escribe a quien lee, y son la razón de que existan las mecánicas.
+Son la forma en que el autor del método le escribe a quien lee, y son la razón de que existan las mecánicas. `hooks/session-voice.sh` las inyecta en cada sesión al arrancar, así el agente las sigue sin que nadie se lo pida; `PRISMA_VOICE=0` lo apaga.
 
 - **La respuesta va primero.** Una pregunta cerrada se responde en la primera línea, antes de cualquier título.
 - **Una idea por oración, con verbo.** Corto no es telegráfico; una oración le gana a una etiqueta con dos puntos.

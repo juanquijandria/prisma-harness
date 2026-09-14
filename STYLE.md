@@ -26,7 +26,7 @@ They belong to a wiki kept in Obsidian and are switched on in `.prisma-format.co
 
 ## The rules the gate cannot enforce
 
-These are how the method's author writes to a reader, and they are the reason the mechanical rules exist.
+These are how the method's author writes to a reader, and they are the reason the mechanical rules exist. `hooks/session-voice.sh` injects them into every session at start, so the agent follows them without being asked; `PRISMA_VOICE=0` switches that off.
 
 - **The answer goes first.** A closed question gets its answer in the first line, before any heading.
 - **One idea per sentence, with a verb.** Short is not clipped; a sentence beats a label with a colon.

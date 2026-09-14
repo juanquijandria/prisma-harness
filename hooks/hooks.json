@@ -7,6 +7,11 @@
             "type": "command",
             "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/check-canonical-sync.sh --hook",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-voice.sh",
+            "timeout": 10
           }
         ]
       }

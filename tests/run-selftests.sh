@@ -3,7 +3,7 @@
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 failed=0
-for hook in gate-read-index format-gate check-canonical-sync blind-replica; do
+for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice; do
   printf '\n##### %s\n' "$hook"
   if /bin/sh "$HOOKS/$hook.sh" --selftest; then :; else failed=$((failed+1)); fi
 done
