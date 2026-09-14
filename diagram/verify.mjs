@@ -102,10 +102,38 @@ function selftest() {
   return r
 }
 
+export const HAND_MAP = path.join(HERE, 'method-map', 'method-map.dc.html')
+
+export function verifyHandMap(sourceText, htmlText) {
+  const S = modelOfSource(sourceText)
+  const visible = htmlText.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').toLowerCase()
+  const missing = []
+  for (const g of S.gates) if (!visible.includes(g.toLowerCase())) missing.push(`gate "${g}"`)
+  for (const l of S.lanes) if (!visible.includes(l.toLowerCase())) missing.push(`lane "${l}"`)
+  for (const p of S.steps) if (!visible.includes(`${p.num}. `.toLowerCase()) && !visible.includes(`${p.num}.`.toLowerCase())) missing.push(`step ${p.num}`)
+  for (const r of TRANSVERSAL_RULES(sourceText)) if (!visible.includes(r.toLowerCase())) missing.push(`transversal rule "${r}"`)
+  return missing
+}
+
+function TRANSVERSAL_RULES(sourceText) {
+  const rules = []
+  for (const l of sourceText.split('\n')) {
+    const m = l.match(/^## (Every claim is a hypothesis until it is measured|How the method grows|The instrument comes before the hypothesis)/)
+    if (m) rules.push(m[1])
+  }
+  return rules
+}
+
 if (process.argv[2] === '--selftest') process.exit(selftest())
 if (import.meta.url === `file://${process.argv[1]}`) {
   if (!fs.existsSync(SOURCE)) { console.error(`FAIL: ${SOURCE} does not exist`); process.exit(1) }
-  const failures = verify(fs.readFileSync(SOURCE, 'utf8'))
+  const sourceText = fs.readFileSync(SOURCE, 'utf8')
+  const failures = verify(sourceText)
   if (failures.length) { console.error('THE DIAGRAM LIES:'); failures.forEach((f) => console.error('  ' + f)); process.exit(1) }
   console.log('GATE OK: the diagram and METHOD.md declare the same things, in both directions')
+  if (fs.existsSync(HAND_MAP)) {
+    const missing = verifyHandMap(sourceText, fs.readFileSync(HAND_MAP, 'utf8'))
+    if (missing.length) { console.log('HAND MAP, declared by the method and not drawn:'); missing.forEach((m) => console.log('  ' + m)) }
+    else console.log('HAND MAP OK: every lane, step and gate the method declares is drawn')
+  }
 }

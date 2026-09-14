@@ -40,9 +40,9 @@ Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. 
 
 ## El método en un dibujo
 
-![PRISMA: primero se rutea a uno de cinco carriles; el código con lógica corre cinco pasos por cuatro carriles de actor, la persona, el agente, las puertas y la réplica ciega; cinco puertas cruzan carriles y frenan](assets/prisma-flow.svg)
+![PRISMA: primero se rutea a uno de cinco carriles; el código con lógica corre cinco pasos por cuatro carriles de actor, la persona, el agente, las puertas y la réplica ciega; cinco puertas cruzan carriles y frenan](assets/method-map.png)
 
-El dibujo se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarlo si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
+El mapa de arriba está dibujado a mano en `diagram/method-map/`. Una segunda edición, `assets/prisma-flow.svg`, se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarla si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones; el mismo chequeo lee el mapa a mano y reporta lo que el método declara y el mapa omite. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
 
 ## Cómo lo usa una persona
 

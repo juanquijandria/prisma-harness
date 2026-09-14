@@ -40,9 +40,9 @@ It runs on a single model. There is no second engine, no external service, no ac
 
 ## The method in one drawing
 
-![PRISMA: route first into one of five lanes; code with logic runs five steps across four swimlanes, the person, the agent, the gates and the blind replica; five gates cross lanes and block](assets/prisma-flow.svg)
+![PRISMA: route first into one of five lanes; code with logic runs five steps across four swimlanes, the person, the agent, the gates and the blind replica; five gates cross lanes and block](assets/method-map.png)
 
-The drawing is generated from `diagram/content.mjs`, and `diagram/verify.mjs` refuses to publish it unless it declares the same lanes, steps and gates as `METHOD.md`, in both directions. An interactive version with a card per node is `diagram/index.html`.
+The map above is drawn by hand in `diagram/method-map/`. A second edition, `assets/prisma-flow.svg`, is generated from `diagram/content.mjs`, and `diagram/verify.mjs` refuses to publish it unless it declares the same lanes, steps and gates as `METHOD.md`, in both directions; the same check reads the hand-drawn map and reports anything the method declares that the map omits. An interactive version with a card per node is `diagram/index.html`.
 
 ## How a person uses it
 
