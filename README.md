@@ -38,6 +38,12 @@ PRISMA is a verification method for work that an agent produces, and this reposi
 
 It runs on a single model. There is no second engine, no external service, no account. The one place where the method was born with two engines, the blind replica, is declared as single-model and stays honest about what that costs.
 
+## The method in one drawing
+
+![PRISMA: route first into one of five lanes; code with logic runs five steps across four swimlanes, the person, the agent, the gates and the blind replica; five gates cross lanes and block](assets/prisma-flow.svg)
+
+The drawing is generated from `diagram/content.mjs`, and `diagram/verify.mjs` refuses to publish it unless it declares the same lanes, steps and gates as `METHOD.md`, in both directions. An interactive version with a card per node is `diagram/index.html`.
+
 ## How a person uses it
 
 1. **Install once**, the two commands below.
@@ -67,6 +73,7 @@ Requirements, measured on macOS on 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`,
 | `docs/es/METHOD.md` | the canonical block in Spanish, the reference this plugin ships | `check-canonical-sync.sh` compares your copies against it at session start |
 | `STYLE.md`, `docs/es/STYLE.md` | the writing rules and which ones the format gate enforces | you read it |
 | `skills/prisma/SKILL.md` | the operating order of the method, invoked as `prisma` | when you say "PRISMA" |
+| `diagram/` | the drawing of the method, its geometry, its gate against `METHOD.md` and its layout test; outputs `assets/prisma-flow.svg` and `diagram/index.html` | `node diagram/generate.mjs` |
 | `hooks/gate-read-index.sh` | blocks a write under the docs dir if the session never read the index | `PreToolUse` on Write and Edit |
 | `hooks/pre-push-comments.sh` | blocks a push or PR whose diff adds comment lines, figures in comments, or `file:line` references | `PreToolUse` on Bash |
 | `hooks/pre-push-size.sh` | warns over 400 changed lines, blocks over 1000, and tells a stale branch apart from a big change | `PreToolUse` on Bash |

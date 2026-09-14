@@ -38,6 +38,12 @@ PRISMA es un método de verificación para el trabajo que produce un agente, y e
 
 Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. El único lugar donde el método nació con dos motores, la réplica ciega, se declara de un solo modelo y dice con claridad lo que eso cuesta.
 
+## El método en un dibujo
+
+![PRISMA: primero se rutea a uno de cinco carriles; el código con lógica corre cinco pasos por cuatro carriles de actor, la persona, el agente, las puertas y la réplica ciega; cinco puertas cruzan carriles y frenan](assets/prisma-flow.svg)
+
+El dibujo se genera desde `diagram/content.mjs`, y `diagram/verify.mjs` se niega a publicarlo si no declara los mismos carriles, pasos y puertas que `METHOD.md`, en las dos direcciones. El dibujo está en inglés; la versión interactiva con una ficha por nodo es `diagram/index.html`.
+
 ## Cómo lo usa una persona
 
 1. **Instala una vez**, los dos comandos de abajo.
@@ -67,6 +73,7 @@ Requisitos, medidos en macOS el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `g
 | `docs/es/METHOD.md` | el bloque canónico en español, la referencia que trae este plugin | `check-canonical-sync.sh` compara tus copias contra él al arrancar la sesión |
 | `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura y cuáles hace cumplir el gate de formato | lo lees |
 | `skills/prisma/SKILL.md` | el orden operativo del método, se invoca como `prisma` | cuando dices "PRISMA" |
+| `diagram/` | el dibujo del método, su geometría, su puerta contra `METHOD.md` y su prueba de trazado; produce `assets/prisma-flow.svg` y `diagram/index.html` | `node diagram/generate.mjs` |
 | `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs si la sesión nunca leyó el índice | `PreToolUse` en Write y Edit |
 | `hooks/pre-push-comments.sh` | frena un push o PR cuyo diff agrega comentarios, cifras en comentarios o referencias `archivo:línea` | `PreToolUse` en Bash |
 | `hooks/pre-push-size.sh` | avisa sobre 400 líneas cambiadas, frena sobre 1000, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |

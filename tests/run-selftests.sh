@@ -7,6 +7,13 @@ for hook in gate-read-index format-gate check-canonical-sync blind-replica sessi
   printf '\n##### %s\n' "$hook"
   if /bin/sh "$HOOKS/$hook.sh" --selftest; then :; else failed=$((failed+1)); fi
 done
+printf '\n##### diagram gate and layout\n'
+if command -v node >/dev/null 2>&1; then
+  D="$(cd "$(dirname "$0")/../diagram" && pwd)"
+  node "$D/verify.mjs" && node "$D/verify.mjs" --selftest | tail -1 && node "$D/test-layout.mjs" | tail -1 || failed=$((failed+1))
+else
+  printf 'SKIP node is not installed, the diagram checks did not run\n'
+fi
 printf '\n##### push gate controls\n'
 if /bin/sh "$(dirname "$0")/push-gates-controls.sh"; then :; else failed=$((failed+1)); fi
 printf '\n##### syntax of every hook\n'
