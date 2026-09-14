@@ -1,41 +1,63 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "session-deps".
 
-SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
 INSTALLED="${PRISMA_INSTALLED_PLUGINS:-$HOME/.claude/plugins/installed_plugins.json}"
-DEP_NAME="mattpocock-skills"
-DEP_INSTALL="/plugin install mattpocock-skills@claude-plugins-official"
+REQUIRED_TOOLS="jq python3 git awk cmp bash"
+POCOCK_ID="mattpocock-skills@claude-plugins-official"
 
-dep_present() {
-  [ -r "$INSTALLED" ] && grep -q "\"$DEP_NAME@" "$INSTALLED"
+missing_tools() {
+  missing=""
+  if command -v xcode-select >/dev/null 2>&1 && ! xcode-select -p >/dev/null 2>&1; then
+    missing="command-line-tools"
+  fi
+  for tool in $REQUIRED_TOOLS; do
+    command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+  done
+  printf '%s' "$missing" | sed 's/^ *//'
 }
 
-message() {
-  cat <<MSG
-PRISMA DEPENDENCY: the plugin $DEP_NAME is not installed in this Claude Code. Steps 1 and 2 of PRISMA invoke its skills (grilling, tdd, code-review, diagnosing-bugs). Install it once with $DEP_INSTALL, or run the same sequence by hand as METHOD.md describes: interview in rounds, tests first, a review in a fresh context, commit.
-MSG
+pocock_present() {
+  [ -r "$INSTALLED" ] && grep -q "\"mattpocock-skills@" "$INSTALLED"
+}
+
+report() {
+  tools=$(missing_tools)
+  pocock_ok=1; pocock_present || pocock_ok=0
+  [ -z "$tools" ] && [ "$pocock_ok" = "1" ] && return 0
+  printf 'PRISMA DEPENDENCIES, checked at session start. Tell the person what is missing and offer the install command. Never install anything without their explicit yes.\n'
+  if [ -n "$tools" ]; then
+    printf -- '- Missing on this machine: %s. Without them the gates cannot measure, and they pass with a warning instead of blocking.\n' "$tools"
+    case " $tools " in *" command-line-tools "*) printf '  macOS Command Line Tools, which bring git and python3: xcode-select --install\n' ;; esac
+    printf '  macOS with Homebrew: brew install %s\n' "$(printf '%s' "$tools" | sed 's/command-line-tools//; s/^ *//')"
+    printf '  Debian or Ubuntu: sudo apt install %s\n' "$(printf '%s' "$tools" | sed 's/command-line-tools//; s/^ *//')"
+  fi
+  if [ "$pocock_ok" = "0" ]; then
+    printf -- '- The plugin mattpocock-skills is not installed. Steps 1 and 2 of PRISMA invoke its skills. Install it once with /plugin install %s, or run the same sequence by hand as METHOD.md describes.\n' "$POCOCK_ID"
+  fi
 }
 
 if [ "$1" = "--selftest" ]; then
-  ok=1; T=$(mktemp -d)
+  SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
+  ok=1; T=$(mktemp -d); mkdir -p "$T/bin"
+  for t in cat grep sed sh; do ln -s "$(command -v $t)" "$T/bin/$t"; done
+  printf '{"plugins":{"%s":[{}]}}' "$POCOCK_ID" > "$T/present.json"
   printf '{"plugins":{"other@x":[{}]}}' > "$T/absent.json"
-  printf '{"plugins":{"mattpocock-skills@claude-plugins-official":[{}]}}' > "$T/present.json"
-  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" /bin/sh "$SELF")
-  if printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext | contains("not installed")' >/dev/null 2>&1; then printf 'PASS warns when the dependency is absent\n'; else printf 'FAIL absent: %s\n' "$out"; ok=0; fi
-  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/present.json" /bin/sh "$SELF")
-  if [ -z "$out" ]; then printf 'PASS quiet when the dependency is present\n'; else printf 'FAIL present: %s\n' "$out"; ok=0; fi
-  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/missing.json" /bin/sh "$SELF")
-  if printf '%s' "$out" | grep -q "not installed"; then printf 'PASS warns when no plugin registry exists at all\n'; else printf 'FAIL missing registry: %s\n' "$out"; ok=0; fi
+  run() { printf '{}' | PRISMA_INSTALLED_PLUGINS="$1" PATH="$2" /bin/sh "$SELF"; }
+  out=$(run "$T/present.json" "$PATH")
+  if [ -z "$out" ]; then printf 'PASS quiet when every tool and the plugin are present\n'; else printf 'FAIL expected silence, got: %s\n' "$out"; ok=0; fi
+  out=$(run "$T/absent.json" "$PATH")
+  if printf '%s' "$out" | grep -q "mattpocock-skills is not installed" && ! printf '%s' "$out" | grep -q "Missing on this machine"; then printf 'PASS names only the plugin when only the plugin is missing\n'; else printf 'FAIL plugin case: %s\n' "$out"; ok=0; fi
+  out=$(run "$T/present.json" "$T/bin")
+  if printf '%s' "$out" | grep -q "Missing on this machine: jq python3 git awk cmp bash" && printf '%s' "$out" | grep -q "brew install jq"; then printf 'PASS names the missing tools with the install command, without needing jq\n'; else printf 'FAIL tools case: %s\n' "$out"; ok=0; fi
+  if printf '%s' "$out" | grep -q "Never install anything without their explicit yes"; then printf 'PASS tells the agent to ask before installing\n'; else printf 'FAIL no consent line\n'; ok=0; fi
   out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_DEPS_CHECK=0 switches it off\n'; else printf 'FAIL switch: %s\n' "$out"; ok=0; fi
   rm -rf "$T"
-  [ "$ok" = "1" ] && printf 'SELFTEST OK: 4/4\n' && exit 0
+  [ "$ok" = "1" ] && printf 'SELFTEST OK: 5/5\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 fi
 
 [ "${PRISMA_DEPS_CHECK:-1}" = "1" ] || exit 0
 cat >/dev/null
-dep_present && exit 0
-command -v jq >/dev/null 2>&1 || exit 0
-message | jq -Rs '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:.}}'
+report
 exit 0

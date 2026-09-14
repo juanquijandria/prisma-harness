@@ -73,7 +73,17 @@ Steps 1 and 2 use the skills of Matt Pocock's plugin. Install it next to this on
 /plugin install mattpocock-skills@claude-plugins-official
 ```
 
-Updates arrive with `claude plugin update prisma-harness`, or on their own if you turn on auto-update for this marketplace in `/plugin`. Requirements on macOS, measured 2026-09-14: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, `python3`. Linux is not tested yet.
+To update both, run this in your terminal and open a new session.
+
+```
+claude plugin marketplace update
+claude plugin update prisma-harness@prisma-harness
+claude plugin update mattpocock-skills@claude-plugins-official
+```
+
+To never think about it again, open `/plugin` inside Claude Code, go to Marketplaces, pick `prisma-harness` and turn on auto-update.
+
+Requirements: `jq`, `python3`, `git`, `awk`, `cmp`, `bash`. If any is missing, PRISMA tells you at session start with the install command and asks before installing anything. Tested on macOS; Linux is not tested yet.
 
 ## What is inside
 
@@ -91,7 +101,7 @@ Updates arrive with `claude plugin update prisma-harness`, or on their own if yo
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
 | `hooks/session-voice.sh` | injects the eight writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
-| `hooks/session-deps.sh` | tells the agent, at session start, if the `mattpocock-skills` plugin that steps 1 and 2 invoke is not installed, with the install command. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
+| `hooks/session-deps.sh` | at session start, tells the agent which required tools or which plugin are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 

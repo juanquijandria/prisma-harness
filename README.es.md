@@ -73,7 +73,17 @@ Los pasos 1 y 2 usan las skills del plugin de Matt Pocock. Instálalo junto a es
 /plugin install mattpocock-skills@claude-plugins-official
 ```
 
-Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si activas el auto-update de este marketplace en `/plugin`. Requisitos en macOS, medidos el 14/09/2026: `sh`, `bash`, `jq`, `awk`, `cmp`, `git`, `python3`. Linux no está probado todavía.
+Para actualizar los dos, corre esto en tu terminal y abre una sesión nueva.
+
+```
+claude plugin marketplace update
+claude plugin update prisma-harness@prisma-harness
+claude plugin update mattpocock-skills@claude-plugins-official
+```
+
+Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Marketplaces, elige `prisma-harness` y enciende auto-update.
+
+Requisitos: `jq`, `python3`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada. Probado en macOS; Linux no está probado todavía.
 
 ## Qué hay adentro
 
@@ -91,7 +101,7 @@ Las actualizaciones llegan con `claude plugin update prisma-harness`, o solas si
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
 | `hooks/session-voice.sh` | inyecta las ocho reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
-| `hooks/session-deps.sh` | le dice al agente, al arrancar la sesión, si el plugin `mattpocock-skills` que invocan los pasos 1 y 2 no está instalado, con el comando para instalarlo. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
+| `hooks/session-deps.sh` | al arrancar la sesión, le dice al agente qué herramientas o qué plugin faltan, con el comando para instalarlos, y que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
