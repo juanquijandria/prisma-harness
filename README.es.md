@@ -1,6 +1,6 @@
 <h1 align="center">Prisma Harness</h1>
 
-<p align="center"><em>Tu agente dice que terminó. PRISMA lo obliga a probarlo, vía por vía, antes de que nada salga de la máquina.</em></p>
+<p align="center"><em>Un prisma parte una luz en vías separadas. PRISMA toma una afirmación y la fuerza por rutas independientes hasta que sobrevive o se cae.</em></p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/funciona%20con-Claude%20Code-111111?style=flat-square" alt="Funciona con Claude Code">
@@ -15,13 +15,13 @@
   <a href="#instalar"><b>Instalar</b></a> ·
   <a href="docs/es/METHOD.md"><b>El método</b></a> ·
   <a href="docs/es/STYLE.md"><b>Las reglas de escritura</b></a> ·
-  <a href="#qué-hay-adentro"><b>Qué hay adentro</b></a> ·
+  <a href="#cómo-lo-usa-una-persona"><b>Cómo se usa</b></a> ·
   <a href="#configurar"><b>Configurar</b></a>
 </p>
 
-## El problema
+## Por qué existe
 
-Un agente que escribe código escribe también la afirmación de que el código funciona, y un test no puede refutar la premisa que comparte con lo que verifica. Las fallas que llegan a producción son las que nadie miró desde afuera del modelo. PRISMA es un método para mirar desde afuera, y este plugin es la parte que una máquina puede hacer cumplir.
+PRISMA nació el 15/08/2026, el día que un pull request pasó sus dieciséis tests y su gate de merge y rompió producción igual. Nada lo agarró. Se vio mirando el panel, porque ninguno de los tres filtros cubría la vista que estaba rota. Diez días después una entrega pasó treinta y dos chequeos en verde y estaba mal igual, porque los chequeos compartían la premisa del código que verificaban. Un test no puede refutar la premisa que comparte con lo que verifica. PRISMA es el método que salió de esos dos días, y este plugin es la parte que una máquina puede hacer cumplir. Se dice "esto pasó PRISMA" o "eso no pasa PRISMA".
 
 Así se ve dentro de una sesión. El agente intentó escribir una página del wiki sin abrir el índice, y después intentó empujar un diff con un comentario suelto y 1.202 líneas cambiadas.
 
@@ -37,6 +37,14 @@ Over 1000 lines, defect detection in review drops below half.
 PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar; la skill corre los pasos; el método escrito dice por qué.
 
 Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. El único lugar donde el método nació con dos motores, la réplica ciega, se declara de un solo modelo y dice con claridad lo que eso cuesta.
+
+## Cómo lo usa una persona
+
+1. **Instala una vez**, los dos comandos de abajo.
+2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas y hablan solo cuando algo está mal. Una escritura en tus docs sin abrir el índice se frena y el agente recibe qué leer. Un push con comentarios sueltos, con más de mil líneas cambiadas o con el linter en rojo se frena y el agente recibe qué hacer. Una página con em-dash o voseo no deja que el agente cierre el turno hasta arreglarla. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
+3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama. La skill rutea el pedido por uno de los cinco carriles y corre lo que el carril pide, hasta los cinco pasos y las cinco puertas.
+4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
+5. **Actualiza** con `claude plugin update prisma-harness`, o enciende una vez el auto-update de este marketplace en `/plugin` y olvídate.
 
 ## Instalar
 
