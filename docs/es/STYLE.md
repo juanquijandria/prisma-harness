@@ -14,7 +14,7 @@ El gate habla de tres formas. Un nombre de archivo roto, un H1 ausente, un encab
 | Nombres de archivo en kebab-case | `RULE_KEBAB_CASE` | `Nombre_Malo.md`, `nombreMalo.md` | una sola convención de nombres y los enlaces no se rompen por mayúsculas |
 | H1 en la primera línea | `RULE_H1_FIRST_LINE` | una página que no arranca con `# ` | la primera línea nombra el concepto, para personas y para herramientas |
 | Sin voseo | `RULE_VOSEO` | `mirá`, `usá`, `tenés`, `vos`, `sos` como palabra entera; el pretérito `escribí` no es voseo | el español del método es peruano, de tú y nunca de vos. Se apaga si el tuyo no lo es |
-| Techo de la página | `RULE_LINE_CEILING` | más de 150 líneas, como aviso | pasadas las 150 líneas una página son dos conceptos. Propone partir, no prohíbe. En 0 se apaga, o se declara `<!-- ceiling-imposed: motivo -->` en las primeras diez líneas |
+| Techo de la página | `RULE_LINE_CEILING` | un aviso a nueve décimos del techo y otro al pasarlo, 150 líneas por defecto | pasadas las 150 líneas una página son dos conceptos. Propone partir, no prohíbe. En 0 se apaga, o se declara `<!-- ceiling-imposed: motivo -->` en las primeras diez líneas |
 
 ## Las reglas apagadas por defecto
 
@@ -36,6 +36,8 @@ Son la forma en que el autor del método le escribe a quien lee, y son la razón
 - **Sin paréntesis y sin flechas.** Lo que va entre paréntesis merece una oración o merece irse.
 - **Los números y el código quedan fuera de la prosa.** Una medición va en su propia línea o en una tabla con la fecha en que se midió; un comando va en bloque de código.
 - **Todo nombre propio lleva su cargo la primera vez o no aparece.** Todo "hoy" se vuelve fecha absoluta.
+- **Toda cifra que sale de la máquina es hipótesis hasta medirla por dos vías.** Di qué verificaste, qué no, y qué intentaste cuando no pudiste.
+- **El español es peruano, sin voseo.** El código, los identificadores y los commits van en inglés.
 - **Un texto que alguien va a pegar en otro lado va entre dos líneas de `═`**, sin nada tuyo adentro, nunca en bloque de código ni en cita, porque esos dibujan una barra que se copia junto con el texto.
 
 ## Configuración

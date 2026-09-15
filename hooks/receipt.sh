@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "receipt".
+# PRISMA_RECEIPT_ENTRYPOINT_MARKER, how this file knows it is the script being run and not a library.
 
 receipt_file() {
   printf '%s' "${PRISMA_RECEIPT_FILE:-$HOME/.prisma-harness/receipts.log}"
@@ -51,17 +52,19 @@ receipt_selftest() {
   chmod 700 "$ro"
   PRISMA_RECEIPT_FILE="$T/empty.log" receipt_summary | grep -q "no gate has blocked" && printf 'PASS an empty receipt says so\n' || { printf 'FAIL empty summary\n'; ok=0; }
   printf '#!/bin/sh\nselftest() { printf "the caller keeps its own selftest\\n"; }\n. "%s"\nprintf "the caller still owns its arguments: [%%s]\\n" "$1"\nselftest\n' "$SELF_PATH" > "$T/caller.sh"
+  ln -s "$SELF_PATH" "$T/prisma-receipt" 2>/dev/null
+  if [ -L "$T/prisma-receipt" ]; then
+    if [ "$(sh "$T/prisma-receipt" --path)" = "$PRISMA_RECEIPT_FILE" ]; then printf 'PASS it still answers under another name\n'; else printf 'FAIL renamed copy answered nothing\n'; ok=0; fi
+  else printf 'SKIP no symlink on this filesystem\n'; fi
   out=$(sh "$T/caller.sh" --selftest)
   if printf '%s' "$out" | grep -q 'the caller still owns its arguments: \[--selftest\]' && printf '%s' "$out" | grep -q 'the caller keeps its own selftest' && ! printf '%s' "$out" | grep -q 'one line per event'; then printf 'PASS sourcing it takes neither the arguments nor the selftest of the caller\n'; else printf 'FAIL sourcing hijacked the caller: %s\n' "$out"; ok=0; fi
   rm -rf "$T"
-  [ "$ok" = "1" ] && printf 'SELFTEST OK: 9/9\n' && exit 0
+  [ "$ok" = "1" ] && printf 'SELFTEST OK: 10/10\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 }
 
-case "$0" in
-  */receipt.sh|receipt.sh) ;;
-  *) return 0 2>/dev/null || exit 0 ;;
-esac
+[ "${PRISMA_RECEIPT_SOURCED:-0}" = "1" ] && { PRISMA_RECEIPT_SOURCED=0; return 0; }
+grep -q PRISMA_RECEIPT_ENTRYPOINT_MARKER "$0" 2>/dev/null || { return 0 2>/dev/null || exit 0; }
 
 case "${1:-}" in
   --summary) receipt_summary; exit 0 ;;

@@ -7,6 +7,7 @@ DOCS_ROOT="${PRISMA_DOCS_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 DOCS_DIR="${PRISMA_DOCS_DIR:-wiki}"
 INDEX_FILE="${PRISMA_INDEX_FILE:-index.md}"
 INDEX_PATH="$DOCS_ROOT/$INDEX_FILE"
+PRISMA_RECEIPT_SOURCED=1
 . "$(cd "$(dirname "$0")" && pwd)/receipt.sh"
 
 if [ "$1" = "--selftest" ]; then

@@ -24,8 +24,10 @@ mv \"notes/Meeting 1 of 5\" archive/x"
   case_check "4 a quoted command is not an invocation" "$(printf '%s' 'echo "mv inbox/a archive/x"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   case_check "5 a real separator splits the command" "$(printf '%s' 'ls; mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
   case_check "6 env assignment before the program" "$(printf '%s' 'IMAGES="3 informative, 0 reference" mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
-  case_check "7 a separator inside quotes does not split" "$(printf '%s' 'git commit -m "no toca; mv a b"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "7 a separator inside quotes does not split" "$(printf '%s' 'git commit -m "do not touch; mv a b"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   case_check "8 subcommand after flags that take a value" "$(printf '%s' 'git -C /tmp push origin main' | "$SELF" git push)" "git -C /tmp push origin main"
+  case_check "17 a repository flag of another program takes its value too" "$(printf '%s' 'gh -R owner/name pr create --fill' | "$SELF" gh pr)" "gh -R owner/name pr create --fill"
+  case_check "18 the long form of that flag as well" "$(printf '%s' 'gh --repo owner/name pr create --fill' | "$SELF" gh pr)" "gh --repo owner/name pr create --fill"
   case_check "9 trailing comment" "$(printf '%s' 'mv "notes/Meeting 1 of 5" archive/x # a note' | "$SELF" --arguments mv)" "$PATHS"
   case_check "10 program absent" "$(printf '%s' 'ls -la' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   apostrophes_around="cat >/dev/null <<'A'
@@ -53,7 +55,7 @@ mv 'notes/Meeting 1 of 5' archive/x"
   }
   case_contains "15 stray DOUBLE QUOTE with the path in double quotes" "$(printf '%s' "$stray_double" | "$SELF" --arguments mv)" "$PATHS"
   case_contains "16 stray APOSTROPHE with the path in single quotes" "$(printf '%s' "$stray_single" | "$SELF" --arguments mv)" "$PATHS"
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 16/16" && exit 0
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 18/18" && exit 0
   echo "SELFTEST FAILED"; exit 1
 fi
 
@@ -84,6 +86,8 @@ HAND_REDIRECTIONS = "<>"
 QUOTES = "\"'"'"'"
 WHITESPACE = " \t\r"
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+VALUE_FLAGS = {"git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"),
+              "gh": ("-R", "--repo", "--hostname")}
 CONTROL_WORDS = {"then", "do", "else", "elif", "fi", "done", "!", "time", "sudo", "command", "exec", "env", "nohup"}
 
 
@@ -182,7 +186,7 @@ for tokens in segments:
     rest = tokens[1:]
     i = 0
     while i < len(rest) and rest[i].startswith("-"):
-        takes_value = rest[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path")
+        takes_value = rest[i] in VALUE_FLAGS.get(program, ())
         i += 2 if takes_value else 1
     if i < len(rest) and rest[i] == subcommand:
         found.append(tokens)

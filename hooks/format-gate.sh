@@ -78,6 +78,9 @@ review() {
 
   if [ "$RULE_EM_DASH" = "1" ]; then
     for L in $(awk '
+      NR==1 && /^---$/ { fm=1; next }
+      fm && /^---$/ { fm=0; next }
+      fm { next }
       /^[[:space:]]*```/ { infence = !infence; next }
       infence { next }
       /^[[:space:]]*#/ { next }
@@ -139,6 +142,9 @@ review() {
 
   if [ "$RULE_COLON_IN_PROSE" = "1" ]; then
     for L in $(awk '
+      NR==1 && /^---$/ { fm=1; next }
+      fm && /^---$/ { fm=0; next }
+      fm { next }
       /^```/ { infence = !infence; next }
       infence { next }
       /^[[:space:]]*\|/ { next }
@@ -159,6 +165,9 @@ review() {
   if [ "$RULE_VOSEO" = "1" ]; then
     VOSEO='tenés|podés|querés|sabés|preferís|venís|decís|hacés|sentís|seguís|elegís|mirá|andá|usá|probá|armá|dejá|pasá|contá|mandá|buscá|agregá|revisá|ajustá|explicá|evitá|tomá|llamá|cambiá|guardá|fijate|acordate|quedate'
     for L in $(awk -v vos="$VOSEO" '
+      NR==1 && /^---$/ { fm=1; next }
+      fm && /^---$/ { fm=0; next }
+      fm { next }
       /^```/ { infence = !infence; next }
       infence { next }
       /^[[:space:]]*\|/ { next }
@@ -176,6 +185,7 @@ review() {
 }
 
 . "$HOOKS_DIR/format-gate-tests.sh"
+PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 . "$HOOKS_DIR/format-gate-debt.sh"
 STRICT=0
@@ -198,6 +208,7 @@ case "$1" in
     HOOK_MODE=1
     for f in $F; do exempt "$f" || review "$f"; done
     ;;
+  -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 2 ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 2 ;;
   *)  for f in "$@"; do exempt "$f" && { printf 'SKIP  %s (exempt from page format)\n' "${f#$DOCS_ROOT/}"; continue; }; review "$f"; done ;;
 esac

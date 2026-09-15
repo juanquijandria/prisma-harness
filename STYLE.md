@@ -14,7 +14,7 @@ The gate speaks in three ways. A broken file name, a missing H1, a heading whose
 | File names in kebab-case | `RULE_KEBAB_CASE` | `Bad_Name.md`, `badName.md` | one name convention means links never break on case |
 | H1 on the first line | `RULE_H1_FIRST_LINE` | a page that does not start with `# ` | the first line names the concept, for people and for tools |
 | No River Plate voseo | `RULE_VOSEO` | `mirá`, `usá`, `tenés`, `vos`, `sos` as whole words; the first-person preterite `escribí` is not voseo | the method's Spanish is Peruvian, `tú` and never `vos`. Off if your Spanish is not |
-| Page ceiling | `RULE_LINE_CEILING` | more than 150 lines, as a warning | past 150 lines a page is two concepts. It proposes a split, it does not forbid. Set to 0 to disable, or add `<!-- ceiling-imposed: reason -->` in the first ten lines |
+| Page ceiling | `RULE_LINE_CEILING` | a warning at nine tenths of the ceiling and another past it, 150 lines by default | past 150 lines a page is two concepts. It proposes a split, it does not forbid. Set to 0 to disable, or add `<!-- ceiling-imposed: reason -->` in the first ten lines |
 
 ## The rules off by default
 
@@ -36,6 +36,8 @@ These are how the method's author writes to a reader, and they are the reason th
 - **No parentheticals and no arrows.** What goes in parentheses is either worth a sentence or worth cutting.
 - **Numbers and code stay out of prose.** A measurement goes on its own line or in a table with the date it was measured; a command goes in a code block.
 - **Every proper name gets its role the first time or does not appear.** Every "today" becomes an absolute date.
+- **Every figure that leaves the machine is a hypothesis until measured by two routes.** Say what you verified, what you did not, and what you tried when you could not.
+- **Spanish is Peruvian, with no voseo.** Code, identifiers and commits are in English.
 - **A text someone will paste elsewhere goes between two lines of `═`**, with nothing of yours inside, never in a code block or a quote, because those render a bar that gets copied along.
 
 ## Configuration

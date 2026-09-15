@@ -109,7 +109,7 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-Eight pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt and the command parser. The three push gates are covered by 21 controls in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/run-selftests.sh` runs all of it and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
+Eight pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt and the command parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -132,6 +132,7 @@ Environment variables, all optional.
 | `PRISMA_RECEIPT_FILE` | `~/.prisma-harness/receipts.log` | where the receipt is written |
 | `PRISMA_REQUIRED_TOOLS` | the requirements above | what the dependency check looks for, spaces or commas |
 | `PRISMA_HOOKS_DIR` | the folder of the running hook | where a gate looks for its siblings |
+| `PRISMA_INSTALLED_PLUGINS`, `PRISMA_UNAME` | the real ones | seams the dependency check uses to test itself |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 

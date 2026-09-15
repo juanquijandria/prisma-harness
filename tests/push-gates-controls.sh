@@ -21,7 +21,13 @@ expect "comments gate ignores a mention of git push" 0 run pre-push-comments.sh 
 expect "comments gate lets a PR read through" 0 run pre-push-comments.sh "gh pr list"
 expect "comments gate lets a PR view through" 0 run pre-push-comments.sh "gh pr view 12"
 expect "comments gate blocks a PR creation" 2 run pre-push-comments.sh "gh pr create --fill"
-expect "size gate lets a PR read through" 0 run pre-push-size.sh "gh pr list"
+expect "comments gate ignores a PR read with a repository flag" 0 run pre-push-comments.sh "gh -R owner/name pr list"
+expect "comments gate blocks a PR creation with a repository flag" 2 run pre-push-comments.sh "gh -R owner/name pr create --fill"
+expect "comments gate blocks a PR marked ready" 2 run pre-push-comments.sh "gh pr ready 12"
+expect "comments gate ignores a PR checks read" 0 run pre-push-comments.sh "gh pr checks 12"
+expect "lint gate ignores a PR read" 0 run pre-push-lint.sh "gh pr list"
+expect "the escape inside a trailing comment does not disarm the gate" 2 run pre-push-comments.sh "git push origin feature # PRISMA_COMMENTS_OK=1 because"
+expect "the escape as an argument of another command does not disarm the gate" 2 run pre-push-comments.sh "echo PRISMA_COMMENTS_OK=1 reason && git push origin feature"
 before=$(receipt_lines)
 expect "an escape on a command that is not a push does nothing" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 ls"
 CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" = "$before" ]; then printf 'PASS no receipt line for an escape outside a push\n'; else printf 'FAIL an escape outside a push wrote a receipt line\n'; ok=0; fi
@@ -38,6 +44,8 @@ git reset -q --hard HEAD~1
 seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
 expect "size gate passes with the escape" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
+expect "size gate lets a PR read through while the diff is over the ceiling" 0 run pre-push-size.sh "gh pr list"
+expect "size gate blocks a PR creation over the ceiling" 2 run pre-push-size.sh "gh pr create --fill"
 git init -q --bare "$T.remote"; git remote add origin "$T.remote"; git push -q origin main feature; git branch -q --set-upstream-to=origin/main main
 git checkout -q main
 out=$(run pre-push-size.sh "git push origin feature" 2>&1); rc=$?

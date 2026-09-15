@@ -17,6 +17,14 @@ for hook in gate-read-index format-gate check-canonical-sync blind-replica sessi
   fi
 done
 rm -f "$OUT"
+printf '\n##### the pages of this repo under its own gate\n'
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PAGES=$(find "$ROOT" -name '*.md' -not -path '*/.git/*')
+GATE_OUT=$(PRISMA_DOCS_ROOT="$ROOT" PRISMA_EXEMPT_NAMES="none.md" PRISMA_RULE_KEBAB_CASE=0 PRISMA_RULE_H1_FIRST_LINE=0 PRISMA_RULE_LINE_CEILING=0 sh "$HOOKS/format-gate.sh" --strict $PAGES 2>&1)
+printf '%s\n' "$GATE_OUT" | tail -1
+printf '%s' "$GATE_OUT" | grep -q 'PASS: 0 blocking, 0 warnings' || { printf 'FAIL the repo pages do not pass the rules this repo ships\n'; failed=$((failed+1)); }
+printf '  file names and the H1 are off here, the repo root uses uppercase names and an HTML title\n'
+
 printf '\n##### push gate controls\n'
 if /bin/sh "$(dirname "$0")/push-gates-controls.sh"; then :; else failed=$((failed+1)); fi
 printf '\n##### receipt written by the push gate controls\n'

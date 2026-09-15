@@ -6,7 +6,10 @@ INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 GATE="$HOOKS_DIR/measure-comments.sh"
 ESCAPE="PRISMA_COMMENTS_OK=1"
+PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
+PRISMA_ESCAPE_SOURCED=1
+. "$HOOKS_DIR/escape-declared.sh"
 
 command -v jq >/dev/null 2>&1 || { echo "WARN: the comments gate did not run, jq is missing." >&2; exit 0; }
 [ -x "$GATE" ] || { echo "WARN: the comments gate did not run, measure-comments.sh is missing." >&2; exit 0; }
@@ -17,29 +20,29 @@ payload=$(cat)
 tool=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
 [ "$tool" = "Bash" ] || exit 0
 
-comando=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
-[ -n "$comando" ] || exit 0
+command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
+[ -n "$command_text" ] || exit 0
 
-if [ -x "$STRIP_QUOTES" ]; then desnudo=$(printf '%s' "$comando" | "$STRIP_QUOTES"); else desnudo="$comando"; fi
+if [ -x "$STRIP_QUOTES" ]; then bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES"); else bare_command="$command_text"; fi
 if [ -x "$INVOKES" ]; then
-  segmentos=$(printf '%s' "$comando" | "$INVOKES" git push); rc=$?
+  segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
   [ "$rc" = "3" ] && { echo "WARN: the comments gate did not run, the command parser has no python." >&2; exit 0; }
-  segmentos_pr=$(printf '%s' "$comando" | "$INVOKES" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
-  [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
+  pr_segments=$(printf '%s' "$command_text" | "$INVOKES" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
+  [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 else
   echo "WARN: without command-invokes.sh the trigger is approximate." >&2
-  case "$comando" in *"git push"*|*"pr create"*) ;; *) exit 0 ;; esac
-  segmentos="$comando"; segmentos_pr=""
+  case "$command_text" in *"git push"*|*"pr create"*) ;; *) exit 0 ;; esac
+  segments="$command_text"; pr_segments=""
 fi
 
-if [ -n "$segmentos" ]; then
-  reales=$(printf '%s\n' "$segmentos" | grep -vE -- '--delete|--tags|refs/tags' || true)
+if [ -n "$segments" ]; then
+  real_pushes=$(printf '%s\n' "$segments" | grep -vE -- '--delete|--tags|refs/tags' || true)
 else
-  reales="$segmentos_pr"
+  real_pushes="$pr_segments"
 fi
-[ -n "$reales" ] || exit 0
+[ -n "$real_pushes" ] || exit 0
 
-dir=$(printf '%s' "$comando" | sed -n 's|^[[:space:]]*cd[[:space:]]\{1,\}\([^&;|]*\).*|\1|p' | sed 's/[[:space:]]*$//' | tr -d "'\"")
+dir=$(printf '%s' "$command_text" | sed -n 's|^[[:space:]]*cd[[:space:]]\{1,\}\([^&;|]*\).*|\1|p' | sed 's/[[:space:]]*$//' | tr -d "'\"")
 if [ -z "$dir" ]; then
   dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
 fi
@@ -53,33 +56,31 @@ if [ -z "$dir" ] || [ ! -d "$dir" ]; then
   exit 0
 fi
 
-real=$(cd "$dir" 2>/dev/null && pwd -P)
+real_dir=$(cd "$dir" 2>/dev/null && pwd -P)
 
 for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$dir" in "$skip"|"$skip"/*) exit 0 ;; esac
-  case "$real" in "$skip"|"$skip"/*) exit 0 ;; esac
+  case "$real_dir" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
-case "$desnudo" in
-  *"$ESCAPE"*) receipt_append comments-gate "$real" escaped; exit 0 ;;
-esac
+if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
 
-salida=$(cd "$dir" 2>/dev/null && "$GATE" 2>&1)
-estado=$?
+output=$(cd "$dir" 2>/dev/null && "$GATE" 2>&1)
+status=$?
 
-if [ "$estado" = "0" ]; then
+if [ "$status" = "0" ]; then
   exit 0
 fi
 
-if [ "$estado" != "1" ]; then
-  echo "WARN: the comments gate could not measure in $dir, so nothing is blocked. $(printf '%s' "$salida" | tail -1)" >&2
+if [ "$status" != "1" ]; then
+  echo "WARN: the comments gate could not measure in $dir, so nothing is blocked. $(printf '%s' "$output" | tail -1)" >&2
   exit 0
 fi
 
 cat >&2 <<MSG
 COMMENTS GATE: this diff is over the ceiling, and the push is blocked.
 
-$salida
+$output
 
 The ceiling is ZERO comment lines. Code explains itself. If a line needs a
 comment, the name is wrong or a function with a proper name is missing. The
@@ -104,5 +105,5 @@ What to do, in this order.
 If the violation is deliberate, declare it by prefixing the command with
 $ESCAPE, and write the reason in the change description.
 MSG
-receipt_append comments-gate "$real" blocked
+receipt_append comments-gate "$real_dir" blocked
 exit 2

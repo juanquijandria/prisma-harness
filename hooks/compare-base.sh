@@ -3,37 +3,37 @@
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 1
 
-ARBOL_VACIO=$(git hash-object -t tree /dev/null 2>/dev/null)
-[ -n "$ARBOL_VACIO" ] || exit 1
+EMPTY_TREE=$(git hash-object -t tree /dev/null 2>/dev/null)
+[ -n "$EMPTY_TREE" ] || exit 1
 
-rama=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 cabeza_remota=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
 
-remota=""
-for candidata in "@{upstream}" "origin/$rama" $cabeza_remota origin/main origin/master origin/develop origin/staging; do
-  [ -n "$candidata" ] || continue
-  git rev-parse --verify --quiet "$candidata" >/dev/null 2>&1 && { remota="$candidata"; break; }
+remote=""
+for candidate in "@{upstream}" "origin/$branch" $cabeza_remota origin/main origin/master origin/develop origin/staging; do
+  [ -n "$candidate" ] || continue
+  git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1 && { remote="$candidate"; break; }
 done
 
-base="$remota"
+base="$remote"
 if [ -z "$base" ]; then
-  for candidata in main master; do
-    [ "$candidata" = "$rama" ] && continue
-    git rev-parse --verify --quiet "$candidata" >/dev/null 2>&1 && { base="$candidata"; break; }
+  for candidate in main master; do
+    [ "$candidate" = "$branch" ] && continue
+    git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1 && { base="$candidate"; break; }
   done
 fi
 
 if [ -z "$base" ]; then
-  printf '%s\n' "$ARBOL_VACIO"
+  printf '%s\n' "$EMPTY_TREE"
   exit 0
 fi
 
-mb=$(git merge-base "$base" HEAD 2>/dev/null) || { printf '%s\n' "$ARBOL_VACIO"; exit 0; }
+merge_base=$(git merge-base "$base" HEAD 2>/dev/null) || { printf '%s\n' "$EMPTY_TREE"; exit 0; }
 
-if [ "$mb" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
-  [ -n "$remota" ] && exit 2
-  printf '%s\n' "$ARBOL_VACIO"
+if [ "$merge_base" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
+  [ -n "$remote" ] && exit 2
+  printf '%s\n' "$EMPTY_TREE"
   exit 0
 fi
 
-printf '%s\n' "$mb"
+printf '%s\n' "$merge_base"
