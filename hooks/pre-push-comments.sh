@@ -25,7 +25,8 @@ case "$desnudo" in
 esac
 
 if [ -x "$INVOKES" ]; then
-  segmentos=$(printf '%s' "$comando" | "$INVOKES" git push)
+  segmentos=$(printf '%s' "$comando" | "$INVOKES" git push); rc=$?
+  [ "$rc" = "3" ] && { echo "WARN: the comments gate did not run, the command parser has no python." >&2; exit 0; }
   segmentos_pr=$(printf '%s' "$comando" | "$INVOKES" gh pr)
   [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
 else

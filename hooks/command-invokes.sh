@@ -66,7 +66,9 @@ fi
 PROGRAM="${1:?program name required}"
 SUBCOMMAND="${2:-}"
 
-MODE="$MODE" PROGRAM="$PROGRAM" SUBCOMMAND="$SUBCOMMAND" python3 -c '
+PYTHON=$(command -v python3 || command -v python)
+[ -n "$PYTHON" ] || { echo "WARN: command-invokes.sh needs python3 or python and found neither." >&2; exit 3; }
+MODE="$MODE" PROGRAM="$PROGRAM" SUBCOMMAND="$SUBCOMMAND" "$PYTHON" -c '
 import io, os, re, shlex, sys
 
 mode = os.environ["MODE"]

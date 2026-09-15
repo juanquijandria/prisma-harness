@@ -85,7 +85,9 @@ claude plugin update mattpocock-skills@claude-plugins-official
 
 Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Marketplaces, elige `prisma-harness` y enciende auto-update.
 
-Requisitos: `jq`, `python3`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada. Probado en macOS; Linux no está probado todavía.
+Requisitos: `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada.
+
+Probado en macOS. Los scripts son shell POSIX y todos los selftests pasan bajo `dash`, el shell de Debian, Ubuntu y WSL, pero ninguna máquina Linux los ha corrido todavía. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash; instala `jq` y Python con `winget install jqlang.jq Python.Python.3.12`, y después corre `sh tests/run-selftests.sh` desde Git Bash y manda la salida si algo falla. WSL 2 se comporta como Linux.
 
 ## Qué hay adentro
 

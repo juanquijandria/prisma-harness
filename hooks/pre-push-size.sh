@@ -31,7 +31,8 @@ case "$desnudo" in
   *"$ESCAPE"*) exit 0 ;;
 esac
 
-segmentos=$(printf '%s' "$comando" | "$INVOCA" git push)
+segmentos=$(printf '%s' "$comando" | "$INVOCA" git push); rc=$?
+[ "$rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser has no python." >&2; exit 0; }
 segmentos_pr=$(printf '%s' "$comando" | "$INVOCA" gh pr)
 [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
 

@@ -34,6 +34,6 @@ fi
 
 [ "${PRISMA_VOICE:-1}" = "1" ] || exit 0
 cat >/dev/null
-command -v jq >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || { voice_text; exit 0; }
 voice_text | jq -Rs '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:.}}'
 exit 0

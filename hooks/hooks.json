@@ -5,17 +5,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/check-canonical-sync.sh --hook",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/check-canonical-sync.sh\" --hook",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-voice.sh",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-voice.sh\"",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-deps.sh",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-deps.sh\"",
             "timeout": 10
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/gate-read-index.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/gate-read-index.sh\""
           }
         ]
       },
@@ -36,15 +36,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre-push-comments.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-comments.sh\""
           },
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre-push-size.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-size.sh\""
           },
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre-push-lint.sh"
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-push-lint.sh\""
           }
         ]
       }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/bin/sh \"${CLAUDE_PLUGIN_ROOT}\"/hooks/format-gate.sh --changed",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/format-gate.sh\" --changed",
             "timeout": 30
           }
         ]
