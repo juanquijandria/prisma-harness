@@ -85,7 +85,7 @@ claude plugin update mattpocock-skills@claude-plugins-official
 
 Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Marketplaces, elige `prisma-harness` y enciende auto-update.
 
-Requisitos: `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada.
+Requisitos: `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mktemp`, `find`, `sed`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada.
 
 Todos los selftests y los controles de las puertas de push corren en GitHub Actions en Ubuntu, macOS y Windows con Git Bash, en cada push. La insignia de arriba es esa corrida. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash, y la primera corrida en Windows cazó dos cosas ya arregladas, Python escribiendo CRLF en la salida del parser y `python` como único nombre disponible. Instala las herramientas con `winget install jqlang.jq Python.Python.3.12`. WSL 2 se comporta como Linux.
 
@@ -103,13 +103,13 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/pre-push-lint.sh` | corre el linter del propio repo, `php-cs-fixer` o `eslint`, sobre el diff antes del push | `PreToolUse` en Bash |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
-| `hooks/session-voice.sh` | inyecta las ocho reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
+| `hooks/session-voice.sh` | inyecta las reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
 | `hooks/session-deps.sh` | al arrancar la sesión, le dice al agente qué herramientas o qué plugin faltan, con el comando para instalarlos, y que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Los seis hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión y el chequeo de dependencia, tienen `--selftest`, y también el parser de comandos, con 16 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
+Ocho piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo y el parser de comandos. Las tres puertas de push se cubren con 21 controles en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/run-selftests.sh` corre todo y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Configurar
 

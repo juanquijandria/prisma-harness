@@ -85,7 +85,7 @@ claude plugin update mattpocock-skills@claude-plugins-official
 
 To never think about it again, open `/plugin` inside Claude Code, go to Marketplaces, pick `prisma-harness` and turn on auto-update.
 
-Requirements: `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`. If any is missing, PRISMA tells you at session start with the install command and asks before installing anything.
+Requirements: `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mktemp`, `find`, `sed`. If any is missing, PRISMA tells you at session start with the install command and asks before installing anything.
 
 Every selftest and every push gate control runs on GitHub Actions on Ubuntu, macOS and Windows with Git Bash, on each push. The badge at the top is that run. On Windows, Claude Code needs Git for Windows so the hooks run under Git Bash, and the first Windows run caught two things now fixed, Python writing CRLF into the parser output and `python` being the only name available. Install the tools with `winget install jqlang.jq Python.Python.3.12`. WSL 2 behaves like Linux.
 
@@ -103,13 +103,13 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/pre-push-lint.sh` | runs the repo's own linter, `php-cs-fixer` or `eslint`, on the diff before the push | `PreToolUse` on Bash |
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
-| `hooks/session-voice.sh` | injects the eight writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
+| `hooks/session-voice.sh` | injects the writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
 | `hooks/session-deps.sh` | at session start, tells the agent which required tools or which plugin are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
-The six hooks that act on their own, the index gate, the format gate, the sync check, the blind replica, the session voice and the dependency check, have a `--selftest`, and so does the command parser, with 16 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
+Eight pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt and the command parser. The three push gates are covered by 21 controls in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/run-selftests.sh` runs all of it and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
 
 ## Configure
 
@@ -129,6 +129,9 @@ Environment variables, all optional.
 | `PRISMA_VOICE` | 1 | set to 0 to stop injecting the writing rules at session start |
 | `PRISMA_DEPS_CHECK` | 1 | set to 0 to stop the dependency notice at session start |
 | `PRISMA_RECEIPT` | 1 | set to 0 to stop writing the receipt |
+| `PRISMA_RECEIPT_FILE` | `~/.prisma-harness/receipts.log` | where the receipt is written |
+| `PRISMA_REQUIRED_TOOLS` | the requirements above | what the dependency check looks for, spaces or commas |
+| `PRISMA_HOOKS_DIR` | the folder of the running hook | where a gate looks for its siblings |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 
