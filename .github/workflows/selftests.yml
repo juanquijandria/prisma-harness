@@ -1,0 +1,31 @@
+name: selftests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  selftests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y -q jq
+      - name: Install jq on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install jq -y --no-progress
+      - name: Show the shell and tools the hooks will see
+        shell: bash
+        run: |
+          uname -a
+          sh --version 2>/dev/null || echo "sh has no --version"
+          for t in sh bash jq python3 python git awk cmp mktemp find; do printf '%-8s %s\n' "$t" "$(command -v $t || echo MISSING)"; done
+      - name: Run every selftest
+        shell: bash
+        run: sh tests/run-selftests.sh
