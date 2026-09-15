@@ -10,6 +10,7 @@ SIN_COMILLAS="$HOOKS_DIR/strip-quotes.sh"
 AVISO_SOBRE="${PRISMA_SIZE_WARN_OVER:-400}"
 FRENO_SOBRE="${PRISMA_SIZE_BLOCK_OVER:-1000}"
 ESCAPE="PRISMA_SIZE_OK=1"
+. "$HOOKS_DIR/receipt.sh"
 
 [ -n "$JQ" ] || { echo "WARN: the size gate did not run, jq is missing." >&2; exit 0; }
 [ -x "$MEDIDOR" ] || { echo "WARN: the size gate did not run, measure-diff-size.sh is missing." >&2; exit 0; }
@@ -28,7 +29,7 @@ comando=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/de
 
 desnudo=$(printf '%s' "$comando" | "$SIN_COMILLAS")
 case "$desnudo" in
-  *"$ESCAPE"*) exit 0 ;;
+  *"$ESCAPE"*) receipt_append size-gate "$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
 esac
 
 segmentos=$(printf '%s' "$comando" | "$INVOCA" git push); rc=$?
@@ -90,6 +91,7 @@ if [ "$lineas" -gt "$FRENO_SOBRE" ]; then
     echo "If it truly cannot be split and is up to date, declare $ESCAPE and"
     echo "write in the PR body why it could not be split."
   } >&2
+  receipt_append size-gate "$(pwd)" blocked
   exit 2
 fi
 

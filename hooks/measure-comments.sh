@@ -39,8 +39,10 @@ fi
 [ -n "$DIFF" ] || { echo "comments gate: empty diff, nothing to measure"; exit 0; }
 
 printf '%s\n' "$DIFF" | awk -v pctmax="$PCT_MAX" -v blomax="$BLOQUE_MAX" '
-function es_comentario(s) {
+function hash_comment_language(f) { return (f ~ /\.(sh|bash|py|rb)$/) }
+function es_comentario(s, f) {
   gsub(/^[ \t]*/, "", s)
+  if (hash_comment_language(f)) return (s ~ /^#[^!]/ || s == "#")
   return (s ~ /^\/\// || s ~ /^\/\*/ || s ~ /^\*/ || s ~ /^\*\// || s ~ /^<!--/ || s ~ /^#[^!]/ || s == "#")
 }
 /^\+\+\+ b\// { archivo = substr($0, 7); next }
@@ -49,7 +51,7 @@ function es_comentario(s) {
   if (archivo !~ /\.(php|js|mjs|cjs|jsx|ts|tsx|vue|py|rb|go|java|kt|swift|sh|bash|css|scss|sql)$/) next
   if (archivo ~ /(^|\/)(vendor|node_modules|dist|build)\// || archivo ~ /\.(lock|min\.js|snap)$/) next
   total++
-  if (es_comentario(linea)) {
+  if (es_comentario(linea, archivo)) {
     linea_sin_marca = linea
     sub(/^[ \t]*(\/\/|\/\*\*?|\*)[ \t]*/, "", linea_sin_marca)
     if (linea_sin_marca ~ /^@[a-zA-Z-]+/ || linea_sin_marca ~ /^(eslint|ts-|prettier|phpcs|phpstan|psalm|@ts-)/) {

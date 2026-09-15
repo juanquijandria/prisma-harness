@@ -176,6 +176,7 @@ review() {
 }
 
 . "$HOOKS_DIR/format-gate-tests.sh"
+. "$HOOKS_DIR/receipt.sh"
 . "$HOOKS_DIR/format-gate-debt.sh"
 STRICT=0
 if [ "$1" = "--strict" ]; then STRICT=1; shift; fi
@@ -207,6 +208,7 @@ if [ "$FAILS" -gt 0 ]; then
   printf 'FAIL: %d blocking, %d warnings\n' "$FAILS" "$WARNS"
   if [ "${HOOK_MODE:-0}" = "1" ]; then
     printf 'FORMAT GATE: %d page(s) touched today break the writing rules. Fix them before stopping. Run hooks/format-gate.sh --strict <page> to see each finding.\n' "$FAILS" >&2
+    receipt_append format-gate "$DOCS_ROOT" blocked
     exit 2
   fi
   exit 1

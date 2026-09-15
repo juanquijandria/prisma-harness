@@ -7,6 +7,7 @@ INVOCA="$HOOKS_DIR/command-invokes.sh"
 SIN_COMILLAS="$HOOKS_DIR/strip-quotes.sh"
 BASE_DE_COMPARACION="$HOOKS_DIR/compare-base.sh"
 ESCAPE="PRISMA_LINT_OK=1"
+. "$HOOKS_DIR/receipt.sh"
 [ -n "$JQ" ] || { echo "WARN: the lint gate did not run, jq is missing." >&2; exit 0; }
 
 payload=$(cat)
@@ -20,7 +21,7 @@ comando=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/de
 
 if [ -x "$SIN_COMILLAS" ]; then desnudo=$(printf '%s' "$comando" | "$SIN_COMILLAS"); else desnudo="$comando"; fi
 case "$desnudo" in
-  *"$ESCAPE"*) exit 0 ;;
+  *"$ESCAPE"*) receipt_append lint-gate "$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
 esac
 
 if [ -x "$INVOCA" ]; then
@@ -86,6 +87,7 @@ PHP
         echo "" >&2
         echo "Fix with: ./vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php <files>" >&2
         echo "If deliberate, prefix the command with $ESCAPE." >&2
+        receipt_append lint-gate "$(pwd)" blocked
         exit 2
       fi
       echo "WARN: php-cs-fixer could not run here, nothing was measured. $(printf '%s' "$salida" | tail -1)" >&2
@@ -101,6 +103,7 @@ if [ -f package.json ] && [ -x node_modules/.bin/eslint ]; then
       echo "LINT GATE: eslint reports errors in files of this diff, and the push is blocked." >&2
       printf '%s\n' "$salida" | grep -E "error" | head -12 >&2
       echo "If deliberate, prefix the command with $ESCAPE." >&2
+      receipt_append lint-gate "$(pwd)" blocked
       exit 2
     fi
   fi

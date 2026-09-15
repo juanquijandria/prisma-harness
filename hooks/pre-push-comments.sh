@@ -6,6 +6,7 @@ INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 GATE="$HOOKS_DIR/measure-comments.sh"
 ESCAPE="PRISMA_COMMENTS_OK=1"
+. "$HOOKS_DIR/receipt.sh"
 
 command -v jq >/dev/null 2>&1 || { echo "WARN: the comments gate did not run, jq is missing." >&2; exit 0; }
 [ -x "$GATE" ] || { echo "WARN: the comments gate did not run, measure-comments.sh is missing." >&2; exit 0; }
@@ -21,7 +22,7 @@ comando=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/n
 
 if [ -x "$STRIP_QUOTES" ]; then desnudo=$(printf '%s' "$comando" | "$STRIP_QUOTES"); else desnudo="$comando"; fi
 case "$desnudo" in
-  *"$ESCAPE"*) exit 0 ;;
+  *"$ESCAPE"*) receipt_append comments-gate "$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
 esac
 
 if [ -x "$INVOKES" ]; then
@@ -102,4 +103,5 @@ What to do, in this order.
 If the violation is deliberate, declare it by prefixing the command with
 $ESCAPE, and write the reason in the change description.
 MSG
+receipt_append comments-gate "$real" blocked
 exit 2

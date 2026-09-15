@@ -7,6 +7,7 @@ DOCS_ROOT="${PRISMA_DOCS_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 DOCS_DIR="${PRISMA_DOCS_DIR:-wiki}"
 INDEX_FILE="${PRISMA_INDEX_FILE:-index.md}"
 INDEX_PATH="$DOCS_ROOT/$INDEX_FILE"
+. "$(cd "$(dirname "$0")" && pwd)/receipt.sh"
 
 if [ "$1" = "--selftest" ]; then
   root=$(mktemp -d)
@@ -54,4 +55,5 @@ if jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool
 fi
 
 echo "INDEX GATE: you are about to write a page under $DOCS_DIR/ without having opened $INDEX_FILE in this session. Read $INDEX_PATH first so you do not create a duplicate page or leave the index stale, then retry." >&2
+receipt_append index-gate "$DOCS_ROOT" blocked
 exit 2
