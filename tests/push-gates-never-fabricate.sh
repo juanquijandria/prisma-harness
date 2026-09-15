@@ -62,7 +62,7 @@ else
   skip "A2 this filesystem does not enforce directory permissions"
 fi
 
-out=$(sh "$HOOKS/measure-comments.sh" --diff "$T" 2>&1); rc=$?
+out=$("$HOOKS/measure-comments.sh" --diff "$T" 2>&1); rc=$?
 if [ "$rc" = "2" ] && printf '%s' "$out" | grep -q 'could not read the diff'; then
   pass "A4 an unreadable diff is named as unreadable and exits 2"
 else
