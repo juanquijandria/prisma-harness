@@ -27,7 +27,11 @@ for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RUL
   [ -n "$override" ] && eval "$v=\"\$override\""
 done
 
-TALLY=$(mktemp)
+HOOK_MODE=0
+[ "${1:-}" = "--changed" ] && HOOK_MODE=1
+cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] && exit 0; exit 1; }
+TALLY=$(mktemp "${PRISMA_TMPDIR:-${TMPDIR:-/tmp}}/prisma-tally-XXXXXX" 2>/dev/null) || cannot_measure "the format gate could not create its tally file, so nothing was measured."
+[ -f "$TALLY" ] || cannot_measure "the format gate could not create its tally file, so nothing was measured."
 trap 'rm -f "$TALLY"' EXIT
 
 exempt() {
@@ -210,12 +214,13 @@ case "$1" in
     HOOK_MODE=1
     for f in $F; do exempt "$f" || review "$f"; done
     ;;
-  -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 2 ;;
-  "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 2 ;;
+  -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
+  "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
   *)  for f in "$@"; do exempt "$f" && { printf 'SKIP  %s (exempt from page format)\n' "${f#$DOCS_ROOT/}"; continue; }; review "$f"; done ;;
 esac
 
 printf '\n'
+[ -f "$TALLY" ] || cannot_measure "the format gate lost its tally file, so nothing is certified."
 FAILS=$(grep -c '^F$' "$TALLY" 2>/dev/null); FAILS=${FAILS:-0}
 WARNS=$(grep -c '^W$' "$TALLY" 2>/dev/null); WARNS=${WARNS:-0}
 if [ "$FAILS" -gt 0 ]; then

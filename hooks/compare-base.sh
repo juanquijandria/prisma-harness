@@ -24,14 +24,20 @@ if [ -z "$base" ]; then
 fi
 
 if [ -z "$base" ]; then
+  echo "WARN: no base branch to compare against, falling back to the whole history." >&2
   printf '%s\n' "$EMPTY_TREE"
   exit 0
 fi
 
-merge_base=$(git merge-base "$base" HEAD 2>/dev/null) || { printf '%s\n' "$EMPTY_TREE"; exit 0; }
+merge_base=$(git merge-base "$base" HEAD 2>/dev/null) || {
+  echo "WARN: no merge base with $base, falling back to the whole history." >&2
+  printf '%s\n' "$EMPTY_TREE"
+  exit 0
+}
 
 if [ "$merge_base" = "$(git rev-parse HEAD 2>/dev/null)" ]; then
   [ -n "$remote" ] && exit 2
+  echo "WARN: HEAD is already contained in $base, falling back to the whole history." >&2
   printf '%s\n' "$EMPTY_TREE"
   exit 0
 fi

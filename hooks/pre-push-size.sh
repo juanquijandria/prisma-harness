@@ -19,7 +19,7 @@ PRISMA_ESCAPE_SOURCED=1
 [ -x "$MEASURE" ] || { echo "WARN: the size gate did not run, measure-diff-size.sh is missing." >&2; exit 0; }
 [ -x "$COMPARE_BASE" ] || { echo "WARN: the size gate did not run, compare-base.sh is missing." >&2; exit 0; }
 [ -x "$INVOKES" ] || { echo "WARN: the size gate did not run, command-invokes.sh is missing." >&2; exit 0; }
-[ -x "$STRIP_QUOTES" ] || { echo "WARN: the size gate did not run, strip-quotes.sh is missing." >&2; exit 0; }
+[ -x "$STRIP_QUOTES" ] || echo "WARN: strip-quotes.sh is missing, so a declared escape will not be honored here." >&2
 
 payload=$(cat)
 [ -n "$payload" ] || exit 0
@@ -30,11 +30,18 @@ tool=$(printf '%s' "$payload" | "$JQ" -r '.tool_name // empty' 2>/dev/null)
 command_text=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$command_text" ] || exit 0
 
-bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES")
+if [ -x "$STRIP_QUOTES" ]; then
+  bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES"); strip_rc=$?
+else
+  strip_rc=3
+fi
+[ "$strip_rc" = "0" ] || bare_command=""
 
 segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
 [ "$rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser has no python." >&2; exit 0; }
-pr_segments=$(printf '%s' "$command_text" | "$INVOKES" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
+pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
+[ "$pr_rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser failed." >&2; exit 0; }
+pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)
 [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 
 if [ -n "$segments" ]; then
@@ -61,7 +68,7 @@ done
 
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append size-gate "$real_dir" escaped; exit 0; fi
 
-cd "$dir" 2>/dev/null || exit 0
+cd "$dir" 2>/dev/null || { echo "WARN: the size gate could not enter $dir, so nothing was measured." >&2; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; exit 0; }
 
 merge_base=$("$COMPARE_BASE"); rc=$?

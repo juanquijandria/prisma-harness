@@ -21,15 +21,15 @@ mv \"notes/Meeting 1 of 5\" archive/x"
   case_check "1 balanced quotes" "$(printf '%s' "$balanced" | "$SELF" --arguments mv)" "$PATHS"
   case_check "2 APOSTROPHE in a heredoc, the origin is not lost" "$(printf '%s' "$heredoc" | "$SELF" --arguments mv)" "$PATHS"
   case_check "3 APOSTROPHE before the mv, still detected" "$(printf '%s' "$second_mv" | "$SELF" --arguments mv)" "$PATHS"
-  case_check "4 a quoted command is not an invocation" "$(printf '%s' 'echo "mv inbox/a archive/x"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "4 a quoted command is not an invocation" "$(printf '%s' 'echo "mv inbox/a archive/x"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=0"
   case_check "5 a real separator splits the command" "$(printf '%s' 'ls; mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
   case_check "6 env assignment before the program" "$(printf '%s' 'IMAGES="3 informative, 0 reference" mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
-  case_check "7 a separator inside quotes does not split" "$(printf '%s' 'git commit -m "do not touch; mv a b"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "7 a separator inside quotes does not split" "$(printf '%s' 'git commit -m "do not touch; mv a b"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=0"
   case_check "8 subcommand after flags that take a value" "$(printf '%s' 'git -C /tmp push origin main' | "$SELF" git push)" "git -C /tmp push origin main"
   case_check "17 a repository flag of another program takes its value too" "$(printf '%s' 'gh -R owner/name pr create --fill' | "$SELF" gh pr)" "gh -R owner/name pr create --fill"
   case_check "18 the long form of that flag as well" "$(printf '%s' 'gh --repo owner/name pr create --fill' | "$SELF" gh pr)" "gh --repo owner/name pr create --fill"
   case_check "9 trailing comment" "$(printf '%s' 'mv "notes/Meeting 1 of 5" archive/x # a note' | "$SELF" --arguments mv)" "$PATHS"
-  case_check "10 program absent" "$(printf '%s' 'ls -la' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "10 program absent" "$(printf '%s' 'ls -la' | "$SELF" --arguments mv; echo "exit=$?")" "exit=0"
   apostrophes_around="cat >/dev/null <<'A'
 x'y
 A
@@ -40,7 +40,7 @@ unmatched'
 B"
   case_check "11 APOSTROPHES enclosing the mv, still detected" "$(printf '%s' "$apostrophes_around" | "$SELF" --arguments mv)" "$PATHS"
   case_check "12 REDIRECTION before the program, still detected" "$(printf '%s' '>/dev/null mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
-  case_check "13 a redirection target is not a program" "$(printf '%s' 'echo hola > mv' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "13 a redirection target is not a program" "$(printf '%s' 'echo hola > mv' | "$SELF" --arguments mv; echo "exit=$?")" "exit=0"
   case_check "14 redirection after the arguments" "$(printf '%s' 'mv "notes/Meeting 1 of 5" archive/x >/dev/null' | "$SELF" --arguments mv)" "$PATHS"
   stray_double="cat >> log.md <<'EOF'
 the table says 5\" wide
@@ -68,10 +68,23 @@ fi
 PROGRAM="${1:?program name required}"
 SUBCOMMAND="${2:-}"
 
-PYTHON=$(command -v python3 || command -v python)
+PYTHON="${PRISMA_PYTHON-$(command -v python3 || command -v python)}"
 [ -n "$PYTHON" ] || { echo "WARN: command-invokes.sh needs python3 or python and found neither." >&2; exit 3; }
+ERRFILE=$(mktemp) || { echo "WARN: command-invokes.sh could not create a temporary file, so the command was not parsed." >&2; exit 3; }
+trap 'rm -f "$ERRFILE"' EXIT
 MODE="$MODE" PROGRAM="$PROGRAM" SUBCOMMAND="$SUBCOMMAND" "$PYTHON" -c '
-import io, os, re, shlex, sys
+import io, os, re, shlex, sys, traceback
+
+
+def crash(kind, value, trace):
+    traceback.print_exception(kind, value, trace)
+    sys.stdout.flush()
+    os._exit(4)
+
+
+sys.excepthook = crash
+if os.environ.get("PRISMA_PARSER_FAULT"):
+    raise RuntimeError("fault injected by PRISMA_PARSER_FAULT")
 sys.stdout.reconfigure(newline="\n")
 
 mode = os.environ["MODE"]
@@ -80,6 +93,7 @@ subcommand = os.environ["SUBCOMMAND"]
 command = sys.stdin.read()
 
 SHLEX_SEPARATORS = {";", "&", "&&", "|", "||", "(", ")", "{", "}", "\n", "<", ">", ">>"}
+PUNCTUATION = "();<>|&\n"
 REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "&>", ">|"}
 HAND_SEPARATORS = ";&|\n(){}<>"
 HAND_REDIRECTIONS = "<>"
@@ -91,20 +105,33 @@ VALUE_FLAGS = {"git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "-
 CONTROL_WORDS = {"then", "do", "else", "elif", "fi", "done", "!", "time", "sudo", "command", "exec", "env", "nohup"}
 
 
+def punctuation_pieces(token):
+    if not ("\n" in token and set(token) <= set(PUNCTUATION)):
+        return [token]
+    pieces = []
+    for part in token.split("\n"):
+        if part:
+            pieces.append(part)
+        pieces.append("\n")
+    return pieces[:-1]
+
+
 def segments_with_shlex(text):
-    lexer = shlex.shlex(io.StringIO(text), posix=True, punctuation_chars=True)
+    lexer = shlex.shlex(io.StringIO(text), posix=True, punctuation_chars=PUNCTUATION)
+    lexer.whitespace = WHITESPACE
     lexer.whitespace_split = True
     current, output, skip = [], [], False
     for token in lexer:
-        if skip:
-            skip = False
-        elif token in REDIRECTIONS:
-            skip = True
-        elif token in SHLEX_SEPARATORS:
-            output.append(current)
-            current = []
-        else:
-            current.append(token)
+        for piece in punctuation_pieces(token):
+            if skip:
+                skip = False
+            elif piece in REDIRECTIONS:
+                skip = True
+            elif piece in SHLEX_SEPARATORS:
+                output.append(current)
+                current = []
+            else:
+                current.append(piece)
     output.append(current)
     return output
 
@@ -204,6 +231,8 @@ for tokens in unique:
             print(token)
     else:
         print(" ".join(tokens))
-
-sys.exit(0 if found else 1)
-'
+' 2>"$ERRFILE"
+rc=$?
+[ -s "$ERRFILE" ] && cat "$ERRFILE" >&2
+[ "$rc" = "0" ] || { echo "WARN: command-invokes.sh could not parse the command, so the trigger was not evaluated." >&2; exit 3; }
+exit 0

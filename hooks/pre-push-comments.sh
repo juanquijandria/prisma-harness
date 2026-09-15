@@ -23,11 +23,19 @@ tool=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
 command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
 [ -n "$command_text" ] || exit 0
 
-if [ -x "$STRIP_QUOTES" ]; then bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES"); else bare_command="$command_text"; fi
+if [ -x "$STRIP_QUOTES" ]; then
+  bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES"); strip_rc=$?
+else
+  echo "WARN: strip-quotes.sh is missing, so a declared escape will not be honored here." >&2
+  strip_rc=3
+fi
+[ "$strip_rc" = "0" ] || bare_command=""
 if [ -x "$INVOKES" ]; then
   segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
   [ "$rc" = "3" ] && { echo "WARN: the comments gate did not run, the command parser has no python." >&2; exit 0; }
-  pr_segments=$(printf '%s' "$command_text" | "$INVOKES" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
+  pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
+  [ "$pr_rc" = "3" ] && { echo "WARN: the gate did not run, the command parser failed." >&2; exit 0; }
+  pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)
   [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 else
   echo "WARN: without command-invokes.sh the trigger is approximate." >&2
@@ -65,7 +73,8 @@ done
 
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
 
-output=$(cd "$dir" 2>/dev/null && "$GATE" 2>&1)
+( cd "$dir" ) 2>/dev/null || { echo "WARN: the comments gate could not enter $dir, so nothing was measured." >&2; exit 0; }
+output=$(cd "$dir" && "$GATE" 2>&1)
 status=$?
 
 if [ "$status" = "0" ]; then

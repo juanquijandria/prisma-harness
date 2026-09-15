@@ -18,7 +18,7 @@ done
 
 if [ -n "$DIFF_FILE" ]; then
   [ -r "$DIFF_FILE" ] || { echo "cannot read $DIFF_FILE" >&2; exit 2; }
-  DIFF=$(cat "$DIFF_FILE")
+  DIFF=$(cat "$DIFF_FILE") || { echo "could not read the diff in $DIFF_FILE" >&2; exit 2; }
 else
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 2; }
 
@@ -33,7 +33,7 @@ else
   [ -n "$BASE" ] || { echo "could not infer the remote base branch" >&2; exit 2; }
   git rev-parse --verify "$BASE" >/dev/null 2>&1 || { echo "base '$BASE' does not exist" >&2; exit 2; }
   MB=$(git merge-base "$BASE" HEAD) || { echo "no merge-base with '$BASE'" >&2; exit 2; }
-  DIFF=$(git diff "$MB")
+  DIFF=$(git diff "$MB") || { echo "could not read the diff against '$MB'" >&2; exit 2; }
 fi
 
 [ -n "$DIFF" ] || { echo "comments gate: empty diff, nothing to measure"; exit 0; }

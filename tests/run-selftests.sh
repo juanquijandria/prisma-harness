@@ -29,6 +29,20 @@ printf '  file names and the H1 are off here, the repo root uses uppercase names
 
 printf '\n##### push gate controls\n'
 if /bin/sh "$(dirname "$0")/push-gates-controls.sh"; then :; else failed=$((failed+1)); fi
+
+for controls in push-gates-never-fabricate page-gates-never-fabricate; do
+  printf '\n##### %s\n' "$controls"
+  FAB=$(mktemp)
+  if /bin/sh "$(dirname "$0")/$controls.sh" > "$FAB" 2>&1; then :; else failed=$((failed+1)); fi
+  cat "$FAB"
+  fab_declared=$(sed -n 's/.*SELFTEST OK: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p' "$FAB" | tail -1)
+  fab_ran=$(grep -cE '^ *(PASS|SKIP)' "$FAB")
+  if [ -n "$fab_declared" ] && [ "$fab_declared" != "$fab_ran" ]; then
+    printf 'FAIL %s says %s cases and printed %s PASS or SKIP lines\n' "$controls" "$fab_declared" "$fab_ran"
+    failed=$((failed+1))
+  fi
+  rm -f "$FAB"
+done
 printf '\n##### receipt written by the push gate controls\n'
 sh "$HOOKS/receipt.sh" --summary | grep -E 'gate +[0-9]' || { printf 'FAIL no gate wrote a receipt line during the controls\n'; failed=$((failed+1)); }
 printf '\n##### syntax of every hook\n'

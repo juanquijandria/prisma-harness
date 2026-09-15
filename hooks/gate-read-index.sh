@@ -14,7 +14,7 @@ if [ "$1" = "--selftest" ]; then
   root=$(mktemp -d)
   export PRISMA_DOCS_ROOT="$root"
   read_tx=$(mktemp)
-  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$read_tx"
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$read_tx"
   empty_tx=$(mktemp)
   echo '{}' > "$empty_tx"
   mention_tx=$(mktemp)
@@ -41,8 +41,10 @@ fi
 command -v jq >/dev/null 2>&1 || { echo "WARN: the index gate did not run, jq is missing." >&2; exit 0; }
 
 payload=$(cat)
-file_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
-transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' 2>/dev/null)
+[ -n "$payload" ] || { echo "WARN: the index gate received an empty payload, so nothing was verified." >&2; exit 0; }
+printf '%s' "$payload" | jq -e . >/dev/null 2>&1 || { echo "WARN: the index gate could not parse the payload, so nothing was verified." >&2; exit 0; }
+file_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty')
+transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
 
 case "$file_path" in
   "$DOCS_ROOT/$DOCS_DIR"/*) ;;
@@ -51,9 +53,18 @@ esac
 
 [ -n "$transcript" ] && [ -f "$transcript" ] || { echo "WARN: the index gate could not read the transcript, nothing was verified." >&2; exit 0; }
 
-if jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | .input.file_path // empty' "$transcript" 2>/dev/null | grep -qx "$INDEX_PATH"; then
-  exit 0
-fi
+opened=$(jq -r --arg idx "$INDEX_PATH" 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | select((.input.file_path // "") == $idx) | .id // empty' "$transcript" 2>/dev/null)
+opened_status=$?
+errored=$(jq -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
+errored_status=$?
+{ [ "$opened_status" = "0" ] && [ "$errored_status" = "0" ]; } || { echo "WARN: the index gate could not read the transcript, so nothing was verified." >&2; exit 0; }
+
+while IFS= read -r call; do
+  [ -n "$call" ] || continue
+  printf '%s\n' "$errored" | grep -Fqx -- "$call" || exit 0
+done <<CALLS
+$opened
+CALLS
 
 echo "INDEX GATE: you are about to write a page under $DOCS_DIR/ without having opened $INDEX_FILE in this session. Read $INDEX_PATH first so you do not create a duplicate page or leave the index stale, then retry." >&2
 receipt_append index-gate "$DOCS_ROOT" blocked

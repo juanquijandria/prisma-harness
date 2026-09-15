@@ -17,14 +17,17 @@ case "${1:-}" in
   *) printf 'usage: check-canonical-sync.sh [--hook|--selftest]\n' >&2; exit 2 ;;
 esac
 
-JQ=$(command -v jq)
+JQ="${PRISMA_JQ-$(command -v jq)}"
 
 fail_open() {
   msg="$1"
   if [ "$MODE" = "hook" ]; then
-    [ -n "$JQ" ] || exit 0
-    "$JQ" -n --arg c "CANONICAL SYNC NOT VERIFIED. $msg" \
-      '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
+    if [ -n "$JQ" ]; then
+      "$JQ" -n --arg c "CANONICAL SYNC NOT VERIFIED. $msg" \
+        '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
+    else
+      printf 'CANONICAL SYNC NOT VERIFIED. %s\n' "$msg"
+    fi
     exit 0
   fi
   printf 'CANONICAL SYNC WARN: %s\n' "$msg" >&2
@@ -183,7 +186,14 @@ selftest() {
     printf 'FAIL hook mode did not emit valid JSON\n'; ok=0
   fi
 
-  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 8/8\n' && return 0
+  plain_out=$(PRISMA_JQ="" run_check --hook 2>/dev/null)
+  if printf '%s' "$plain_out" | grep -q 'copy-b.md' && ! printf '%s' "$plain_out" | grep -q 'hookSpecificOutput'; then
+    printf 'PASS hook mode still reports the drift as plain text without jq\n'
+  else
+    printf 'FAIL hook mode without jq produced [%s]\n' "$plain_out"; ok=0
+  fi
+
+  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 9/9\n' && return 0
   printf 'SELFTEST FAILED\n'
   return 1
 }
@@ -204,10 +214,13 @@ case "$rc" in
     ;;
   1)
     if [ "$MODE" = "hook" ]; then
-      [ -n "$JQ" ] || exit 0
-      "$JQ" -n --arg c "CANONICAL SYNC BROKEN. The source file is the single source of truth. Fix these copies before changing the method:
+      if [ -n "$JQ" ]; then
+        "$JQ" -n --arg c "CANONICAL SYNC BROKEN. The source file is the single source of truth. Fix these copies before changing the method:
 $DETAILS" \
-        '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
+          '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$c}}'
+      else
+        printf 'CANONICAL SYNC BROKEN. The source file is the single source of truth. Fix these copies before changing the method:\n%s\n' "$DETAILS"
+      fi
       exit 0
     fi
     printf 'CANONICAL SYNC FAIL:\n%s\n' "$DETAILS" >&2
