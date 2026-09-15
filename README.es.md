@@ -58,7 +58,7 @@ El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD
 2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas y hablan solo cuando algo está mal. Una escritura en tus docs sin abrir el índice se frena y el agente recibe qué leer. Un push con comentarios sueltos, con más de mil líneas cambiadas o con el linter en rojo se frena y el agente recibe qué hacer. Una página con em-dash o voseo no deja que el agente cierre el turno hasta arreglarla. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
 3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama. La skill rutea el pedido por uno de los cinco carriles y corre lo que el carril pide, hasta los cinco pasos y las cinco puertas.
 4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
-5. **Actualiza** con `claude plugin update prisma-harness`, o enciende una vez el auto-update de este marketplace en `/plugin` y olvídate.
+5. **Actualiza** con los comandos de la sección siguiente, o enciende una vez el auto-update de este marketplace en `/plugin` y olvídate.
 
 ## Instalar
 

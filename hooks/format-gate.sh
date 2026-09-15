@@ -18,7 +18,7 @@ RULE_LINE_CEILING=150
 RULE_SOURCES_FOOTER=0
 RULE_WIKILINKS=0
 RULE_VERIFY_TAG=0
-EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md SKILL.md log.md"
+EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md README.es.md SKILL.md METHOD.md STYLE.md CHANGELOG.md CONTRIBUTING.md SECURITY.md log.md"
 EXEMPT_DIRS="raw archive inbox Clippings"
 
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
@@ -188,6 +188,7 @@ case "$1" in
   --debt-freeze) debt_freeze; exit $? ;;
   --changed)
     STRICT=1
+    [ -d "$DOCS_ROOT/$DOCS_DIR" ] || exit 0
     F=$(find "$DOCS_ROOT/$DOCS_DIR" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null)
     if [ $? -ne 0 ]; then
       echo "WARN: --changed could not list today's pages, so NOTHING was reviewed." >&2

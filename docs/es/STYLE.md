@@ -2,6 +2,8 @@
 
 Todo texto que sale de la máquina sigue estas reglas, y `hooks/format-gate.sh` comprueba las mecánicas. El gate revisa cómo está escrita una página; no lee código ni encuentra bugs. La versión en inglés es `STYLE.md`, en la raíz.
 
+El gate habla de tres formas. Un nombre de archivo roto, un H1 ausente, un encabezado cuyo conteo no cuadra y, cuando está encendido, un pie de fuentes ausente, son fallas en todos los modos. Un em-dash en la prosa y el voseo son avisos por su cuenta y fallas bajo `--strict`, que es como corre el hook de cierre. Los dos puntos en la prosa, el techo de la página, una etiqueta de verificar sin fecha y un wikilink roto son siempre avisos.
+
 ## Las reglas que el gate hace cumplir por defecto
 
 | Regla | Clave de config | Qué caza | Por qué |
@@ -41,7 +43,7 @@ Son la forma en que el autor del método le escribe a quien lee, y son la razón
 Copia `.prisma-format.conf.example` a `<raíz de docs>/.prisma-format.conf`, o define `PRISMA_<CLAVE>` en el entorno. La raíz de docs es `PRISMA_DOCS_ROOT`, por defecto la carpeta del proyecto, y las páginas se buscan bajo `PRISMA_DOCS_DIR`, por defecto `wiki`. `EXEMPT_NAMES` y `EXEMPT_DIRS` listan lo que el gate salta.
 
 ```
-hooks/format-gate.sh --strict pagina.md    una página; em-dash y voseo se vuelven fallas, el resto queda en aviso
+hooks/format-gate.sh --strict pagina.md    una página, con em-dash y voseo elevados a falla
 hooks/format-gate.sh --changed             toda página bajo la carpeta de docs tocada hoy, estricto, sale 2 para que el hook de Stop frene
 hooks/format-gate.sh --debt                inventario de toda la carpeta, contado y no gritado
 hooks/format-gate.sh --debt-freeze         congela el inventario de hoy como baseline de regresión

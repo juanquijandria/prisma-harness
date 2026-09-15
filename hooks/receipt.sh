@@ -30,7 +30,8 @@ receipt_summary() {
   printf '\n%s lines. It counts blocks, not whether each block was right, and it cannot see what no gate caught. Nothing here leaves this machine unless you paste it.\n' "$total"
 }
 
-selftest() {
+receipt_selftest() {
+  SELF_PATH=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
   ok=1; T=$(mktemp -d); export PRISMA_RECEIPT_FILE="$T/r.log"
   receipt_append size-gate /repo/a blocked
   receipt_append size-gate /repo/a escaped
@@ -49,10 +50,18 @@ selftest() {
   PRISMA_RECEIPT_FILE="$ro/sub/r.log" receipt_append x /r blocked && printf 'PASS an unwritable location fails open, exit 0\n' || { printf 'FAIL unwritable location broke the caller\n'; ok=0; }
   chmod 700 "$ro"
   PRISMA_RECEIPT_FILE="$T/empty.log" receipt_summary | grep -q "no gate has blocked" && printf 'PASS an empty receipt says so\n' || { printf 'FAIL empty summary\n'; ok=0; }
+  printf '#!/bin/sh\nselftest() { printf "the caller keeps its own selftest\\n"; }\n. "%s"\nprintf "the caller still owns its arguments: [%%s]\\n" "$1"\nselftest\n' "$SELF_PATH" > "$T/caller.sh"
+  out=$(sh "$T/caller.sh" --selftest)
+  if printf '%s' "$out" | grep -q 'the caller still owns its arguments: \[--selftest\]' && printf '%s' "$out" | grep -q 'the caller keeps its own selftest' && ! printf '%s' "$out" | grep -q 'one line per event'; then printf 'PASS sourcing it takes neither the arguments nor the selftest of the caller\n'; else printf 'FAIL sourcing hijacked the caller: %s\n' "$out"; ok=0; fi
   rm -rf "$T"
-  [ "$ok" = "1" ] && printf 'SELFTEST OK: 8/8\n' && exit 0
+  [ "$ok" = "1" ] && printf 'SELFTEST OK: 9/9\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 }
+
+case "$0" in
+  */receipt.sh|receipt.sh) ;;
+  *) return 0 2>/dev/null || exit 0 ;;
+esac
 
 case "${1:-}" in
   --summary) receipt_summary; exit 0 ;;
@@ -62,5 +71,5 @@ case "${1:-}" in
     [ -f "$RECEIPT_FILE" ] || { printf 'nothing to reset\n'; exit 0; }
     printf 'This empties %s. Type yes to continue: ' "$RECEIPT_FILE"; read -r answer
     [ "$answer" = "yes" ] && : > "$RECEIPT_FILE" && printf 'receipt emptied\n'; exit 0 ;;
-  --selftest) selftest ;;
+  --selftest) receipt_selftest ;;
 esac

@@ -21,14 +21,10 @@ comando=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/n
 [ -n "$comando" ] || exit 0
 
 if [ -x "$STRIP_QUOTES" ]; then desnudo=$(printf '%s' "$comando" | "$STRIP_QUOTES"); else desnudo="$comando"; fi
-case "$desnudo" in
-  *"$ESCAPE"*) receipt_append comments-gate "$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
-esac
-
 if [ -x "$INVOKES" ]; then
   segmentos=$(printf '%s' "$comando" | "$INVOKES" git push); rc=$?
   [ "$rc" = "3" ] && { echo "WARN: the comments gate did not run, the command parser has no python." >&2; exit 0; }
-  segmentos_pr=$(printf '%s' "$comando" | "$INVOKES" gh pr)
+  segmentos_pr=$(printf '%s' "$comando" | "$INVOKES" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
   [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
 else
   echo "WARN: without command-invokes.sh the trigger is approximate." >&2
@@ -60,8 +56,13 @@ fi
 real=$(cd "$dir" 2>/dev/null && pwd -P)
 
 for skip in ${PRISMA_SKIP_REPOS:-}; do
+  case "$dir" in "$skip"|"$skip"/*) exit 0 ;; esac
   case "$real" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
+
+case "$desnudo" in
+  *"$ESCAPE"*) receipt_append comments-gate "$real" escaped; exit 0 ;;
+esac
 
 salida=$(cd "$dir" 2>/dev/null && "$GATE" 2>&1)
 estado=$?

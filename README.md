@@ -58,7 +58,7 @@ The order the agent follows is written, not drawn. It lives in `METHOD.md` and i
 2. **Open a new session and work as always.** You do not call anything. The gates run on their own and speak only when something is wrong. A write to your docs without opening the index is blocked and the agent is told what to read. A push with stray comments, over a thousand changed lines or a red linter is blocked and the agent is told what to do. A page with an em-dash or voseo keeps the agent from closing its turn until it is fixed. The writing rules arrive at session start, so the agent writes that way without being asked.
 3. **Say "PRISMA"** when you want the whole method on a piece of work. That is the only thing you ever call. The skill routes the request into one of the five lanes and runs what the lane requires, up to the five steps and five gates.
 4. **Read `METHOD.md`** when you want to know why a gate did what it did.
-5. **Update** with `claude plugin update prisma-harness`, or turn on auto-update for this marketplace once in `/plugin` and forget about it.
+5. **Update** with the commands in the next section, or turn on auto-update for this marketplace once in `/plugin` and forget about it.
 
 ## Install
 

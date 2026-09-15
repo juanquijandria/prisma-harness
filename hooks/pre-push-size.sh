@@ -28,13 +28,10 @@ comando=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/de
 [ -n "$comando" ] || exit 0
 
 desnudo=$(printf '%s' "$comando" | "$SIN_COMILLAS")
-case "$desnudo" in
-  *"$ESCAPE"*) receipt_append size-gate "$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
-esac
 
 segmentos=$(printf '%s' "$comando" | "$INVOCA" git push); rc=$?
 [ "$rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser has no python." >&2; exit 0; }
-segmentos_pr=$(printf '%s' "$comando" | "$INVOCA" gh pr)
+segmentos_pr=$(printf '%s' "$comando" | "$INVOCA" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
 [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
 
 if [ -n "$segmentos" ]; then
@@ -52,13 +49,19 @@ esac
 if [ -z "$dir" ] || [ ! -d "$dir" ]; then
   dir=$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)
 fi
-[ -n "$dir" ] && [ -d "$dir" ] || exit 0
+[ -n "$dir" ] && [ -d "$dir" ] || { echo "WARN: the size gate could not locate the repo, nothing was measured." >&2; exit 0; }
+real=$(cd "$dir" 2>/dev/null && pwd -P)
 for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$dir" in "$skip"|"$skip"/*) exit 0 ;; esac
+  case "$real" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
+case "$desnudo" in
+  *"$ESCAPE"*) receipt_append size-gate "$real" escaped; exit 0 ;;
+esac
+
 cd "$dir" 2>/dev/null || exit 0
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; exit 0; }
 
 mb=$("$BASE_DE_COMPARACION"); rc=$?
 if [ "$rc" = "2" ]; then echo "WARN: the size gate measures HEAD and HEAD has nothing over its base, so nothing was measured. If you are pushing another branch from here, check it out first." >&2; exit 0; fi

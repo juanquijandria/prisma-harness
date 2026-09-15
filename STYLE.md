@@ -2,6 +2,8 @@
 
 Every text that leaves the machine follows these rules, and `hooks/format-gate.sh` checks the mechanical ones. The gate reads how a page is written; it reads no code and finds no bugs. The Spanish version of this page is `docs/es/STYLE.md`.
 
+The gate speaks in three ways. A broken file name, a missing H1, a heading whose count does not match and, when it is on, a missing sources footer, are failures in every mode. An em-dash in prose and voseo are warnings on their own and failures under `--strict`, which is how the Stop hook runs. A colon in prose, the page ceiling, an undated verify tag and a broken wikilink are always warnings.
+
 ## The rules the gate enforces by default
 
 | Rule | Config key | What it catches | Why |
@@ -41,7 +43,7 @@ These are how the method's author writes to a reader, and they are the reason th
 Copy `.prisma-format.conf.example` to `<docs root>/.prisma-format.conf`, or set `PRISMA_<KEY>` in the environment. The docs root is `PRISMA_DOCS_ROOT`, defaulting to the project directory, and pages are looked up under `PRISMA_DOCS_DIR`, defaulting to `wiki`. `EXEMPT_NAMES` and `EXEMPT_DIRS` list what the gate skips.
 
 ```
-hooks/format-gate.sh --strict page.md      one page; em-dash and voseo become failures, the rest stay warnings
+hooks/format-gate.sh --strict page.md      one page, with em-dash and voseo raised to failures
 hooks/format-gate.sh --changed             every page under the docs dir touched today, strict, exits 2 so the Stop hook blocks
 hooks/format-gate.sh --debt                inventory of the whole docs dir, counted and not shouted
 hooks/format-gate.sh --debt-freeze         freeze today's inventory as the regression baseline

@@ -20,14 +20,10 @@ comando=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/de
 [ -n "$comando" ] || exit 0
 
 if [ -x "$SIN_COMILLAS" ]; then desnudo=$(printf '%s' "$comando" | "$SIN_COMILLAS"); else desnudo="$comando"; fi
-case "$desnudo" in
-  *"$ESCAPE"*) receipt_append lint-gate "$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)" escaped; exit 0 ;;
-esac
-
 if [ -x "$INVOCA" ]; then
   segmentos=$(printf '%s' "$comando" | "$INVOCA" git push); rc=$?
   [ "$rc" = "3" ] && { echo "WARN: the lint gate did not run, the command parser has no python." >&2; exit 0; }
-  segmentos_pr=$(printf '%s' "$comando" | "$INVOCA" gh pr)
+  segmentos_pr=$(printf '%s' "$comando" | "$INVOCA" gh pr | grep -E '(^| )pr +(create|ready)( |$)' || true)
   [ -n "$segmentos" ] || [ -n "$segmentos_pr" ] || exit 0
 else
   echo "WARN: without command-invokes.sh the trigger is approximate." >&2
@@ -50,18 +46,23 @@ case "$dir" in
   "~") dir="$HOME" ;;
   "~/"*) dir="$HOME/${dir#\~/}" ;;
 esac
-[ -n "$dir" ] && [ -d "$dir" ] || exit 0
+[ -n "$dir" ] && [ -d "$dir" ] || { echo "WARN: the lint gate could not locate the repo, nothing was measured." >&2; exit 0; }
 
 real=$(cd "$dir" 2>/dev/null && pwd -P)
 for skip in ${PRISMA_SKIP_REPOS:-}; do
+  case "$dir" in "$skip"|"$skip"/*) exit 0 ;; esac
   case "$real" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
-cd "$dir" 2>/dev/null || exit 0
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+case "$desnudo" in
+  *"$ESCAPE"*) receipt_append lint-gate "$real" escaped; exit 0 ;;
+esac
 
-mb=$("$BASE_DE_COMPARACION") || exit 0
-[ -n "$mb" ] || exit 0
+cd "$dir" 2>/dev/null || exit 0
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the lint gate did not measure, $dir is not a git repository." >&2; exit 0; }
+
+mb=$("$BASE_DE_COMPARACION") || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
+[ -n "$mb" ] || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
 
 if [ -x vendor/bin/php-cs-fixer ] && [ -f .php-cs-fixer.php ]; then
   archivos=$(git diff --name-only --diff-filter=ACMR "$mb" -- '*.php' | tr '\n' ' ')

@@ -8,46 +8,46 @@ if [ "$1" = "--selftest" ]; then
   case_check() {
     if [ "$2" = "$3" ]; then echo "PASS case $1"; else echo "FAIL case $1, expected [$3] and got [$2]"; ok=0; fi
   }
-  PATHS="inbox/Reunion HI LUCA 1 DE 5
-raw/x"
-  balanced='mv "inbox/Reunion HI LUCA 1 DE 5" raw/x'
-  heredoc="mv \"inbox/Reunion HI LUCA 1 DE 5\" raw/x && cat >> log.md <<'EOF'
-el clip de O'Reilly
+  PATHS="notes/Meeting 1 of 5
+archive/x"
+  balanced='mv "notes/Meeting 1 of 5" archive/x'
+  heredoc="mv \"notes/Meeting 1 of 5\" archive/x && cat >> log.md <<'EOF'
+a quote from O'Reilly
 EOF"
   second_mv="cat >> log.md <<'EOF'
-el clip de O'Reilly
+a quote from O'Reilly
 EOF
-mv \"inbox/Reunion HI LUCA 1 DE 5\" raw/x"
+mv \"notes/Meeting 1 of 5\" archive/x"
   case_check "1 balanced quotes" "$(printf '%s' "$balanced" | "$SELF" --arguments mv)" "$PATHS"
   case_check "2 APOSTROPHE in a heredoc, the origin is not lost" "$(printf '%s' "$heredoc" | "$SELF" --arguments mv)" "$PATHS"
   case_check "3 APOSTROPHE before the mv, still detected" "$(printf '%s' "$second_mv" | "$SELF" --arguments mv)" "$PATHS"
-  case_check "4 a quoted command is not an invocation" "$(printf '%s' 'echo "mv inbox/a raw/x"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
-  case_check "5 a real separator splits the command" "$(printf '%s' 'ls; mv "inbox/Reunion HI LUCA 1 DE 5" raw/x' | "$SELF" --arguments mv)" "$PATHS"
-  case_check "6 env assignment before the program" "$(printf '%s' 'IMAGENES="3 informativas, 0 referenciales" mv "inbox/Reunion HI LUCA 1 DE 5" raw/x' | "$SELF" --arguments mv)" "$PATHS"
+  case_check "4 a quoted command is not an invocation" "$(printf '%s' 'echo "mv inbox/a archive/x"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
+  case_check "5 a real separator splits the command" "$(printf '%s' 'ls; mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
+  case_check "6 env assignment before the program" "$(printf '%s' 'IMAGES="3 informative, 0 reference" mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
   case_check "7 a separator inside quotes does not split" "$(printf '%s' 'git commit -m "no toca; mv a b"' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   case_check "8 subcommand after flags that take a value" "$(printf '%s' 'git -C /tmp push origin main' | "$SELF" git push)" "git -C /tmp push origin main"
-  case_check "9 trailing comment" "$(printf '%s' 'mv "inbox/Reunion HI LUCA 1 DE 5" raw/x # nota' | "$SELF" --arguments mv)" "$PATHS"
+  case_check "9 trailing comment" "$(printf '%s' 'mv "notes/Meeting 1 of 5" archive/x # a note' | "$SELF" --arguments mv)" "$PATHS"
   case_check "10 program absent" "$(printf '%s' 'ls -la' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
   apostrophes_around="cat >/dev/null <<'A'
 x'y
 A
-mv \"inbox/Reunion HI LUCA 1 DE 5\" raw/x
+mv \"notes/Meeting 1 of 5\" archive/x
 cat >/dev/null <<B
 close'
 unmatched'
 B"
   case_check "11 APOSTROPHES enclosing the mv, still detected" "$(printf '%s' "$apostrophes_around" | "$SELF" --arguments mv)" "$PATHS"
-  case_check "12 REDIRECTION before the program, still detected" "$(printf '%s' '>/dev/null mv "inbox/Reunion HI LUCA 1 DE 5" raw/x' | "$SELF" --arguments mv)" "$PATHS"
+  case_check "12 REDIRECTION before the program, still detected" "$(printf '%s' '>/dev/null mv "notes/Meeting 1 of 5" archive/x' | "$SELF" --arguments mv)" "$PATHS"
   case_check "13 a redirection target is not a program" "$(printf '%s' 'echo hola > mv' | "$SELF" --arguments mv; echo "exit=$?")" "exit=1"
-  case_check "14 redirection after the arguments" "$(printf '%s' 'mv "inbox/Reunion HI LUCA 1 DE 5" raw/x >/dev/null' | "$SELF" --arguments mv)" "$PATHS"
+  case_check "14 redirection after the arguments" "$(printf '%s' 'mv "notes/Meeting 1 of 5" archive/x >/dev/null' | "$SELF" --arguments mv)" "$PATHS"
   stray_double="cat >> log.md <<'EOF'
-la tabla dice 5\" de ancho
+the table says 5\" wide
 EOF
-mv \"inbox/Reunion HI LUCA 1 DE 5\" raw/x"
+mv \"notes/Meeting 1 of 5\" archive/x"
   stray_single="cat >> log.md <<'EOF'
-el clip de O'Reilly
+a quote from O'Reilly
 EOF
-mv 'inbox/Reunion HI LUCA 1 DE 5' raw/x"
+mv 'notes/Meeting 1 of 5' archive/x"
   case_contains() {
     case "$2" in *"$3"*) echo "PASS case $1";; *) echo "FAIL case $1, expected it to contain [$3] and got [$2]"; ok=0;; esac
   }

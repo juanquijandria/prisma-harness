@@ -2,7 +2,7 @@
 # Prisma Harness. Documented in README.md, section "session-deps".
 
 INSTALLED="${PRISMA_INSTALLED_PLUGINS:-$HOME/.claude/plugins/installed_plugins.json}"
-REQUIRED_TOOLS=$(printf '%s' "${PRISMA_REQUIRED_TOOLS:-jq python3 git awk cmp bash}" | tr ',' ' ')
+REQUIRED_TOOLS=$(printf '%s' "${PRISMA_REQUIRED_TOOLS:-jq python3 git awk cmp bash mktemp find sed}" | tr ',' ' ')
 POCOCK_ID="mattpocock-skills@claude-plugins-official"
 
 missing_tools() {
@@ -33,6 +33,7 @@ report() {
     case " $tools " in *" command-line-tools "*) printf '  macOS Command Line Tools, which bring git and python3: xcode-select --install\n' ;; esac
     printf '  macOS with Homebrew: brew install %s\n' "$(printf '%s' "$tools" | sed 's/command-line-tools//; s/^ *//')"
     printf '  Debian or Ubuntu: sudo apt install %s\n' "$(printf '%s' "$tools" | sed 's/command-line-tools//; s/^ *//')"
+    case "${PRISMA_UNAME:-$(uname -s 2>/dev/null)}" in MINGW*|MSYS*|CYGWIN*) printf '  Windows with Git Bash: winget install jqlang.jq Python.Python.3.12\n' ;; esac
   fi
   if [ "$pocock_ok" = "0" ]; then
     printf -- '- The plugin mattpocock-skills is not installed. Steps 1 and 2 of PRISMA invoke its skills. Install it once with /plugin install %s, or run the same sequence by hand as METHOD.md describes.\n' "$POCOCK_ID"
@@ -52,10 +53,14 @@ if [ "$1" = "--selftest" ]; then
   out=$(run "$T/present.json" "sh,no-such-tool-alpha,no-such-tool-beta")
   if printf '%s' "$out" | grep -q "Missing on this machine: no-such-tool-alpha no-such-tool-beta" && printf '%s' "$out" | grep -q "brew install no-such-tool-alpha no-such-tool-beta"; then printf 'PASS names the missing tools with the install command\n'; else printf 'FAIL tools case: %s\n' "$out"; ok=0; fi
   if printf '%s' "$out" | grep -q "Never install anything without their explicit yes"; then printf 'PASS tells the agent to ask before installing\n'; else printf 'FAIL no consent line\n'; ok=0; fi
+  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/present.json" PRISMA_REQUIRED_TOOLS="no-such-tool-alpha" PRISMA_UNAME="MINGW64_NT-10.0" sh "$SELF")
+  if printf '%s' "$out" | grep -q "winget install"; then printf 'PASS on Windows it offers the winget command\n'; else printf 'FAIL no winget line: %s\n' "$out"; ok=0; fi
+  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/present.json" PRISMA_REQUIRED_TOOLS="no-such-tool-alpha" PRISMA_UNAME="Darwin" sh "$SELF")
+  if ! printf '%s' "$out" | grep -q "winget install"; then printf 'PASS off Windows it does not offer winget\n'; else printf 'FAIL winget offered on Darwin\n'; ok=0; fi
   out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_DEPS_CHECK=0 switches it off\n'; else printf 'FAIL switch: %s\n' "$out"; ok=0; fi
   rm -rf "$T"
-  [ "$ok" = "1" ] && printf 'SELFTEST OK: 5/5\n' && exit 0
+  [ "$ok" = "1" ] && printf 'SELFTEST OK: 7/7\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 fi
 
