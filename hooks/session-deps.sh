@@ -39,7 +39,7 @@ report() {
 if [ "$1" = "--selftest" ]; then
   SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
   ok=1; T=$(mktemp -d); mkdir -p "$T/bin"
-  for t in cat grep sed sh; do cp "$(command -v $t)" "$T/bin/$t" 2>/dev/null || ln -s "$(command -v $t)" "$T/bin/$t"; done
+  for t in cat grep sed sh; do ln -s "$(command -v $t)" "$T/bin/$t" 2>/dev/null || cp "$(command -v $t)" "$T/bin/$t"; done
   printf '{"plugins":{"%s":[{}]}}' "$POCOCK_ID" > "$T/present.json"
   printf '{"plugins":{"other@x":[{}]}}' > "$T/absent.json"
   run() { printf '{}' | PRISMA_INSTALLED_PLUGINS="$1" PATH="$2" /bin/sh "$SELF"; }
