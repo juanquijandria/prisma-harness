@@ -117,7 +117,7 @@ Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las 
 
 ## El recibo
 
-Cada vez que una puerta frena algo, o alguien la pasa con el escape, cae una línea en un archivo local con la fecha y hora, la puerta, el repositorio, y si fue frenado o escapado. Nada más, y nunca sale de tu máquina salvo que lo pegues.
+Cada vez que una puerta frena algo, o alguien la pasa con el escape, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y si fue frenado o escapado. Nada más, y nunca sale de tu máquina salvo que lo pegues. Los hooks que corren dentro de Claude Code y el comando que corres en la terminal leen y escriben ese mismo archivo, a propósito.
 
 ```
 sh hooks/receipt.sh --summary

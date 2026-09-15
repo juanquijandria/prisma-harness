@@ -134,7 +134,7 @@ The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZ
 
 ## The receipt
 
-Every time a gate blocks something, or someone gets past it with an escape, one line lands in a local file with the date and time, the gate, the repository, and whether it was blocked or escaped. Nothing else, and it never leaves your machine unless you paste it.
+Every time a gate blocks something, or someone gets past it with an escape, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and whether it was blocked or escaped. Nothing else, and it never leaves your machine unless you paste it. The hooks running inside Claude Code and the command you run in a terminal read and write that same file, on purpose.
 
 ```
 sh hooks/receipt.sh --summary

@@ -2,7 +2,7 @@
 # Prisma Harness. Documented in README.md, section "receipt".
 
 receipt_file() {
-  printf '%s' "${PRISMA_RECEIPT_FILE:-${CLAUDE_PLUGIN_DATA:-$HOME/.prisma-harness}/receipts.log}"
+  printf '%s' "${PRISMA_RECEIPT_FILE:-$HOME/.prisma-harness/receipts.log}"
 }
 
 receipt_append() {
