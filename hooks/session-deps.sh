@@ -37,7 +37,6 @@ report() {
 }
 
 if [ "$1" = "--print-required" ]; then printf '%s\n' "$REQUIRED_TOOLS"; exit 0; fi
-if [ "$1" = "--print-installed" ]; then printf '%s\n' "$INSTALLED"; exit 0; fi
 
 if [ "$1" = "--selftest" ]; then
   SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
@@ -60,6 +59,7 @@ if [ "$1" = "--selftest" ]; then
   if printf '%s' "$out" | grep -q "Never install anything without their explicit yes"; then printf 'PASS tells the agent to ask before installing\n'; else printf 'FAIL no consent line\n'; ok=0; fi
   out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_DEPS_CHECK=0 switches it off\n'; else printf 'FAIL switch: %s\n' "$out"; ok=0; fi
+  printf 'info: a child process sees a spaced env value as [%s] and an unspaced one as [%s]\n' "$(PRISMA_REQUIRED_TOOLS='a b' sh "$SELF" --print-required)" "$(PRISMA_REQUIRED_TOOLS='a,b' sh "$SELF" --print-required)"
   rm -rf "$T"
   [ "$ok" = "1" ] && printf 'SELFTEST OK: 5/5\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
