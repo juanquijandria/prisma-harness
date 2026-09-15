@@ -36,6 +36,9 @@ report() {
   fi
 }
 
+if [ "$1" = "--print-required" ]; then printf '%s\n' "$REQUIRED_TOOLS"; exit 0; fi
+if [ "$1" = "--print-installed" ]; then printf '%s\n' "$INSTALLED"; exit 0; fi
+
 if [ "$1" = "--selftest" ]; then
   SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
   ok=1; T=$(mktemp -d); mkdir -p "$T/bin"
@@ -48,7 +51,12 @@ if [ "$1" = "--selftest" ]; then
   out=$(run "$T/absent.json" "$PATH")
   if printf '%s' "$out" | grep -q "mattpocock-skills is not installed" && ! printf '%s' "$out" | grep -q "Missing on this machine"; then printf 'PASS names only the plugin when only the plugin is missing\n'; else printf 'FAIL plugin case: %s\n' "$out"; ok=0; fi
   out=$(run "$T/present.json" "$T/bin")
-  if printf '%s' "$out" | grep -q "Missing on this machine: jq python3 git awk cmp bash" && printf '%s' "$out" | grep -q "brew install jq"; then printf 'PASS names the missing tools with the install command, without needing jq\n'; else printf 'FAIL tools case: %s\n' "$out"; ok=0; fi
+  if printf '%s' "$out" | grep -q "Missing on this machine: jq python3 git awk cmp bash" && printf '%s' "$out" | grep -q "brew install jq"; then printf 'PASS names the missing tools with the install command, without needing jq\n'; else
+    printf 'FAIL tools case: %s\n' "$out"; ok=0
+    printf 'debug installed=[%s] readable=%s grep_rc=%s\n' "$T/present.json" "$([ -r "$T/present.json" ] && echo yes || echo no)" "$(grep -q '"mattpocock-skills@' "$T/present.json"; echo $?)"
+    printf 'debug missing_tools=[%s] cmdv_rc=%s\n' "$(PRISMA_REQUIRED_TOOLS='no-such-tool-x' missing_tools)" "$(command -v no-such-tool-x >/dev/null 2>&1; echo $?)"
+    printf 'debug child sees REQUIRED_TOOLS=[%s] INSTALLED=[%s]\n' "$(PRISMA_REQUIRED_TOOLS='a b' sh "$SELF" --print-required)" "$(PRISMA_INSTALLED_PLUGINS="$T/present.json" sh "$SELF" --print-installed)"
+  fi
   if printf '%s' "$out" | grep -q "Never install anything without their explicit yes"; then printf 'PASS tells the agent to ask before installing\n'; else printf 'FAIL no consent line\n'; ok=0; fi
   out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_DEPS_CHECK=0 switches it off\n'; else printf 'FAIL switch: %s\n' "$out"; ok=0; fi
