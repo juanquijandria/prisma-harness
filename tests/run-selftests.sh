@@ -4,10 +4,19 @@
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 export PRISMA_RECEIPT_FILE="$(mktemp -d)/receipts.log"
 failed=0
+OUT=$(mktemp)
 for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes receipt; do
   printf '\n##### %s\n' "$hook"
-  if /bin/sh "$HOOKS/$hook.sh" --selftest; then :; else failed=$((failed+1)); fi
+  if sh "$HOOKS/$hook.sh" --selftest > "$OUT" 2>&1; then :; else failed=$((failed+1)); fi
+  cat "$OUT"
+  declared=$(sed -n 's/.*SELFTEST OK: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p' "$OUT" | tail -1)
+  ran=$(grep -c '^ *PASS' "$OUT")
+  if [ -n "$declared" ] && [ "$declared" != "$ran" ]; then
+    printf 'FAIL %s says %s cases and printed %s PASS lines\n' "$hook" "$declared" "$ran"
+    failed=$((failed+1))
+  fi
 done
+rm -f "$OUT"
 printf '\n##### push gate controls\n'
 if /bin/sh "$(dirname "$0")/push-gates-controls.sh"; then :; else failed=$((failed+1)); fi
 printf '\n##### receipt written by the push gate controls\n'

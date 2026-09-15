@@ -183,7 +183,7 @@ selftest() {
     printf 'FAIL hook mode did not emit valid JSON\n'; ok=0
   fi
 
-  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 7/7\n' && return 0
+  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 8/8\n' && return 0
   printf 'SELFTEST FAILED\n'
   return 1
 }
