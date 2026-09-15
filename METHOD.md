@@ -6,18 +6,18 @@ This page is an English translation, declared as such, of the canonical Spanish 
 
 ## What PRISMA is, in one paragraph
 
-Five lanes, five steps, five gates. Every request is routed first into one of five lanes, and the lane decides how much verification runs. Only code with logic runs the five steps. Five gates with distinct names decide whether the work leaves the machine. Above all of it sits one rule, that every claim is a hypothesis until it is measured, no matter who wrote it or where it appears.
+Five lanes, five steps, five gates. Every request is routed first, into one of four lanes by the kind of work, and into the fifth as well when something leaves to a third party; the lanes decide how much verification runs. Only code with logic runs the five steps. Five gates with distinct names decide whether the work leaves the machine. Above all of it sits one rule, that every claim is a hypothesis until it is measured, no matter who wrote it or where it appears.
 
 ## Route first
 
-Ask the one-line question of each lane, in order, and stop at the first yes.
+Ask two questions. First, what kind of work is it, and four lanes answer that, query, mechanical change, code with logic and text; the one-line question of each settles it, and when two fit the more expensive one wins. Second, does anything leave to a third party. The fifth lane answers that, and it stacks on whichever lane the first answer chose, adding controls and never replacing them.
 
 | Lane | The one-line question | Example | What runs |
 |---|---|---|---|
 | **Query** | Does this only answer with data and change nothing? | "How many users signed up in August?" | the claims rule. If the figure goes to a third party, two routes and a `[value \| route \| date-time]` label. No skill |
 | **Mechanical change** | Can you PROVE it changes no executable behavior, stored data, permissions, integration or deployment? If you cannot prove it, it is code. A constant is not automatically mechanical and a threshold is a decision | renaming a variable, moving a file, fixing a typo in a string nobody parses | **step 3 only**, run it and look. No skill |
 | **Code with logic** | Is it a feature, a bug fix, a migration, or a script someone else will run? | a new endpoint, a query that feeds a chart, a cron | **the five steps**, and the skills are INVOKED, not cited |
-| **Data to a third party** | Does a file, a list or a figure leave to someone else? | a spreadsheet, a list or a figure someone else will act on | **adds controls, never replaces them.** The query that produces the file is code and runs its lane; the delivery adds mandatory step 3, opening the file and looking at real rows, the verification protocol, and a refuter |
+| **Data to a third party** | Does a file, a list or a figure leave to someone else? | a spreadsheet, a list or a figure someone else will act on | **adds controls, never replaces them.** The query that produces the file is code and runs its lane; the delivery adds mandatory step 3, opening the file and looking at real rows, the verification protocol, a refuter, and the blind replica on every derived figure |
 | **Text** | Is it a page, a PR body, a message, a report, a script to read aloud? | a wiki page, a Slack message, a meeting summary | format gate, refuter, and the claims rule |
 
 **Risk is measured, never size, and the burden of proof is on "mechanical".** A one-line formula can be the most dangerous change of the day. A failure of permissions, integration or deployment touches no decision, formula, metric or interpretation, and still breaks production; a lane cannot depend on a generous reading.

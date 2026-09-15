@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "escape-declared".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 escape_declared() {
   token="$1"

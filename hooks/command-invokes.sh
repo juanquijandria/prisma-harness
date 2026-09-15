@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "command-invokes". Same behavior as its source in the author's toolbox, identifiers translated.
+# Prisma Harness. Documented in README.md, section "What is inside". Same behavior as its source in the author's toolbox, identifiers translated.
 
 SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
 

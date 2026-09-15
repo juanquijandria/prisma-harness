@@ -1,4 +1,4 @@
-# Prisma Harness. Documented in README.md, section "format-gate". Loaded by format-gate.sh, not run alone.
+# Prisma Harness. Documented in README.md, section "What is inside". Loaded by format-gate.sh, not run alone.
 
 debt() {
   printf '=== format debt inventory of %s/%s (%s) ===\n\n' "$DOCS_ROOT" "$DOCS_DIR" "$(date +%Y-%m-%d)"

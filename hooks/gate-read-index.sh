@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "gate-read-index".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
 

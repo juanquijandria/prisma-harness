@@ -178,4 +178,32 @@ else
   fail "B1 the lint gate passed in silence (rc=$rc) out=[$out]"
 fi
 
+bigrepo2="$T/size-policy-repo"
+fixture_repo "$bigrepo2"
+printf 'x\n' > "$bigrepo2/f.txt"; git -C "$bigrepo2" add f.txt >/dev/null 2>&1; git -C "$bigrepo2" commit -qm init
+git -C "$bigrepo2" checkout -qb feature
+seq 1 3200 > "$bigrepo2/big.txt"; git -C "$bigrepo2" add big.txt >/dev/null 2>&1; git -C "$bigrepo2" commit -qm big
+out=$(payload "$bigrepo2" "git push origin feature" | PRISMA_SIZE_BLOCK_OVER=3000 sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
+if [ "$rc" = "2" ] && printf '%s' "$out" | grep -q '3000' && ! printf '%s' "$out" | grep -qi 'drops below half\|defect detection'; then
+  pass "F2a with a custom ceiling the block message states the policy and no empirical claim"
+else
+  fail "F2a rc=$rc out=[$out]"
+fi
+
+seq 1 500 > "$bigrepo2/big.txt"; git -C "$bigrepo2" commit -qam smaller
+out=$(payload "$bigrepo2" "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
+if [ "$rc" = "2" ]; then
+  pass "F2b the default ceiling blocks a 500-line push"
+else
+  fail "F2b a 500-line push passed the default ceiling (rc=$rc)"
+fi
+
+seq 1 250 > "$bigrepo2/big.txt"; git -C "$bigrepo2" commit -qam smaller-still
+out=$(payload "$bigrepo2" "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then
+  pass "F2c the default warning fires on a 250-line push without blocking"
+else
+  fail "F2c a 250-line push (rc=$rc) out=[$out]"
+fi
+
 finish

@@ -33,7 +33,8 @@ index.md in this session. Read <docs root>/index.md first so you do not create
 a duplicate page or leave the index stale, then retry.
 
 SIZE GATE: 1202 lines changed, the push is blocked.
-Over 1000 lines, defect detection in review drops below half.
+This repository blocks a push over 400 changed lines and warns
+over 200. Reviewers stop finding things long before they finish reading.
 ```
 
 PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar; la skill corre los pasos; el método escrito dice por qué.
@@ -55,8 +56,8 @@ El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD
 ## Cómo lo usa una persona
 
 1. **Instala una vez**, los dos comandos de abajo.
-2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas y hablan solo cuando algo está mal. Una escritura en tus docs sin abrir el índice se frena y el agente recibe qué leer. Un push con comentarios sueltos, con más de mil líneas cambiadas o con el linter en rojo se frena y el agente recibe qué hacer. Una página con em-dash o voseo no deja que el agente cierre el turno hasta arreglarla. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
-3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama. La skill rutea el pedido por uno de los cinco carriles y corre lo que el carril pide, hasta los cinco pasos y las cinco puertas.
+2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas y hablan solo cuando algo está mal. Una escritura en tus docs sin abrir el índice se frena y el agente recibe qué leer. Un push con comentarios sueltos, con más de cuatrocientas líneas cambiadas o con el linter en rojo se frena y el agente recibe qué hacer. Una página con em-dash o voseo no deja que el agente cierre el turno hasta arreglarla. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
+3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama. La skill rutea el pedido por los cinco carriles y corre lo que piden, hasta los cinco pasos y las cinco puertas.
 4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
 5. **Actualiza** con los comandos de la sección siguiente, o enciende una vez el auto-update de este marketplace en `/plugin` y olvídate.
 
@@ -99,21 +100,42 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `skills/prisma/SKILL.md` | el orden operativo del método, se invoca como `prisma` | cuando dices "PRISMA" |
 | `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs si la sesión nunca leyó el índice | `PreToolUse` en Write y Edit |
 | `hooks/pre-push-comments.sh` | frena un push o PR cuyo diff agrega comentarios, cifras en comentarios o referencias `archivo:línea` | `PreToolUse` en Bash |
-| `hooks/pre-push-size.sh` | avisa sobre 400 líneas cambiadas, frena sobre 1000, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |
+| `hooks/pre-push-size.sh` | avisa sobre 200 líneas cambiadas, frena sobre 400, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |
 | `hooks/pre-push-lint.sh` | corre el linter del propio repo, `php-cs-fixer` o `eslint`, sobre el diff antes del push | `PreToolUse` en Bash |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
 | `hooks/session-voice.sh` | inyecta las reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
 | `hooks/session-deps.sh` | al arrancar la sesión, le dice al agente qué herramientas o qué plugin faltan, con el comando para instalarlos, y que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
-| `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
+| `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta, y con un auditor configurado su código de salida es el veredicto | lo llamas tú |
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
-| `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
+| `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Ocho piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo y el parser de comandos. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 25 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
+Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 28 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
+
+## Qué se hace cumplir, y quién
+
+"Pasó PRISMA" significa tres cosas distintas según la promesa, y esta tabla dice cuál. Un hook frena solo. Al agente se le pide, y el transcript y el recibo son la evidencia. Una persona, o evidencia de fuera de la máquina, decide el resto. Nada del tercer tipo lo hace cumplir este repositorio, y decirlo es el punto. Las puertas de push miden el HEAD activo contra su base, así que una rama empujada desde otro lado no se mide y la puerta lo dice, y un repositorio listado en `PRISMA_SKIP_REPOS` nunca se mide.
+
+| Promesa | La sostiene | Cómo lo sabes |
+|---|---|---|
+| ninguna página bajo el directorio de docs se escribe sin leer el índice | hook | el gate de índice frena, y no existe escape |
+| ningún push de un repositorio vigilado lleva líneas de comentario, cifras en comentarios ni referencias de archivo y línea | hook | la puerta de comentarios frena el HEAD, y un escape queda en el recibo |
+| ningún push de un repositorio vigilado pasa el techo de tamaño | hook | la puerta de tamaño frena el HEAD, y un escape queda en el recibo |
+| un push de un repositorio vigilado pasa su propio linter | hook | la puerta de lint frena el HEAD, y un escape queda en el recibo |
+| una página tocada hoy cumple las reglas de escritura | hook | el gate de formato frena el cierre, y una regla se apaga en la config |
+| el bloque canónico coincide con toda copia registrada | agente | la sincronía reporta la deriva al arrancar y nunca frena |
+| los cinco pasos corren para código con lógica | agente | la skill los ordena, y el transcript muestra si corrieron |
+| un hallazgo se reproduce antes de repetirse como hecho | agente | el transcript |
+| una cifra se mide por una segunda vía | agente | `blind-replica.sh` arma el brief y lee el veredicto, y no juzga su verdad |
+| el resultado se miró en la superficie que ve una persona | persona | el paso 3, y nadie más puede hacerlo |
+| la condición de salida se cumple donde cayó el trabajo | evidencia externa | el paso 5, sobre la fuente real |
+| las puertas reducen los defectos escapados | evidencia externa | el recibo cuenta frenos, no si cada freno tenía razón |
 
 ## Configurar
 
 Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
+
+**De dónde salen 200 y 400.** Los defaults siguen el estudio que le puso un umbral al tamaño de revisión, [2.500 revisiones en Cisco](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) publicado en 2006 por el proveedor de la herramienta de revisión, que midió densidad de defectos contra líneas bajo revisión y concluyó que deben quedar bajo 200 y nunca pasar de 400. Trabajo con revisión por pares posterior reporta cuán grandes son los cambios en empresas grandes, una mediana de 24 líneas en un estudio, y no fija umbral. Los datos de Cisco son C y C++ de un solo grupo, y las líneas bajo revisión en una herramienta no son las líneas que cuenta un diff, así que esta puerta mide un sustituto y los números son tuyos para cambiarlos. Una versión anterior de esta puerta citaba un techo de 1000 y una afirmación sobre la detección cayendo por debajo de la mitad; ninguna se rastreaba a una fuente, y las dos salieron. El mensaje que imprime la puerta dice la política y nunca el estudio.
 
 ## El recibo
 
@@ -128,7 +150,7 @@ Eso imprime una fila por puerta con frenos, escapes y el primer y último día, 
 ## Lo que no se toca sin escribir la razón
 
 - **El bloque canónico en `docs/es/METHOD.md`.** Toda copia registrada se compara contra él; editarlo acá hace derivar todas las copias a propósito.
-- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto.
+- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto. `hooks/blind-replica.sh` es un comando y no un hook, y sus códigos son propios, `0` el auditor confirmó, `5` refutó, `4` sin veredicto, `6` no hay auditor configurado y solo se imprimió el brief.
 - **Los selftests.** Cambias una puerta, reintroduces el defecto exacto por el que existe, la ves frenar, lo quitas, la ves pasar. El silencio no prueba nada.
 
 ## Trampas conocidas

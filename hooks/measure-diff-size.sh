@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "measure-diff-size".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 REPO="${1:?repo path required}"
 BASE="${2:?base ref required}"

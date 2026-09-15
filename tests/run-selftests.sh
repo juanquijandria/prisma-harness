@@ -5,7 +5,7 @@ HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 export PRISMA_RECEIPT_FILE="$(mktemp -d)/receipts.log"
 failed=0
 OUT=$(mktemp)
-for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes receipt; do
+for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes escape-declared receipt; do
   printf '\n##### %s\n' "$hook"
   if sh "$HOOKS/$hook.sh" --selftest > "$OUT" 2>&1; then :; else failed=$((failed+1)); fi
   cat "$OUT"

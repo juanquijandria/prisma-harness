@@ -9,14 +9,14 @@ Read `METHOD.md` at the plugin root once per session before applying this skill.
 
 ## 1. Route first
 
-Ask the one-line question of each lane, in this order, and stop at the first yes.
+Ask two questions. First, what kind of work is it, and four lanes answer it, query, mechanical change, code with logic and text, the more expensive one winning when two fit. Second, does anything leave to a third party, and the fifth lane stacks on the first answer, adding controls and never replacing them.
 
 | Lane | The question | What runs |
 |---|---|---|
 | Query | Does this only answer with data and change nothing? | the claims rule. A figure that leaves the machine gets two routes and a `[value \| route \| date-time]` label |
 | Mechanical change | Can you PROVE it changes no executable behavior, stored data, permissions, integration or deployment? | step 3 only, run it and look |
 | Code with logic | Is it a feature, a bug fix, a migration, or a script someone else will run? | the five steps |
-| Data to a third party | Does a file, list or figure leave to someone else? | the producing query is code and runs its lane, plus step 3 on the real rows, the verification protocol, and a refuter |
+| Data to a third party | Does a file, list or figure leave to someone else? | the producing query is code and runs its lane, plus step 3 on the real rows, the verification protocol, a refuter, and the blind replica on every derived figure |
 | Text | Is it a page, a PR body, a message, a report, a script to read aloud? | the format gate, a refuter, the claims rule |
 
 Two guards. When in doubt, take the MORE expensive lane, because the agent has an interest in choosing the cheap one. A lane goes up, never silently down; going down is declared.
@@ -35,7 +35,7 @@ Two guards. When in doubt, take the MORE expensive lane, because the agent has a
 - **Format gate**, `hooks/format-gate.sh`. Is the deliverable written to the rules? It reads no code and finds no bugs.
 - **Refuter**, an adversarial agent whose job is to knock the finding down against code and data.
 - **Merge gate**, the CI or bot check on the PR. It says whether the PR can merge. Its findings are reproduced before being repeated as facts.
-- **Blind replica**, `hooks/blind-replica.sh`. Receives the claim and the sources and NOTHING of the calculation. Mandatory for derived figures, platform semantics, ambiguous sources, data to third parties, and hard-to-revert consequences. In single-model mode it runs in a fresh-context subagent and declares that it gives independence of derivation, not of engine.
+- **Blind replica**, `hooks/blind-replica.sh`. Receives the claim and the sources and NOTHING of the calculation. Mandatory for derived figures, platform semantics, ambiguous sources, data to third parties, and hard-to-revert consequences. In single-model mode it runs in a fresh-context subagent and declares that it gives independence of derivation, not of engine. Write the claim and its sources to a file and run `sh hooks/blind-replica.sh <file>`. Without `PRISMA_AUDITOR_CMD` it prints the brief for a fresh subagent and exits 6; with it, the exit code is the verdict, 0 confirmed, 5 refuted, 4 none.
 
 ## 4. Every claim is a hypothesis until measured
 

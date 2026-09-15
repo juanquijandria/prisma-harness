@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prisma Harness. Documented in README.md, section "measure-comments".
+# Prisma Harness. Documented in README.md, section "What is inside".
 set -uo pipefail
 
 PCT_MAX="${PRISMA_COMMENTS_MAX_PCT:-0}"

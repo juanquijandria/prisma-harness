@@ -33,7 +33,8 @@ index.md in this session. Read <docs root>/index.md first so you do not create
 a duplicate page or leave the index stale, then retry.
 
 SIZE GATE: 1202 lines changed, the push is blocked.
-Over 1000 lines, defect detection in review drops below half.
+This repository blocks a push over 400 changed lines and warns
+over 200. Reviewers stop finding things long before they finish reading.
 ```
 
 PRISMA is a verification method for work that an agent produces, and this repository is the method packaged as a Claude Code plugin. Five lanes decide how much verification a request needs, five steps run for code with logic, and five gates with distinct names decide whether the work leaves the machine. The hooks block what the method says must not pass; the skill runs the steps; the written method says why.
@@ -55,8 +56,8 @@ The order the agent follows is written, not drawn. It lives in `METHOD.md` and i
 ## How a person uses it
 
 1. **Install once**, the two commands below.
-2. **Open a new session and work as always.** You do not call anything. The gates run on their own and speak only when something is wrong. A write to your docs without opening the index is blocked and the agent is told what to read. A push with stray comments, over a thousand changed lines or a red linter is blocked and the agent is told what to do. A page with an em-dash or voseo keeps the agent from closing its turn until it is fixed. The writing rules arrive at session start, so the agent writes that way without being asked.
-3. **Say "PRISMA"** when you want the whole method on a piece of work. That is the only thing you ever call. The skill routes the request into one of the five lanes and runs what the lane requires, up to the five steps and five gates.
+2. **Open a new session and work as always.** You do not call anything. The gates run on their own and speak only when something is wrong. A write to your docs without opening the index is blocked and the agent is told what to read. A push with stray comments, over four hundred changed lines or a red linter is blocked and the agent is told what to do. A page with an em-dash or voseo keeps the agent from closing its turn until it is fixed. The writing rules arrive at session start, so the agent writes that way without being asked.
+3. **Say "PRISMA"** when you want the whole method on a piece of work. That is the only thing you ever call. The skill routes the request through the five lanes and runs what they require, up to the five steps and five gates.
 4. **Read `METHOD.md`** when you want to know why a gate did what it did.
 5. **Update** with the commands in the next section, or turn on auto-update for this marketplace once in `/plugin` and forget about it.
 
@@ -99,17 +100,36 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `skills/prisma/SKILL.md` | the operating order of the method, invoked as `prisma` | when you say "PRISMA" |
 | `hooks/gate-read-index.sh` | blocks a write under the docs dir if the session never read the index | `PreToolUse` on Write and Edit |
 | `hooks/pre-push-comments.sh` | blocks a push or PR whose diff adds comment lines, figures in comments, or `file:line` references | `PreToolUse` on Bash |
-| `hooks/pre-push-size.sh` | warns over 400 changed lines, blocks over 1000, and tells a stale branch apart from a big change | `PreToolUse` on Bash |
+| `hooks/pre-push-size.sh` | warns over 200 changed lines, blocks over 400, and tells a stale branch apart from a big change | `PreToolUse` on Bash |
 | `hooks/pre-push-lint.sh` | runs the repo's own linter, `php-cs-fixer` or `eslint`, on the diff before the push | `PreToolUse` on Bash |
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
 | `hooks/session-voice.sh` | injects the writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
 | `hooks/session-deps.sh` | at session start, tells the agent which required tools or which plugin are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
-| `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
+| `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate, and with an auditor configured its exit code is the verdict | you call it |
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
-| `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
+| `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | the helpers the gates share | called by the gates |
 
-Eight pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt and the command parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 25 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
+Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 28 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
+
+## What is enforced, and by what
+
+"It passed PRISMA" means three different things depending on the promise, and this table says which. A hook blocks on its own. The agent is asked, and the transcript and the receipt are the evidence. A person, or evidence from outside the machine, decides the rest. Nothing in the third kind is enforced by this repository, and saying so is the point. The push gates measure the checked-out HEAD against its base, so a branch pushed from elsewhere is not measured and the gate says so, and a repository listed in `PRISMA_SKIP_REPOS` is never measured at all.
+
+| Promise | Held by | How you know |
+|---|---|---|
+| no page under the docs dir is written without reading the index | hook | the index gate blocks, and no escape exists |
+| no push from a watched repository carries comment lines, figures in comments or file and line references | hook | the comments gate blocks HEAD, and an escape is recorded in the receipt |
+| no push from a watched repository passes the size ceiling | hook | the size gate blocks HEAD, and an escape is recorded |
+| a push from a watched repository passes its own linter | hook | the lint gate blocks HEAD, and an escape is recorded |
+| a page touched today follows the writing rules | hook | the format gate blocks the stop, and a rule switches off in config |
+| the canonical block matches every registered copy | agent | the sync check reports drift at session start and never blocks |
+| the five steps run for code with logic | agent | the skill orders them, and the transcript shows whether they ran |
+| a finding is reproduced before it is repeated as a fact | agent | the transcript |
+| a figure is measured by a second route | agent | `blind-replica.sh` builds the brief and reads the verdict, and it does not judge its truth |
+| the result was looked at on the surface a person sees | person | step 3, and nobody else can do it |
+| the exit condition holds where the work landed | outside evidence | step 5, on the real source |
+| the gates reduce escaped defects | outside evidence | the receipt counts blocks, not whether each block was right |
 
 ## Configure
 
@@ -122,7 +142,7 @@ Environment variables, all optional.
 | `PRISMA_INDEX_FILE` | `index.md` | the file a session must read before writing a page |
 | `PRISMA_FORMAT_CONFIG` | `<docs root>/.prisma-format.conf` | rule switches, see `STYLE.md` and `.prisma-format.conf.example` |
 | `PRISMA_CANONICAL`, `PRISMA_CANONICAL_COPIES` | the plugin's Spanish block, and `~/.claude/CLAUDE.md` plus the project `CLAUDE.md` when they carry the markers | what the sync check compares |
-| `PRISMA_SIZE_WARN_OVER`, `PRISMA_SIZE_BLOCK_OVER` | 400, 1000 | the size gate thresholds |
+| `PRISMA_SIZE_WARN_OVER`, `PRISMA_SIZE_BLOCK_OVER` | 200, 400 | the size gate thresholds |
 | `PRISMA_COMMENTS_MAX_PCT`, `PRISMA_COMMENTS_MAX_BLOCK` | 0, 0 | the comments gate ceilings |
 | `PRISMA_SKIP_REPOS` | empty | absolute paths where the push gates do not apply |
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
@@ -137,6 +157,8 @@ Environment variables, all optional.
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 
+**Where 200 and 400 come from.** The defaults follow the study that put a threshold on review size, [2,500 reviews at Cisco](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) published in 2006 by the vendor of the review tool, which measured defect density against lines under review and concluded that they should stay under 200 and never pass 400. Peer-reviewed work since then reports how large changes are at large companies, a median of 24 lines in one study, and sets no threshold. The Cisco data is C and C++ from one group, and lines under review in a tool are not the lines a diff counts, so this gate measures a proxy and the numbers are yours to change. An earlier version of this gate quoted a ceiling of 1000 and a claim about detection dropping below half; neither traced to a source, and both are gone. The message the gate prints states the policy and never the study.
+
 ## The receipt
 
 Every time a gate blocks something, or someone gets past it with an escape, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and whether it was blocked or escaped. Nothing else, and it never leaves your machine unless you paste it. The hooks running inside Claude Code and the command you run in a terminal read and write that same file, on purpose.
@@ -150,7 +172,7 @@ That prints one row per gate with blocks, escapes and the first and last day, re
 ## What not to change without writing the reason
 
 - **The canonical block in `docs/es/METHOD.md`.** Every registered copy is compared against it; editing it here makes every copy drift on purpose.
-- **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict.
+- **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict. `hooks/blind-replica.sh` is a command and not a hook, and its codes are its own, `0` the auditor confirmed, `5` it refuted, `4` no verdict, `6` no auditor is configured and only the brief was printed.
 - **The selftests.** Change a gate, reintroduce the exact defect it exists for, watch it block, remove it, watch it pass. Silence proves nothing.
 
 ## Gotchas

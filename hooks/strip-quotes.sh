@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "command-invokes".
+# Prisma Harness. Documented in README.md, section "What is inside".
 PYTHON="${PRISMA_PYTHON-$(command -v python3 || command -v python)}"
 [ -n "$PYTHON" ] || { echo "WARN: strip-quotes.sh needs python3 or python and found neither, quotes were not stripped." >&2; exit 3; }
 stripped=$("$PYTHON" -c '

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "compare-base".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 1
 

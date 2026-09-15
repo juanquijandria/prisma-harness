@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "session-voice", and in STYLE.md.
+# Prisma Harness. Documented in README.md, section "What is inside", and in STYLE.md.
 
 SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
 

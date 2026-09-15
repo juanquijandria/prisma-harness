@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "receipt".
+# Prisma Harness. Documented in README.md, section "What is inside".
 # PRISMA_RECEIPT_ENTRYPOINT_MARKER, how this file knows it is the script being run and not a library.
 
 receipt_file() {

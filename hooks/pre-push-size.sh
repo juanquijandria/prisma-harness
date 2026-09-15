@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "pre-push-size".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 JQ=$(command -v jq)
@@ -7,8 +7,8 @@ MEASURE="$HOOKS_DIR/measure-diff-size.sh"
 COMPARE_BASE="$HOOKS_DIR/compare-base.sh"
 INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
-WARN_OVER="${PRISMA_SIZE_WARN_OVER:-400}"
-BLOCK_OVER="${PRISMA_SIZE_BLOCK_OVER:-1000}"
+WARN_OVER="${PRISMA_SIZE_WARN_OVER:-200}"
+BLOCK_OVER="${PRISMA_SIZE_BLOCK_OVER:-400}"
 ESCAPE="PRISMA_SIZE_OK=1"
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
@@ -88,8 +88,8 @@ if [ "$lines" -gt "$BLOCK_OVER" ]; then
   {
     echo "SIZE GATE: $lines lines changed, the push is blocked."
     echo
-    echo "Over $BLOCK_OVER lines, defect detection in review drops below half."
-    echo "Reviewers stop finding things long before they finish reading."
+    echo "This repository blocks a push over $BLOCK_OVER changed lines and warns"
+    echo "over $WARN_OVER. Reviewers stop finding things long before they finish reading."
     echo
     if [ "$behind" -ge "$STALE_BEHIND" ]; then
       echo "NOTE: this branch is $behind commits BEHIND its upstream. Much of those"
@@ -107,7 +107,7 @@ if [ "$lines" -gt "$BLOCK_OVER" ]; then
 fi
 
 if [ "$lines" -gt "$WARN_OVER" ]; then
-  echo "WARN from the size gate: $lines lines changed, over the $WARN_OVER where review starts missing defects. Not blocking." >&2
+  echo "WARN from the size gate: $lines lines changed, over the $WARN_OVER this repository warns at. Not blocking." >&2
 fi
 
 exit 0

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Documented in README.md, section "pre-push-lint".
+# Prisma Harness. Documented in README.md, section "What is inside".
 
 HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 JQ=$(command -v jq)
