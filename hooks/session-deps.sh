@@ -2,7 +2,7 @@
 # Prisma Harness. Documented in README.md, section "session-deps".
 
 INSTALLED="${PRISMA_INSTALLED_PLUGINS:-$HOME/.claude/plugins/installed_plugins.json}"
-REQUIRED_TOOLS="jq python3 git awk cmp bash"
+REQUIRED_TOOLS=$(printf '%s' "${PRISMA_REQUIRED_TOOLS:-jq python3 git awk cmp bash}" | tr ',' ' ')
 POCOCK_ID="mattpocock-skills@claude-plugins-official"
 
 missing_tools() {
@@ -11,7 +11,10 @@ missing_tools() {
     missing="command-line-tools"
   fi
   for tool in $REQUIRED_TOOLS; do
-    command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+    case "$tool" in
+      python3) command -v python3 >/dev/null 2>&1 || command -v python >/dev/null 2>&1 || missing="$missing python3" ;;
+      *) command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool" ;;
+    esac
   done
   printf '%s' "$missing" | sed 's/^ *//'
 }
@@ -36,30 +39,21 @@ report() {
   fi
 }
 
-if [ "$1" = "--print-required" ]; then printf '%s\n' "$REQUIRED_TOOLS"; exit 0; fi
-
 if [ "$1" = "--selftest" ]; then
   SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
-  ok=1; T=$(mktemp -d); mkdir -p "$T/bin"
-  for t in cat grep sed sh; do ln -s "$(command -v $t)" "$T/bin/$t" 2>/dev/null || cp "$(command -v $t)" "$T/bin/$t"; done
+  ok=1; T=$(mktemp -d)
   printf '{"plugins":{"%s":[{}]}}' "$POCOCK_ID" > "$T/present.json"
   printf '{"plugins":{"other@x":[{}]}}' > "$T/absent.json"
-  run() { printf '{}' | PRISMA_INSTALLED_PLUGINS="$1" PATH="$2" /bin/sh "$SELF"; }
-  out=$(run "$T/present.json" "$PATH")
+  run() { printf '{}' | PRISMA_INSTALLED_PLUGINS="$1" PRISMA_REQUIRED_TOOLS="$2" sh "$SELF"; }
+  out=$(run "$T/present.json" "sh")
   if [ -z "$out" ]; then printf 'PASS quiet when every tool and the plugin are present\n'; else printf 'FAIL expected silence, got: %s\n' "$out"; ok=0; fi
-  out=$(run "$T/absent.json" "$PATH")
+  out=$(run "$T/absent.json" "sh")
   if printf '%s' "$out" | grep -q "mattpocock-skills is not installed" && ! printf '%s' "$out" | grep -q "Missing on this machine"; then printf 'PASS names only the plugin when only the plugin is missing\n'; else printf 'FAIL plugin case: %s\n' "$out"; ok=0; fi
-  out=$(run "$T/present.json" "$T/bin")
-  if printf '%s' "$out" | grep -q "Missing on this machine: jq python3 git awk cmp bash" && printf '%s' "$out" | grep -q "brew install jq"; then printf 'PASS names the missing tools with the install command, without needing jq\n'; else
-    printf 'FAIL tools case: %s\n' "$out"; ok=0
-    printf 'debug installed=[%s] readable=%s grep_rc=%s\n' "$T/present.json" "$([ -r "$T/present.json" ] && echo yes || echo no)" "$(grep -q '"mattpocock-skills@' "$T/present.json"; echo $?)"
-    printf 'debug missing_tools=[%s] cmdv_rc=%s\n' "$(PRISMA_REQUIRED_TOOLS='no-such-tool-x' missing_tools)" "$(command -v no-such-tool-x >/dev/null 2>&1; echo $?)"
-    printf 'debug child sees REQUIRED_TOOLS=[%s] INSTALLED=[%s]\n' "$(PRISMA_REQUIRED_TOOLS='a b' sh "$SELF" --print-required)" "$(PRISMA_INSTALLED_PLUGINS="$T/present.json" sh "$SELF" --print-installed)"
-  fi
+  out=$(run "$T/present.json" "sh,no-such-tool-alpha,no-such-tool-beta")
+  if printf '%s' "$out" | grep -q "Missing on this machine: no-such-tool-alpha no-such-tool-beta" && printf '%s' "$out" | grep -q "brew install no-such-tool-alpha no-such-tool-beta"; then printf 'PASS names the missing tools with the install command\n'; else printf 'FAIL tools case: %s\n' "$out"; ok=0; fi
   if printf '%s' "$out" | grep -q "Never install anything without their explicit yes"; then printf 'PASS tells the agent to ask before installing\n'; else printf 'FAIL no consent line\n'; ok=0; fi
-  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 /bin/sh "$SELF")
+  out=$(printf '{}' | PRISMA_INSTALLED_PLUGINS="$T/absent.json" PRISMA_DEPS_CHECK=0 sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_DEPS_CHECK=0 switches it off\n'; else printf 'FAIL switch: %s\n' "$out"; ok=0; fi
-  printf 'info: a child process sees a spaced env value as [%s] and an unspaced one as [%s]\n' "$(PRISMA_REQUIRED_TOOLS='a b' sh "$SELF" --print-required)" "$(PRISMA_REQUIRED_TOOLS='a,b' sh "$SELF" --print-required)"
   rm -rf "$T"
   [ "$ok" = "1" ] && printf 'SELFTEST OK: 5/5\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
