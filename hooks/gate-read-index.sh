@@ -38,13 +38,14 @@ if [ "$1" = "--selftest" ]; then
   exit 1
 fi
 
-command -v jq >/dev/null 2>&1 || { echo "WARN: the index gate did not run, jq is missing." >&2; exit 0; }
+JQ="${PRISMA_JQ:-$(command -v jq)}"
+[ -n "$JQ" ] || { echo "WARN: the index gate did not run, jq is missing." >&2; exit 0; }
 
 payload=$(cat)
 [ -n "$payload" ] || { echo "WARN: the index gate received an empty payload, so nothing was verified." >&2; exit 0; }
-printf '%s' "$payload" | jq -e . >/dev/null 2>&1 || { echo "WARN: the index gate could not parse the payload, so nothing was verified." >&2; exit 0; }
-file_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty')
-transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
+printf '%s' "$payload" | "$JQ" -e . >/dev/null 2>&1 || { echo "WARN: the index gate could not parse the payload, so nothing was verified." >&2; exit 0; }
+file_path=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.file_path // empty')
+transcript=$(printf '%s' "$payload" | "$JQ" -r '.transcript_path // empty')
 
 case "$file_path" in
   "$DOCS_ROOT/$DOCS_DIR"/*) ;;
@@ -53,11 +54,12 @@ esac
 
 [ -n "$transcript" ] && [ -f "$transcript" ] || { echo "WARN: the index gate could not read the transcript, nothing was verified." >&2; exit 0; }
 
-opened=$(jq -r --arg idx "$INDEX_PATH" 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | select((.input.file_path // "") == $idx) | .id // empty' "$transcript" 2>/dev/null)
-opened_status=$?
-errored=$(jq -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
+touched=$("$JQ" -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | select((.id // "") != "") | select((.input.file_path // "") != "") | "\(.id)\t\(.input.file_path)"' "$transcript" 2>/dev/null)
+touched_status=$?
+errored=$("$JQ" -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
 errored_status=$?
-{ [ "$opened_status" = "0" ] && [ "$errored_status" = "0" ]; } || { echo "WARN: the index gate could not read the transcript, so nothing was verified." >&2; exit 0; }
+{ [ "$touched_status" = "0" ] && [ "$errored_status" = "0" ]; } || { echo "WARN: the index gate could not read the transcript, so nothing was verified." >&2; exit 0; }
+opened=$(printf '%s\n' "$touched" | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
 
 while IFS= read -r call; do
   [ -n "$call" ] || continue

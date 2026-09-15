@@ -91,4 +91,29 @@ else
   fail "F4b a failed Read was accepted as evidence (rc=$rc)"
 fi
 
+# W1
+mangle_dir="$T/native-windows-bin"
+mkdir -p "$mangle_dir"
+cat > "$mangle_dir/jq" <<MANGLE
+#!/bin/sh
+args=""
+countdown=0
+for a in "\$@"; do
+  [ "\$countdown" = "1" ] && case "\$a" in /*) a="C:/Temp\${a}" ;; esac
+  [ "\$countdown" -gt 0 ] && countdown=\$((countdown-1))
+  [ "\$a" = "--arg" ] && countdown=2
+  args="\$args '\$a'"
+done
+eval exec $(command -v jq) \$args
+MANGLE
+chmod +x "$mangle_dir/jq"
+tx="$T/mangle.jsonl"
+{ tool_use tu_m Read; tool_result tu_m false; } > "$tx"
+out=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/p.md"}}' "$tx" "$root" | PRISMA_DOCS_ROOT="$root" PATH="$mangle_dir:$PATH" sh "$HOOKS/gate-read-index.sh" 2>&1); rc=$?
+if [ "$rc" = "0" ]; then
+  pass "W1 a jq that rewrites unix paths, as Git Bash does for a native binary, does not hide that the index was read"
+else
+  fail "W1 path rewriting turned a read index into a block (rc=$rc) out=[$out]"
+fi
+
 finish
