@@ -106,6 +106,7 @@ Probado en macOS. Los scripts son shell POSIX y todos los selftests pasan bajo `
 | `hooks/session-voice.sh` | inyecta las ocho reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
 | `hooks/session-deps.sh` | al arrancar la sesión, le dice al agente qué herramientas o qué plugin faltan, con el comando para instalarlos, y que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta | lo llamas tú |
+| `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
 Los seis hooks que actúan solos, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión y el chequeo de dependencia, tienen `--selftest`, y también el parser de comandos, con 16 casos. Las tres puertas de push se prueban con control positivo y negativo contra un repo de prueba en `tests/push-gates-controls.sh`. `tests/run-selftests.sh` corre todo. Una puerta cuyas pruebas nunca fallan es decoración.
@@ -113,6 +114,16 @@ Los seis hooks que actúan solos, el gate de índice, el de formato, la sincron�
 ## Configurar
 
 Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
+
+## El recibo
+
+Cada vez que una puerta frena algo, o alguien la pasa con el escape, cae una línea en un archivo local con la fecha y hora, la puerta, el repositorio, y si fue frenado o escapado. Nada más, y nunca sale de tu máquina salvo que lo pegues.
+
+```
+sh hooks/receipt.sh --summary
+```
+
+Eso imprime una fila por puerta con frenos, escapes y el primer y último día, lista para pegar en un chat. Así sabes qué puertas cazan cosas en tu trabajo y cuáles nunca disparan, y es lo que le mandas a quien lleve PRISMA para un equipo. Cuenta frenos, no si cada freno tenía razón, y no ve lo que ninguna puerta cazó. `PRISMA_RECEIPT=0` lo apaga, `--path` dice dónde está el archivo, `--reset` lo vacía después de preguntar.
 
 ## Lo que no se toca sin escribir la razón
 

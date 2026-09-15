@@ -106,6 +106,7 @@ Tested on macOS. The scripts are POSIX shell and every selftest passes under `da
 | `hooks/session-voice.sh` | injects the eight writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
 | `hooks/session-deps.sh` | at session start, tells the agent which required tools or which plugin are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate | you call it |
+| `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh` | the helpers the gates share | called by the gates |
 
 The six hooks that act on their own, the index gate, the format gate, the sync check, the blind replica, the session voice and the dependency check, have a `--selftest`, and so does the command parser, with 16 cases. The three push gates are tested by positive and negative control against a fixture repo in `tests/push-gates-controls.sh`. `tests/run-selftests.sh` runs all of it. A gate whose tests never fail is decoration.
@@ -127,8 +128,19 @@ Environment variables, all optional.
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
 | `PRISMA_VOICE` | 1 | set to 0 to stop injecting the writing rules at session start |
 | `PRISMA_DEPS_CHECK` | 1 | set to 0 to stop the dependency notice at session start |
+| `PRISMA_RECEIPT` | 1 | set to 0 to stop writing the receipt |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
+
+## The receipt
+
+Every time a gate blocks something, or someone gets past it with an escape, one line lands in a local file with the date and time, the gate, the repository, and whether it was blocked or escaped. Nothing else, and it never leaves your machine unless you paste it.
+
+```
+sh hooks/receipt.sh --summary
+```
+
+That prints one row per gate with blocks, escapes and the first and last day, ready to paste into a chat. It is how you learn which gates catch things in your work and which never fire, and it is what you send to whoever runs PRISMA for a team. It counts blocks, not whether each block was right, and it cannot see what no gate caught. `PRISMA_RECEIPT=0` switches it off, `--path` shows where the file is, `--reset` empties it after asking.
 
 ## What not to change without writing the reason
 
