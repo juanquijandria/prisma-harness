@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/funciona%20con-Claude%20Code-111111?style=flat-square" alt="Funciona con Claude Code">
   <img src="https://img.shields.io/badge/modelo-uno%20solo-111111?style=flat-square" alt="Un solo modelo, sin segundo motor">
-  <img src="https://img.shields.io/badge/selftests-en%20verde-111111?style=flat-square" alt="Todo hook que decide tiene selftest">
+  <a href="https://github.com/juanquijandria/prisma-harness/actions/workflows/selftests.yml"><img src="https://github.com/juanquijandria/prisma-harness/actions/workflows/selftests.yml/badge.svg" alt="selftests en Ubuntu, macOS y Windows"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licencia-MIT-111111?style=flat-square" alt="MIT"></a>
 </p>
 
@@ -87,7 +87,7 @@ Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Market
 
 Requisitos: `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada.
 
-Probado en macOS. Los scripts son shell POSIX y todos los selftests pasan bajo `dash`, el shell de Debian, Ubuntu y WSL, pero ninguna máquina Linux los ha corrido todavía. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash; instala `jq` y Python con `winget install jqlang.jq Python.Python.3.12`, y después corre `sh tests/run-selftests.sh` desde Git Bash y manda la salida si algo falla. WSL 2 se comporta como Linux.
+Todos los selftests y los controles de las puertas de push corren en GitHub Actions en Ubuntu, macOS y Windows con Git Bash, en cada push. La insignia de arriba es esa corrida. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash, y la primera corrida en Windows cazó dos cosas ya arregladas, Python escribiendo CRLF en la salida del parser y `python` como único nombre disponible. Instala las herramientas con `winget install jqlang.jq Python.Python.3.12`. WSL 2 se comporta como Linux.
 
 ## Qué hay adentro
 

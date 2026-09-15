@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code-111111?style=flat-square" alt="Works with Claude Code">
   <img src="https://img.shields.io/badge/model-single-111111?style=flat-square" alt="Single model, no second engine">
-  <img src="https://img.shields.io/badge/selftests-passing-111111?style=flat-square" alt="Every deciding hook has a selftest">
+  <a href="https://github.com/juanquijandria/prisma-harness/actions/workflows/selftests.yml"><img src="https://github.com/juanquijandria/prisma-harness/actions/workflows/selftests.yml/badge.svg" alt="selftests on Ubuntu, macOS and Windows"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT"></a>
 </p>
 
@@ -87,7 +87,7 @@ To never think about it again, open `/plugin` inside Claude Code, go to Marketpl
 
 Requirements: `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`. If any is missing, PRISMA tells you at session start with the install command and asks before installing anything.
 
-Tested on macOS. The scripts are POSIX shell and every selftest passes under `dash`, the shell of Debian, Ubuntu and WSL, but no Linux machine has run them yet. On Windows, Claude Code needs Git for Windows so that the hooks run under Git Bash; install `jq` and Python with `winget install jqlang.jq Python.Python.3.12`, then run `sh tests/run-selftests.sh` from Git Bash and send the output if anything fails. WSL 2 behaves like Linux.
+Every selftest and every push gate control runs on GitHub Actions on Ubuntu, macOS and Windows with Git Bash, on each push. The badge at the top is that run. On Windows, Claude Code needs Git for Windows so the hooks run under Git Bash, and the first Windows run caught two things now fixed, Python writing CRLF into the parser output and `python` being the only name available. Install the tools with `winget install jqlang.jq Python.Python.3.12`. WSL 2 behaves like Linux.
 
 ## What is inside
 
