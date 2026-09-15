@@ -77,6 +77,12 @@ EOT
   stay_quiet "first-person preterite (escribí, corregí) is NOT voseo" "$T/wiki/preterite.md"
   sed 's/Nothing else./El script vosea y los casos famosos son peligrosos./' "$GOOD" > "$T/wiki/substring.md"
   stay_quiet "vos/sos inside vosea, famosos, casos, peligrosos" "$T/wiki/substring.md"
+  sed 's/Nothing else./The team sent an SOS to the on-call engineer./' "$GOOD" > "$T/wiki/english-sos.md"
+  stay_quiet "SOS in an English page is not voseo" "$T/wiki/english-sos.md"
+  sed 's/Nothing else./En este caso sos el que decide, con todos los datos./' "$GOOD" > "$T/wiki/spanish-sos.md"
+  break_it "sos in a Spanish page is still voseo" "$T/wiki/spanish-sos.md"
+  sed 's/Nothing else./Mirá the dashboard before you deploy./' "$GOOD" > "$T/wiki/mixed-voseo.md"
+  break_it "an accented imperative is caught in any page" "$T/wiki/mixed-voseo.md"
   sed 's/Nothing else./The convention is to write `[verify]` with its date next to it./' "$GOOD" > "$T/wiki/verify-quoted.md"
   stay_quiet "[verify] inside backticks (page names the convention)" "$T/wiki/verify-quoted.md"
   sed 's/Nothing else./Links `[[like-this]]` join pages./' "$GOOD" > "$T/wiki/wikilink-quoted.md"
@@ -112,7 +118,7 @@ EOX
 
   rm -rf "$T"
   printf '\n'
-  [ "$R" -eq 0 ] && printf 'SELFTEST OK: passes the good page, catches the 14 breaks, stays quiet on the 15 quiet cases\n' || printf 'SELFTEST FAILED: blind checks or false alarms\n'
+  [ "$R" -eq 0 ] && printf 'SELFTEST OK: passes the good page, catches the 16 breaks, stays quiet on the 16 quiet cases\n' || printf 'SELFTEST FAILED: blind checks or false alarms\n'
   return $R
 }
 

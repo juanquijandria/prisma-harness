@@ -13,7 +13,7 @@ El gate habla de tres formas. Un nombre de archivo roto, un H1 ausente, un encab
 | El encabezado cuenta lo que sigue | `RULE_HEADING_COUNTS` | "## Tres detalles" seguido de cuatro items numerados en negrita, en numerales de español o inglés | un conteo escrito es una afirmación que un diff puede desmentir |
 | Nombres de archivo en kebab-case | `RULE_KEBAB_CASE` | `Nombre_Malo.md`, `nombreMalo.md` | una sola convención de nombres y los enlaces no se rompen por mayúsculas |
 | H1 en la primera línea | `RULE_H1_FIRST_LINE` | una página que no arranca con `# ` | la primera línea nombra el concepto, para personas y para herramientas |
-| Sin voseo | `RULE_VOSEO` | `mirá`, `usá`, `tenés`, `vos`, `sos` como palabra entera; el pretérito `escribí` no es voseo | el español del método es peruano, de tú y nunca de vos. Se apaga si el tuyo no lo es |
+| Sin voseo | `RULE_VOSEO` | los imperativos con tilde como `mirá` o `usá` en cualquier página, y las palabras sueltas `vos` y `sos` solo en una página escrita en español, así un `SOS` en inglés no es hallazgo. El pretérito `escribí` nunca es voseo | el español del método es peruano, sin voseo. Se apaga si el tuyo lo usa, o si no escribes en español |
 | Techo de la página | `RULE_LINE_CEILING` | un aviso a nueve décimos del techo y otro al pasarlo, 150 líneas por defecto | pasadas las 150 líneas una página son dos conceptos. Propone partir, no prohíbe. En 0 se apaga, o se declara `<!-- ceiling-imposed: motivo -->` en las primeras diez líneas |
 
 ## Las reglas apagadas por defecto

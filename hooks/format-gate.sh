@@ -163,8 +163,10 @@ review() {
   fi
 
   if [ "$RULE_VOSEO" = "1" ]; then
+    SPANISH=0
+    grep -qiE '[áéíóúñ¿¡]|(^|[^[:alnum:]])(que|para|con|una|del|los|las|por|como|pero)([^[:alnum:]]|$)' "$F" && SPANISH=1
     VOSEO='tenés|podés|querés|sabés|preferís|venís|decís|hacés|sentís|seguís|elegís|mirá|andá|usá|probá|armá|dejá|pasá|contá|mandá|buscá|agregá|revisá|ajustá|explicá|evitá|tomá|llamá|cambiá|guardá|fijate|acordate|quedate'
-    for L in $(awk -v vos="$VOSEO" '
+    for L in $(awk -v vos="$VOSEO" -v spanish="$SPANISH" '
       NR==1 && /^---$/ { fm=1; next }
       fm && /^---$/ { fm=0; next }
       fm { next }
@@ -176,7 +178,7 @@ review() {
         gsub(/`[^`]*`/, "", line)
         if (line ~ /voseo|argentin/) next
         if (line ~ ("(^|[^[:alnum:]])(" vos ")([^[:alnum:]]|$)")) { print NR; next }
-        if (line ~ /(^|[^[:alnum:]])(vos|sos)([^[:alnum:]]|$)/) print NR
+        if (spanish == 1 && line ~ /(^|[^[:alnum:]])(vos|sos)([^[:alnum:]]|$)/) print NR
       }
     ' "$F"); do
       strict_or_warn "$REL:$L | voseo. The rule is Peruvian Spanish, tú and never vos"

@@ -13,7 +13,7 @@ The gate speaks in three ways. A broken file name, a missing H1, a heading whose
 | Headings count what follows | `RULE_HEADING_COUNTS` | "## Three details" followed by four bold numbered items, in English or Spanish numerals | a stated count is a claim a diff can disprove |
 | File names in kebab-case | `RULE_KEBAB_CASE` | `Bad_Name.md`, `badName.md` | one name convention means links never break on case |
 | H1 on the first line | `RULE_H1_FIRST_LINE` | a page that does not start with `# ` | the first line names the concept, for people and for tools |
-| No River Plate voseo | `RULE_VOSEO` | `mirá`, `usá`, `tenés`, `vos`, `sos` as whole words; the first-person preterite `escribí` is not voseo | the method's Spanish is Peruvian, `tú` and never `vos`. Off if your Spanish is not |
+| No River Plate voseo | `RULE_VOSEO` | accented imperatives like `mirá` or `usá` in any page, and the bare words `vos` and `sos` only in a page that is written in Spanish, so an English `SOS` is not a finding. The first-person preterite `escribí` is never voseo | the method's Spanish is Peruvian, with no voseo. Turn it off if your Spanish uses it, or if you do not write Spanish at all |
 | Page ceiling | `RULE_LINE_CEILING` | a warning at nine tenths of the ceiling and another past it, 150 lines by default | past 150 lines a page is two concepts. It proposes a split, it does not forbid. Set to 0 to disable, or add `<!-- ceiling-imposed: reason -->` in the first ten lines |
 
 ## The rules off by default
