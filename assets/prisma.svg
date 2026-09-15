@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 530" width="400" height="530" role="img" aria-label="Pentagonal prism">
+  <defs>
+    <linearGradient id="edge" gradientUnits="userSpaceOnUse" x1="60" y1="50" x2="345" y2="475">
+      <stop offset="0%" stop-color="#7ee7ff"></stop>
+      <stop offset="50%" stop-color="#9d7bff"></stop>
+      <stop offset="100%" stop-color="#ff8ad4"></stop>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0%" stop-color="#7ee7ff" stop-opacity=".18"></stop>
+      <stop offset="100%" stop-color="#ff8ad4" stop-opacity=".05"></stop>
+    </linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#9d7bff" stop-opacity=".28"></stop>
+      <stop offset="100%" stop-color="#7ee7ff" stop-opacity=".10"></stop>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="9" result="b"></feGaussianBlur>
+      <feMerge><feMergeNode in="b"></feMergeNode><feMergeNode in="b"></feMergeNode></feMerge>
+    </filter>
+    
+  </defs>
+
+  <g class="breathe" filter="url(#glow)" stroke="url(#edge)" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200,68 L333,104 L282,162 L118,162 L67,104 Z"></path>
+    <path d="M200,68 L333,104 L333,404 L282,462 L118,462 L67,404 L67,104 Z"></path>
+    <path d="M333,104 L333,404 M282,162 L282,462 M118,162 L118,462"></path>
+  </g>
+
+  <path d="M200,68 L333,104 L333,404 L282,462 L118,462 L67,404 L67,104 Z" fill="url(#face)"></path>
+  <path d="M200,68 L333,104 L282,162 L118,162 L67,104 Z" fill="url(#top)"></path>
+
+  <g stroke="url(#edge)" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M200,68 L333,104 L282,162 L118,162 L67,104 Z"></path>
+    <path d="M333,104 L333,404"></path>
+    <path d="M282,162 L282,462"></path>
+    <path d="M118,162 L118,462"></path>
+    <path d="M67,104 L67,404"></path>
+    <path d="M333,404 L282,462 L118,462 L67,404"></path>
+  </g>
+
+  <g class="flow" stroke="url(#edge)" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="16 20" opacity=".85">
+    <path d="M200,68 L200,368"></path>
+    <path d="M67,404 L200,368 L333,404"></path>
+  </g>
+
+  <g class="node" fill="#9d7bff">
+    <circle cx="200" cy="68" r="7"></circle>
+    <circle cx="333" cy="104" r="7"></circle>
+    <circle cx="67" cy="104" r="7"></circle>
+    <circle cx="282" cy="162" r="7"></circle>
+    <circle cx="118" cy="162" r="7"></circle>
+    <circle cx="333" cy="404" r="7"></circle>
+    <circle cx="67" cy="404" r="7"></circle>
+    <circle cx="282" cy="462" r="7"></circle>
+    <circle cx="118" cy="462" r="7"></circle>
+  </g>
+  <g fill="#ffffff" opacity=".9">
+    <circle cx="200" cy="68" r="2.6"></circle>
+    <circle cx="333" cy="104" r="2.6"></circle>
+    <circle cx="67" cy="104" r="2.6"></circle>
+    <circle cx="282" cy="162" r="2.6"></circle>
+    <circle cx="118" cy="162" r="2.6"></circle>
+    <circle cx="333" cy="404" r="2.6"></circle>
+    <circle cx="67" cy="404" r="2.6"></circle>
+    <circle cx="282" cy="462" r="2.6"></circle>
+    <circle cx="118" cy="462" r="2.6"></circle>
+  </g>
+  <circle cx="200" cy="368" r="5" fill="#ff8ad4" opacity=".9"></circle>
+</svg>

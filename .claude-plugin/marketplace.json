@@ -7,7 +7,7 @@
     {
       "name": "prisma-harness",
       "source": "./",
-      "description": "PRISMA, a verification method for agent-written work, as Claude Code hooks, a skill and a written method."
+      "description": "PRISMA, a verification method for agent-written work, as Claude Code hooks, five skills and a written method."
     }
   ]
 }

@@ -23,15 +23,15 @@ Two guards. When in doubt, take the MORE expensive lane, because the agent has a
 
 ## 2. The five steps, for code with logic
 
-1. **Plan.** Interview until shared understanding, with a record. Invoke `mattpocock-skills:grilling` if the plugin is installed; otherwise run the interview yourself in rounds with a recommended answer per question. Then say whether the work fits in one session (about 140k tokens of useful context). If it does not, split it into session-sized tickets before building.
-2. **Build.** Build, then `mattpocock-skills:tdd`, then `mattpocock-skills:code-review` in clean subagents, then commit. Without the plugin, the same order by hand, tests first, build, a review in a fresh context, commit.
+1. **Plan.** Invoke `prisma-plan`. It interviews in rounds with a recommended answer per question, leaves a record with the agreed behavior, the exclusions, the seams, the surface and the exit condition, and closes by declaring the lane and whether the work fits in one session, about 140k tokens of useful context. If it does not fit, it splits the work into session-sized tickets before anything is built.
+2. **Build.** Invoke `prisma-build`. Tests first at the agreed seams, every control seen red before the code that turns it green exists, then `prisma-fidelity-review` in a fresh subagent that receives the record and the fixed point and nothing of the builder's account, then commit. If something is broken along the way, invoke `prisma-diagnose` before patching; it ends by naming the step the defect escaped from.
 3. **End to end.** Run it on real data and LOOK at the result. Name the surface where a person will see it BEFORE looking, then look at THAT surface, not the artifact that produces it. Two failures of the same functional hypothesis send you back to step 1.
 4. **QA of the QA and format gate.** Reintroduce the EXACT defect and confirm the test fails for the expected reason. Add a semantic counterexample chosen separately. Run `hooks/format-gate.sh --strict` on every text you deliver.
 5. **Verify.** Check the exit condition on the real source or surface. A figure gets measured again by a second route, in the normal state and in the edge state. A behavior change gets observed at the destination. Never cite an earlier run as a substitute.
 
 ## 3. The five gates, by name
 
-- **Fidelity reviewer**, the code review. Did we build what was agreed?
+- **Fidelity reviewer**, `prisma-fidelity-review` in a fresh subagent. Did we build what the record agreed, no more and no less?
 - **Format gate**, `hooks/format-gate.sh`. Is the deliverable written to the rules? It reads no code and finds no bugs.
 - **Refuter**, an adversarial agent whose job is to knock the finding down against code and data.
 - **Merge gate**, the CI or bot check on the PR. It says whether the PR can merge. Its findings are reproduced before being repeated as facts.

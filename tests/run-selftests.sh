@@ -43,6 +43,17 @@ for controls in push-gates-never-fabricate page-gates-never-fabricate; do
   fi
   rm -f "$FAB"
 done
+printf '\n##### skills controls\n'
+SK=$(mktemp)
+if /bin/sh "$(dirname "$0")/skills-controls.sh" > "$SK" 2>&1; then :; else failed=$((failed+1)); fi
+cat "$SK"
+sk_declared=$(sed -n 's/.*SELFTEST OK: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p' "$SK" | tail -1)
+sk_ran=$(grep -cE '^ *(PASS|SKIP)' "$SK")
+if [ -n "$sk_declared" ] && [ "$sk_declared" != "$sk_ran" ]; then
+  printf 'FAIL skills-controls says %s cases and printed %s PASS or SKIP lines\n' "$sk_declared" "$sk_ran"
+  failed=$((failed+1))
+fi
+rm -f "$SK"
 printf '\n##### receipt written by the push gate controls\n'
 sh "$HOOKS/receipt.sh" --summary | grep -E 'gate +[0-9]' || { printf 'FAIL no gate wrote a receipt line during the controls\n'; failed=$((failed+1)); }
 printf '\n##### syntax of every hook\n'

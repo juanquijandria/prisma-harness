@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/prisma.svg" width="180" alt="A pentagonal prism"></p>
+
 <h1 align="center">Prisma Harness</h1>
 
 <p align="center"><em>A prism splits one light into separate paths. PRISMA takes a claim and forces it through independent routes until it survives or falls.</em></p>
@@ -37,7 +39,7 @@ This repository blocks a push over 400 changed lines and warns
 over 200. Reviewers stop finding things long before they finish reading.
 ```
 
-PRISMA is a verification method for work that an agent produces, and this repository is the method packaged as a Claude Code plugin. Five lanes decide how much verification a request needs, five steps run for code with logic, and five gates with distinct names decide whether the work leaves the machine. The hooks block what the method says must not pass; the skill runs the steps; the written method says why.
+PRISMA is a verification method for work that an agent produces, and this repository is the method packaged as a Claude Code plugin. Five lanes decide how much verification a request needs, five steps run for code with logic, and five gates with distinct names decide whether the work leaves the machine. The hooks block what the method says must not pass; the skills run the steps; the written method says why.
 
 It runs on a single model. There is no second engine, no external service, no account. The one place where the method was born with two engines, the blind replica, is declared as single-model and stays honest about what that costs.
 
@@ -51,11 +53,11 @@ Three rules hold over every lane and are not another step.
 2. The instrument is calibrated on the real corpus, and whoever calibrates says what was not tested.
 3. A line enters the method only if it turns red on its historical case.
 
-The order the agent follows is written, not drawn. It lives in `METHOD.md` and in `skills/prisma/SKILL.md`, which is what runs when you say PRISMA.
+The order the agent follows is written, not drawn. It lives in `METHOD.md` and in `skills/prisma/SKILL.md`, which is what runs when you say PRISMA, with the four step skills next to it.
 
 ## How a person uses it
 
-1. **Install once**, the two commands below.
+1. **Install once**, the two commands below. There is no second plugin to install.
 2. **Open a new session and work as always.** You do not call anything. The gates run on their own and speak only when something is wrong. A write to your docs without opening the index is blocked and the agent is told what to read. A push with stray comments, over four hundred changed lines or a red linter is blocked and the agent is told what to do. A page with an em-dash or voseo keeps the agent from closing its turn until it is fixed. The writing rules arrive at session start, so the agent writes that way without being asked.
 3. **Say "PRISMA"** when you want the whole method on a piece of work. That is the only thing you ever call. The skill routes the request through the five lanes and runs what they require, up to the five steps and five gates.
 4. **Read `METHOD.md`** when you want to know why a gate did what it did.
@@ -70,18 +72,11 @@ Inside Claude Code, two commands.
 /plugin install prisma-harness@prisma-harness
 ```
 
-Steps 1 and 2 use the skills of Matt Pocock's plugin. Install it next to this one; if it is missing, PRISMA tells you at session start.
-
-```
-/plugin install mattpocock-skills@claude-plugins-official
-```
-
-To update both, run this in your terminal and open a new session.
+To update, run this in your terminal and open a new session.
 
 ```
 claude plugin marketplace update
 claude plugin update prisma-harness@prisma-harness
-claude plugin update mattpocock-skills@claude-plugins-official
 ```
 
 To never think about it again, open `/plugin` inside Claude Code, go to Marketplaces, pick `prisma-harness` and turn on auto-update.
@@ -98,6 +93,10 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `docs/es/METHOD.md` | the canonical block in Spanish, the reference this plugin ships | `check-canonical-sync.sh` compares your copies against it at session start |
 | `STYLE.md`, `docs/es/STYLE.md` | the writing rules and which ones the format gate enforces | you read it |
 | `skills/prisma/SKILL.md` | the operating order of the method, invoked as `prisma` | when you say "PRISMA" |
+| `skills/prisma-plan/SKILL.md` | step 1, the interview in rounds that leaves a record and closes with the lane and the session estimate | when `prisma` reaches step 1 |
+| `skills/prisma-build/SKILL.md` | step 2, tests first at the agreed seams, every control seen red before the code, then the review, then the commit | when `prisma` reaches step 2 |
+| `skills/prisma-fidelity-review/SKILL.md` | the fidelity reviewer, two axes kept apart, run in a fresh subagent against the plan record | when `prisma-build` reaches its review, or when you ask for a review |
+| `skills/prisma-diagnose/SKILL.md` | step 2b, the loop before the hypothesis, and the step the defect escaped from at the end | when something is broken |
 | `hooks/gate-read-index.sh` | blocks a write under the docs dir if the session never read the index | `PreToolUse` on Write and Edit |
 | `hooks/pre-push-comments.sh` | blocks a push or PR whose diff adds comment lines, figures in comments, or `file:line` references | `PreToolUse` on Bash |
 | `hooks/pre-push-size.sh` | warns over 200 changed lines, blocks over 400, and tells a stale branch apart from a big change | `PreToolUse` on Bash |
@@ -105,12 +104,12 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
 | `hooks/session-voice.sh` | injects the writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
-| `hooks/session-deps.sh` | at session start, tells the agent which required tools or which plugin are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
+| `hooks/session-deps.sh` | at session start, tells the agent which required tools are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate, and with an auditor configured its exit code is the verdict | you call it |
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | the helpers the gates share | called by the gates |
 
-Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 28 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
+Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 28 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/skills-controls.sh` adds 13 over the text of the four step skills, five of them on mutated copies that must go red. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
 
 ## What is enforced, and by what
 
@@ -152,7 +151,7 @@ Environment variables, all optional.
 | `PRISMA_RECEIPT_FILE` | `~/.prisma-harness/receipts.log` | where the receipt is written |
 | `PRISMA_REQUIRED_TOOLS` | the requirements above | what the dependency check looks for, spaces or commas |
 | `PRISMA_HOOKS_DIR` | the folder of the running hook | where a gate looks for its siblings |
-| `PRISMA_INSTALLED_PLUGINS`, `PRISMA_UNAME` | the real ones | seams the dependency check uses to test itself |
+| `PRISMA_UNAME` | the real one | the seam the dependency check uses to test itself |
 | `PRISMA_PYTHON`, `PRISMA_JQ`, `PRISMA_TMPDIR`, `PRISMA_PARSER_FAULT` | the real ones, and no fault | seams the gates use to test what they do when a tool, a directory or the parser fails |
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
@@ -186,7 +185,7 @@ That prints one row per gate with blocks, escapes and the first and last day, re
 
 ## Where it sits
 
-Remove the model from the diagram of an agent system and what remains is the harness, the tools, permissions, state and evaluators around it. Prisma Harness lives in that layer. It is not a loop, it does not retry work until something passes, and it is not a graph, it does not decide which step runs next. It gives the loop its evidence and the graph its gates, and it only speaks when a gate fails. Steps 1 and 2 of the method use the skills of Matt Pocock, the interview, test-first build and code review; steps 3, 4 and 5 are the part his flow ends before, and the part that this harness exists for.
+Remove the model from the diagram of an agent system and what remains is the harness, the tools, permissions, state and evaluators around it. Prisma Harness lives in that layer. It is not a loop, it does not retry work until something passes, and it is not a graph, it does not decide which step runs next. It gives the loop its evidence and the graph its gates, and it only speaks when a gate fails. Steps 1 and 2 ship their own skills, the interview, the test-first build, the fidelity review and the diagnosis loop; they descend from [the engineering skills of Matt Pocock](https://github.com/mattpocock/skills), whose flow ends at the commit, and steps 3, 4 and 5 are the part this harness exists for.
 
 ## What Prisma Harness refuses to be
 

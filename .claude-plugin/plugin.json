@@ -1,8 +1,8 @@
 {
   "name": "prisma-harness",
   "displayName": "Prisma Harness",
-  "version": "0.4.1",
-  "description": "PRISMA, a verification method for agent-written work, packaged as Claude Code hooks, a skill and a written method. Five lanes, five steps, five gates, single-model.",
+  "version": "0.5.0",
+  "description": "PRISMA, a verification method for agent-written work, packaged as Claude Code hooks, five skills and a written method. Five lanes, five steps, five gates, single-model.",
   "license": "MIT",
   "homepage": "https://github.com/juanquijandria/prisma-harness",
   "repository": "https://github.com/juanquijandria/prisma-harness"

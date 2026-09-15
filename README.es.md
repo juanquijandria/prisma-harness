@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/prisma.svg" width="180" alt="A pentagonal prism"></p>
+
 <h1 align="center">Prisma Harness</h1>
 
 <p align="center"><em>Un prisma parte una luz en vías separadas. PRISMA toma una afirmación y la fuerza por rutas independientes hasta que sobrevive o se cae.</em></p>
@@ -37,7 +39,7 @@ This repository blocks a push over 400 changed lines and warns
 over 200. Reviewers stop finding things long before they finish reading.
 ```
 
-PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar; la skill corre los pasos; el método escrito dice por qué.
+PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar; las skills corren los pasos; el método escrito dice por qué.
 
 Corre con un solo modelo. No hay segundo motor, ni servicio externo, ni cuenta. El único lugar donde el método nació con dos motores, la réplica ciega, se declara de un solo modelo y dice con claridad lo que eso cuesta.
 
@@ -51,11 +53,11 @@ Tres reglas valen sobre todos los carriles y no son un paso más.
 2. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó.
 3. Una línea entra al método solo si da rojo sobre su caso histórico.
 
-El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD.md` y en `skills/prisma/SKILL.md`, que es lo que corre cuando dices PRISMA. El dibujo está en inglés.
+El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD.md` y en `skills/prisma/SKILL.md`, que es lo que corre cuando dices PRISMA, con las cuatro skills de los pasos al lado. El dibujo está en inglés.
 
 ## Cómo lo usa una persona
 
-1. **Instala una vez**, los dos comandos de abajo.
+1. **Instala una vez**, los dos comandos de abajo. No hay un segundo plugin que instalar.
 2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas y hablan solo cuando algo está mal. Una escritura en tus docs sin abrir el índice se frena y el agente recibe qué leer. Un push con comentarios sueltos, con más de cuatrocientas líneas cambiadas o con el linter en rojo se frena y el agente recibe qué hacer. Una página con em-dash o voseo no deja que el agente cierre el turno hasta arreglarla. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
 3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama. La skill rutea el pedido por los cinco carriles y corre lo que piden, hasta los cinco pasos y las cinco puertas.
 4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
@@ -70,18 +72,11 @@ Dentro de Claude Code, dos comandos.
 /plugin install prisma-harness@prisma-harness
 ```
 
-Los pasos 1 y 2 usan las skills del plugin de Matt Pocock. Instálalo junto a este; si falta, PRISMA te lo dice al arrancar la sesión.
-
-```
-/plugin install mattpocock-skills@claude-plugins-official
-```
-
-Para actualizar los dos, corre esto en tu terminal y abre una sesión nueva.
+Para actualizar, corre esto en tu terminal y abre una sesión nueva.
 
 ```
 claude plugin marketplace update
 claude plugin update prisma-harness@prisma-harness
-claude plugin update mattpocock-skills@claude-plugins-official
 ```
 
 Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Marketplaces, elige `prisma-harness` y enciende auto-update.
@@ -98,6 +93,10 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `docs/es/METHOD.md` | el bloque canónico en español, la referencia que trae este plugin | `check-canonical-sync.sh` compara tus copias contra él al arrancar la sesión |
 | `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura y cuáles hace cumplir el gate de formato | lo lees |
 | `skills/prisma/SKILL.md` | el orden operativo del método, se invoca como `prisma` | cuando dices "PRISMA" |
+| `skills/prisma-plan/SKILL.md` | el paso 1, la entrevista en rondas que deja registro y cierra con el carril y la estimación de sesión | cuando `prisma` llega al paso 1 |
+| `skills/prisma-build/SKILL.md` | el paso 2, tests primero en los seams acordados, cada control visto en rojo antes del código, después la revisión, después el commit | cuando `prisma` llega al paso 2 |
+| `skills/prisma-fidelity-review/SKILL.md` | el revisor de fidelidad, dos ejes separados, corre en un subagente limpio contra el registro del plan | cuando `prisma-build` llega a su revisión, o cuando pides una revisión |
+| `skills/prisma-diagnose/SKILL.md` | el paso 2b, el loop antes de la hipótesis, y al final el paso del que se escapó el defecto | cuando algo está roto |
 | `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs si la sesión nunca leyó el índice | `PreToolUse` en Write y Edit |
 | `hooks/pre-push-comments.sh` | frena un push o PR cuyo diff agrega comentarios, cifras en comentarios o referencias `archivo:línea` | `PreToolUse` en Bash |
 | `hooks/pre-push-size.sh` | avisa sobre 200 líneas cambiadas, frena sobre 400, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |
@@ -110,7 +109,7 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 28 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
+Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 28 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/skills-controls.sh` suma 13 sobre el texto de las cuatro skills de los pasos, cinco de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Qué se hace cumplir, y quién
 
@@ -164,7 +163,7 @@ Eso imprime una fila por puerta con frenos, escapes y el primer y último día, 
 
 ## Dónde se ubica
 
-Quita el modelo del diagrama de un sistema de agentes y lo que queda es el harness, las herramientas, los permisos, el estado y los evaluadores que lo rodean. Prisma Harness vive en esa capa. No es un loop, no reintenta el trabajo hasta que algo pase, y no es un grafo, no decide qué paso corre después. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 del método usan las skills de Matt Pocock, la entrevista, la construcción con tests primero y la revisión; los pasos 3, 4 y 5 son la parte donde su flujo termina antes, y la parte por la que existe este harness.
+Quita el modelo del diagrama de un sistema de agentes y lo que queda es el harness, las herramientas, los permisos, el estado y los evaluadores que lo rodean. Prisma Harness vive en esa capa. No es un loop, no reintenta el trabajo hasta que algo pase, y no es un grafo, no decide qué paso corre después. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 traen sus propias skills, la entrevista, la construcción con tests primero, la revisión de fidelidad y el loop de diagnóstico; descienden de [las skills de ingeniería de Matt Pocock](https://github.com/mattpocock/skills), cuyo flujo termina en el commit, y los pasos 3, 4 y 5 son la parte por la que existe este harness.
 
 ## Lo que Prisma Harness se niega a ser
 
