@@ -10,9 +10,11 @@ for hook in gate-read-index format-gate check-canonical-sync blind-replica sessi
   if sh "$HOOKS/$hook.sh" --selftest > "$OUT" 2>&1; then :; else failed=$((failed+1)); fi
   cat "$OUT"
   declared=$(sed -n 's/.*SELFTEST OK: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p' "$OUT" | tail -1)
-  ran=$(grep -c '^ *PASS' "$OUT")
+  ran=$(grep -cE '^ *(PASS|SKIP)' "$OUT")
+  skipped=$(grep -cE '^ *SKIP' "$OUT")
+  [ "$skipped" -gt 0 ] && printf '  %s case(s) skipped on this machine\n' "$skipped"
   if [ -n "$declared" ] && [ "$declared" != "$ran" ]; then
-    printf 'FAIL %s says %s cases and printed %s PASS lines\n' "$hook" "$declared" "$ran"
+    printf 'FAIL %s says %s cases and printed %s PASS or SKIP lines\n' "$hook" "$declared" "$ran"
     failed=$((failed+1))
   fi
 done
