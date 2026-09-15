@@ -116,4 +116,42 @@ else
   fail "W1 path rewriting turned a read index into a block (rc=$rc) out=[$out]"
 fi
 
+X1
+out=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/./wiki/p.md"}}' "$T/write-ok.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
+out2=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s//wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
+printf '{}\n' > "$T/empty.jsonl"
+r1=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/./wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
+r2=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s//wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
+if [ "$r1" = "2" ] && [ "$r2" = "2" ]; then
+  pass "X1 a dot or a double slash in the path does not walk around the index gate"
+else
+  fail "X1 the gate was bypassed by a normalised path (dot=$r1 doubleslash=$r2)"
+fi
+
+# X2
+docs_missing=$(PRISMA_DOCS_ROOT="$T" PRISMA_DOCS_DIR=no-such-dir sh "$HOOKS/format-gate.sh" --changed 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$docs_missing" | grep -q WARN; then
+  pass "X2 a docs directory that does not exist warns instead of dying in silence"
+else
+  fail "X2 a missing docs directory produced rc=$rc and [$docs_missing]"
+fi
+
+# X3
+spaced="$T/spaced"; mkdir -p "$spaced/wiki"
+printf '# a clean page\n\nNothing wrong here.\n' > "$spaced/wiki/mi pagina.md"
+out=$(PRISMA_DOCS_ROOT="$spaced" PRISMA_RULE_KEBAB_CASE=0 sh "$HOOKS/format-gate.sh" --changed 2>&1); rc=$?
+if [ "$rc" = "0" ] && ! printf '%s' "$out" | grep -q 'does not exist'; then
+  pass "X3 a page whose name has a space is reviewed as one page and not as two that do not exist"
+else
+  fail "X3 a space in the name produced rc=$rc and [$out]"
+fi
+
+# X4
+out=$(sh "$HOOKS/format-gate.sh" --strict --changed 2>&1 >/dev/null); rc=$?
+if [ "$rc" = "0" ]; then
+  pass "X4 the hook mode is recognised whatever position its flag is in"
+else
+  fail "X4 --strict --changed exited $rc, which blocks a session on the command line"
+fi
+
 finish

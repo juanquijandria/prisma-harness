@@ -63,10 +63,10 @@ else
 fi
 
 out=$(sh "$HOOKS/measure-comments.sh" --diff "$T" 2>&1); rc=$?
-if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q 'nothing to measure'; then
-  fail "A4 an unreadable diff was announced as an empty diff"
+if [ "$rc" = "2" ] && printf '%s' "$out" | grep -q 'could not read the diff'; then
+  pass "A4 an unreadable diff is named as unreadable and exits 2"
 else
-  pass "A4 an unreadable diff is not announced as an empty diff"
+  fail "A4 an unreadable diff gave rc=$rc and [$out]"
 fi
 
 base_repo="$T/no-base"
@@ -200,10 +200,18 @@ fi
 
 seq 1 250 > "$bigrepo2/big.txt"; git -C "$bigrepo2" commit -qam smaller-still
 out=$(payload "$bigrepo2" "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
-if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qE 'WARN from the size gate: [0-9]+ lines changed'; then
   pass "F2c the default warning fires on a 250-line push without blocking"
 else
   fail "F2c a 250-line push (rc=$rc) out=[$out]"
+fi
+
+# X5
+out=$(payload "$repo" "git push origin feature" | PRISMA_PARSER_FAULT=1 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && ! printf '%s' "$out" | grep -q 'has no python'; then
+  pass "X5 a parser that failed for another reason is not reported as a missing python"
+else
+  fail "X5 the gate stated a cause it did not measure (rc=$rc)"
 fi
 
 finish

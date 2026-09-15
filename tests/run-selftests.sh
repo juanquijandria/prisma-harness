@@ -25,7 +25,7 @@ PAGES=$(find "$ROOT" -name '*.md' -not -path '*/.git/*')
 GATE_OUT=$(PRISMA_DOCS_ROOT="$ROOT" PRISMA_EXEMPT_NAMES="none.md" PRISMA_RULE_KEBAB_CASE=0 PRISMA_RULE_H1_FIRST_LINE=0 PRISMA_RULE_LINE_CEILING=0 sh "$HOOKS/format-gate.sh" --strict $PAGES 2>&1)
 printf '%s\n' "$GATE_OUT" | tail -1
 printf '%s' "$GATE_OUT" | grep -q 'PASS: 0 blocking, 0 warnings' || { printf 'FAIL the repo pages do not pass the rules this repo ships\n'; failed=$((failed+1)); }
-printf '  file names and the H1 are off here, the repo root uses uppercase names and an HTML title\n'
+printf '  three rules are off for this check, file names and the H1 because the repo root uses uppercase names and an HTML title, and the line ceiling because both READMEs are longer than the 150 lines this repo proposes\n'
 
 printf '\n##### push gate controls\n'
 if /bin/sh "$(dirname "$0")/push-gates-controls.sh"; then :; else failed=$((failed+1)); fi

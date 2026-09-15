@@ -16,7 +16,7 @@ Ask two questions. First, what kind of work is it, and four lanes answer it, que
 | Query | Does this only answer with data and change nothing? | the claims rule. A figure that leaves the machine gets two routes and a `[value \| route \| date-time]` label |
 | Mechanical change | Can you PROVE it changes no executable behavior, stored data, permissions, integration or deployment? | step 3 only, run it and look |
 | Code with logic | Is it a feature, a bug fix, a migration, or a script someone else will run? | the five steps |
-| Data to a third party | Does a file, list or figure leave to someone else? | the producing query is code and runs its lane, plus step 3 on the real rows, the verification protocol, a refuter, and the blind replica on every derived figure |
+| Data to a third party | Does a file, list or figure leave to someone else? | the producing query is code and runs its lane, plus step 3 on the real rows, the verification protocol, and a refuter |
 | Text | Is it a page, a PR body, a message, a report, a script to read aloud? | the format gate, a refuter, the claims rule |
 
 Two guards. When in doubt, take the MORE expensive lane, because the agent has an interest in choosing the cheap one. A lane goes up, never silently down; going down is declared.

@@ -29,23 +29,27 @@ EOT
   printf '  (clean)\n\n'
 
   R=0
+  CASES=0
   break_it() {
     : > "$TALLY"
+    CASES=$((CASES+1))
     O=$( review "$2" 2>&1 | grep '^FAIL' )
     if [ -z "$O" ]; then printf '  BLIND on "%s"\n' "$1"; R=1
-    else printf '  caught "%s"\n' "$1"; fi
+    else printf '  PASS caught "%s"\n' "$1"; fi
   }
   break_warn() {
     : > "$TALLY"
+    CASES=$((CASES+1))
     O=$( review "$2" 2>&1 | grep '^WARN' )
     if [ -z "$O" ]; then printf '  BLIND on "%s"\n' "$1"; R=1
-    else printf '  caught "%s"\n' "$1"; fi
+    else printf '  PASS caught "%s"\n' "$1"; fi
   }
   stay_quiet() {
     : > "$TALLY"
+    CASES=$((CASES+1))
     O=$( review "$2" 2>&1 )
     if [ -n "$O" ]; then printf '  FALSE ALARM on "%s"\n%s\n' "$1" "$O"; R=1
-    else printf '  quiet on "%s"\n' "$1"; fi
+    else printf '  PASS quiet on "%s"\n' "$1"; fi
   }
 
   printf '=== broken pages, each must FAIL ===\n'
@@ -118,7 +122,7 @@ EOX
 
   rm -rf "$T"
   printf '\n'
-  [ "$R" -eq 0 ] && printf 'SELFTEST OK: passes the good page, catches the 16 breaks, stays quiet on the 16 quiet cases\n' || printf 'SELFTEST FAILED: blind checks or false alarms\n'
+  [ "$R" -eq 0 ] && printf 'SELFTEST OK: %d/%d\n' "$CASES" "$CASES" || printf 'SELFTEST FAILED: blind checks or false alarms\n'
   return $R
 }
 

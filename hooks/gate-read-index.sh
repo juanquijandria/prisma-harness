@@ -47,8 +47,12 @@ printf '%s' "$payload" | "$JQ" -e . >/dev/null 2>&1 || { echo "WARN: the index g
 file_path=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.file_path // empty')
 transcript=$(printf '%s' "$payload" | "$JQ" -r '.transcript_path // empty')
 
+normalise() { printf '%s' "$1" | sed 's|/\./|/|g; s|//*|/|g; s|/\.$||; s|/$||'; }
+file_path=$(normalise "$file_path")
+WATCHED=$(normalise "$DOCS_ROOT/$DOCS_DIR")
+INDEX_PATH=$(normalise "$INDEX_PATH")
 case "$file_path" in
-  "$DOCS_ROOT/$DOCS_DIR"/*) ;;
+  "$WATCHED"/*) ;;
   *) exit 0 ;;
 esac
 

@@ -31,7 +31,7 @@ fi
 [ "$strip_rc" = "0" ] || bare_command=""
 if [ -x "$INVOKES" ]; then
   segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
-  [ "$rc" = "3" ] && { echo "WARN: the lint gate did not run, the command parser has no python." >&2; exit 0; }
+  [ "$rc" = "3" ] && { echo "WARN: the lint gate did not run, the command parser could not read the command." >&2; exit 0; }
   pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
   [ "$pr_rc" = "3" ] && { echo "WARN: the gate did not run, the command parser failed." >&2; exit 0; }
   pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)

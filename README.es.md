@@ -65,7 +65,17 @@ El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD
 
 ## Instalar
 
-Dentro de Claude Code, dos comandos.
+Primero las dos herramientas que las puertas necesitan, en tu terminal. Sáltate esto si ya las tienes.
+
+```
+brew install jq python
+```
+
+```
+sudo apt install jq python3
+```
+
+Después, dentro de Claude Code, dos comandos.
 
 ```
 /plugin marketplace add juanquijandria/prisma-harness
@@ -109,7 +119,7 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 29 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/skills-controls.sh` suma 13 sobre el texto de las cuatro skills de los pasos, cinco de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
+Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 34 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/skills-controls.sh` suma 13 sobre el texto de las cuatro skills de los pasos, cinco de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. La suite del gate de formato, la más grande con 32 casos, quedaba fuera de esa comparación hasta 0.6.0 porque su línea de cierre no traía conteo. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Qué se hace cumplir, y quién
 
@@ -117,7 +127,7 @@ Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincron�
 
 | Promesa | La sostiene | Cómo lo sabes |
 |---|---|---|
-| ninguna página bajo el directorio de docs se escribe sin leer el índice | hook | el gate de índice frena, y no existe escape |
+| ninguna página bajo el directorio de docs se escribe **con Write o Edit** sin leer el índice | hook | el gate de índice frena, y no tiene escape. Una página escrita por un comando de shell queda fuera |
 | ningún push de un repositorio vigilado lleva líneas de comentario, cifras en comentarios ni referencias de archivo y línea | hook | la puerta de comentarios frena el HEAD, y un escape queda en el recibo |
 | ningún push de un repositorio vigilado pasa el techo de tamaño | hook | la puerta de tamaño frena el HEAD, y un escape queda en el recibo |
 | un push de un repositorio vigilado pasa su propio linter | hook | la puerta de lint frena el HEAD, y un escape queda en el recibo |
@@ -134,11 +144,11 @@ Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincron�
 
 Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
 
-**De dónde salen 200 y 400.** Siguen el único estudio que le puso un número al tamaño de revisión, [un caso de diez meses sobre 2.500 revisiones](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) en un solo grupo de producto de Cisco, hecho y escrito en 2006 por el proveedor de la herramienta de revisión que midió. Su conclusión es que las líneas bajo revisión deben quedar bajo 200 y no pasar de 400.
+**De dónde salen 200 y 400.** Son la política de este repositorio, y toman su forma de una sola fuente, [un caso de diez meses sobre 2.500 revisiones](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) en un solo grupo de producto de Cisco, hecho y escrito en 2006 por el proveedor de la herramienta de revisión que midió. Su conclusión es que las líneas bajo revisión deben quedar bajo 200 y no pasar de 400.
 
-Léelo antes de confiar en los defaults, porque el número solo esconde lo que el estudio dice de sí mismo. Sus conteos de defectos salen de una muestra de 300 de esas revisiones codificada a mano, no de las 2.500. Aparta una quinta parte de las revisiones por poco interesantes. Su propia nota al pie declara la premisa sobre la que se apoya todo, que la densidad real de defectos es constante entre cambios grandes y chicos. Y su consejo resumido es más estrecho que el punto que estos defaults siguen, entre 100 y 300 líneas por vez.
+Léelo antes de confiar en los defaults, porque el número solo esconde lo que el estudio dice de sí mismo. Sus conteos de defectos salen de una muestra de 300 de esas revisiones codificada a mano, no de las 2.500. Aparta una quinta parte de las revisiones por poco interesantes. Su propia nota al pie declara la premisa sobre la que se apoya todo, que la densidad real de defectos es constante entre cambios grandes y chicos. Su consejo resumido es más estrecho que el punto que estos defaults siguen, entre 100 y 300 líneas por vez. Y nunca dice si sus líneas bajo revisión son las líneas que cuenta un diff, que es lo que esta puerta mide.
 
-Trabajo con revisión por pares posterior mide el tamaño del cambio y no fija umbral. [Un estudio de nueve millones de cambios en Google](https://sback.it/publications/icse2018seip.pdf) reporta una mediana de 24 líneas modificadas, y en la misma oración da 44 para una empresa y 263 para otra, así que no hay un número único entre empresas. Ninguna de las dos fuentes dice si las líneas bajo revisión son las líneas que cuenta un diff. Los números de acá son una política que puedes cambiar, y la puerta imprime la política y nunca el estudio. Una versión anterior citaba un techo de 1000 y una afirmación sobre la detección cayendo por debajo de la mitad, y ninguna se rastreaba a una fuente.
+Esa es la única afirmación que este repositorio hace sobre la literatura. No dice haberla leído toda, y dos versiones anteriores de este párrafo fueron refutadas por una réplica ciega que recibió las fuentes y nada del razonamiento. La primera citaba un techo de 1000 que no se rastreaba a ninguna fuente. La segunda decía que los datos de Cisco son C y C++, que el estudio nunca dice. Los números de acá son tuyos para cambiarlos, y la puerta imprime la política y nunca el estudio.
 
 ## El recibo
 
@@ -153,7 +163,7 @@ Eso imprime una fila por puerta con frenos, escapes y el primer y último día, 
 ## Lo que no se toca sin escribir la razón
 
 - **El bloque canónico en `docs/es/METHOD.md`.** Toda copia registrada se compara contra él; editarlo acá hace derivar todas las copias a propósito.
-- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto. `hooks/blind-replica.sh` es un comando y no un hook, y sus códigos son propios, `0` el auditor confirmó, `5` refutó, `4` sin veredicto, `6` no hay auditor configurado y solo se imprimió el brief.
+- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto. `hooks/blind-replica.sh` es un comando y no un hook, y sus códigos son propios, `0` el auditor confirmó, `5` refutó, `4` sin veredicto, `6` no hay auditor configurado y solo se imprimió el brief, `2` no se pudo leer el brief.
 - **Los selftests.** Cambias una puerta, reintroduces el defecto exacto por el que existe, la ves frenar, lo quitas, la ves pasar. El silencio no prueba nada.
 
 ## Trampas conocidas
@@ -161,6 +171,8 @@ Eso imprime una fila por puerta con frenos, escapes y el primer y último día, 
 - **Un hook registrado en esta sesión no corre en esta sesión.** La configuración se lee al arrancar. Prueba un hook nuevo en una sesión nueva.
 - **`hooks/hooks.json` y `skills/` se cargan por convención.** Nombrarlos otra vez en `plugin.json` hace que Claude Code rechace el plugin como duplicado. Medido el 14/09/2026 instalando desde GitHub, donde la carga local con `--plugin-dir` no se había quejado.
 - **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
+- **El gate de índice vigila Write y Edit, no el shell.** Una página creada con `cat > pagina.md` o con una redirección nunca le llega. La puerta existe para que un agente no escriba una página duplicada, y un agente que escribe por el shell le pasa por al lado.
+- **El parser de comandos lee el cuerpo de un heredoc como comandos.** Un `git push` adentro de un heredoc se reporta como push, así que una puerta puede frenar un comando que nunca empuja. Es el mismo exceso que con una comilla sin cerrar, y el arreglo es el mismo, partir el comando en dos.
 - **En Windows, una ruta que se le pasa a un programa nativo se reescribe antes de que el programa la vea.** Git Bash convierte un argumento con forma de ruta Unix en una de Windows, así que `jq --arg alguna_ruta /tmp/x` le llega a jq como `C:/.../tmp/x` mientras el JSON que lee sigue diciendo `/tmp/x`, y la comparación falla en silencio. Los tres sistemas del CI lo cazaron el mismo día que se introdujo. Un hook de acá compara rutas en el shell y nunca le pasa una a jq como dato.
 - **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
 - **El parser de comandos, `command-invokes.sh`, no es un parser de shell.** Respeta comillas, escapes, comentarios y redirecciones, y nunca borra contenido. No resuelve expansiones, alias, `eval` ni globbing. Cuando un comando deja una comilla sin cerrar la lectura es ambigua, y devuelve la UNIÓN de las lecturas plausibles en vez de una sola, así que una puerta puede frenar un comando que no tenía que frenar; el arreglo es partir el comando en dos. Es raro, y determinista cuando pasa.

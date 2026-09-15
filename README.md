@@ -65,7 +65,17 @@ The order the agent follows is written, not drawn. It lives in `METHOD.md` and i
 
 ## Install
 
-Inside Claude Code, two commands.
+First the two tools the gates need, in your terminal. Skip this if you already have them.
+
+```
+brew install jq python
+```
+
+```
+sudo apt install jq python3
+```
+
+Then, inside Claude Code, two commands.
 
 ```
 /plugin marketplace add juanquijandria/prisma-harness
@@ -109,7 +119,7 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | the helpers the gates share | called by the gates |
 
-Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 29 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/skills-controls.sh` adds 13 over the text of the four step skills, five of them on mutated copies that must go red. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
+Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 34 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/skills-controls.sh` adds 13 over the text of the four step skills, five of them on mutated copies that must go red. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. The format gate's own suite, the largest at 32 cases, was outside that comparison until 0.6.0 because its closing line did not carry a count. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
 
 ## What is enforced, and by what
 
@@ -117,7 +127,7 @@ Nine pieces have a `--selftest`, the index gate, the format gate, the sync check
 
 | Promise | Held by | How you know |
 |---|---|---|
-| no page under the docs dir is written without reading the index | hook | the index gate blocks, and no escape exists |
+| no page under the docs dir is written **with Write or Edit** without reading the index | hook | the index gate blocks, and it has no escape. A page written by a shell command is outside it |
 | no push from a watched repository carries comment lines, figures in comments or file and line references | hook | the comments gate blocks HEAD, and an escape is recorded in the receipt |
 | no push from a watched repository passes the size ceiling | hook | the size gate blocks HEAD, and an escape is recorded |
 | a push from a watched repository passes its own linter | hook | the lint gate blocks HEAD, and an escape is recorded |
@@ -156,11 +166,11 @@ Environment variables, all optional.
 
 The three push gates have a declared escape, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, placed in front of the command. The reason goes in the change description. An escape used by default is not a gate. The index gate has no escape, reading the index is the fix. The format gate has no escape either; a rule you do not want is switched off in its config.
 
-**Where 200 and 400 come from.** They follow the one study that put a number on review size, [a ten-month case study of 2,500 reviews](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) in one product group at Cisco, run and written in 2006 by the vendor of the review tool it measured. Its conclusion is that lines under review should be under 200 and should not exceed 400.
+**Where 200 and 400 come from.** They are this repository's policy, and they take their shape from one source, [a ten-month case study of 2,500 reviews](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) in one product group at Cisco, run and written in 2006 by the vendor of the review tool it measured. Its conclusion is that lines under review should be under 200 and should not exceed 400.
 
-Read it before trusting the defaults, because the number alone hides what the study says about itself. Its defect counts come from a hand-coded sample of 300 of those reviews and not from all 2,500. It sets aside a fifth of the reviews as uninteresting. Its own footnote flags the assumption the whole inference rests on, that true defect density is constant across large and small changes. And its summary advice is narrower than the bullet these defaults follow, between 100 and 300 lines at a time.
+Read it before trusting the defaults, because the number alone hides what the study says about itself. Its defect counts come from a hand-coded sample of 300 of those reviews and not from all 2,500. It sets aside a fifth of the reviews as uninteresting. Its own footnote flags the assumption the whole inference rests on, that true defect density is constant across large and small changes. Its summary advice is narrower than the bullet these defaults follow, between 100 and 300 lines at a time. And it never says whether its lines under review are the lines a diff counts, which is what this gate measures.
 
-Peer-reviewed work since then measures change size and sets no threshold. [A study of nine million changes at Google](https://sback.it/publications/icse2018seip.pdf) reports a median of 24 modified lines, and in the same sentence gives 44 for one company and 263 for another, so there is no single number across companies. Neither source says whether lines under review are the lines a diff counts. The numbers here are a policy you can change, and the gate prints the policy and never the study. An earlier version quoted a ceiling of 1000 and a claim about detection dropping below half, and neither traced to a source.
+That is the only claim this repository makes about the literature. It does not claim to have read all of it, and two earlier versions of this paragraph were refuted by a blind replica that was given the sources and none of the reasoning. The first quoted a ceiling of 1000 that traced to no source. The second said the Cisco data is C and C++, which the study never says. The numbers here are yours to change, and the gate prints the policy and never the study.
 
 ## The receipt
 
@@ -175,7 +185,7 @@ That prints one row per gate with blocks, escapes and the first and last day, re
 ## What not to change without writing the reason
 
 - **The canonical block in `docs/es/METHOD.md`.** Every registered copy is compared against it; editing it here makes every copy drift on purpose.
-- **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict. `hooks/blind-replica.sh` is a command and not a hook, and its codes are its own, `0` the auditor confirmed, `5` it refuted, `4` no verdict, `6` no auditor is configured and only the brief was printed.
+- **A gate's exit codes.** As a hook, `0` passes and `2` blocks; a gate that cannot measure prints a `WARN` and exits `0`. On the command line the format gate exits `1` on failures. A gate that fails silently fabricates a verdict. `hooks/blind-replica.sh` is a command and not a hook, and its codes are its own, `0` the auditor confirmed, `5` it refuted, `4` no verdict, `6` no auditor is configured and only the brief was printed, `2` the brief itself could not be read.
 - **The selftests.** Change a gate, reintroduce the exact defect it exists for, watch it block, remove it, watch it pass. Silence proves nothing.
 
 ## Gotchas
@@ -183,6 +193,8 @@ That prints one row per gate with blocks, escapes and the first and last day, re
 - **A hook registered in this session does not run in this session.** Settings are read at startup. Test a new hook in a new session.
 - **`hooks/hooks.json` and `skills/` load by convention.** Naming them again in `plugin.json` makes Claude Code refuse the plugin as a duplicate. Measured on 2026-09-14 installing from GitHub, where the local `--plugin-dir` load had not complained.
 - **The comments gate skips files whose extension it does not know**, and it counts only lines your diff adds.
+- **The index gate watches Write and Edit, not the shell.** A page created with `cat > page.md` or a redirect never reaches it. The gate exists to stop an agent from writing a duplicate page, and an agent that writes through the shell walks past it.
+- **The command parser reads a heredoc body as commands.** A `git push` inside a heredoc is reported as a push, so a gate may block a command that never pushes. It is the same over-blocking as an unbalanced quote, and the fix is the same, split the command in two.
 - **On Windows, a path handed to a native program is rewritten before the program sees it.** Git Bash converts an argument that looks like a Unix path into a Windows one, so `jq --arg some_path /tmp/x` reaches jq as `C:/.../tmp/x` while the JSON it reads still says `/tmp/x`, and the comparison silently fails. The three systems in CI caught this the day it was introduced. A hook here compares paths in the shell and never hands one to jq as data.
 - **`--changed` in the format gate finds pages modified today** by file time, not by git.
 - **The command parser, `command-invokes.sh`, is not a shell parser.** It respects quotes, escapes, comments and redirections, and it never drops content. It does not resolve expansions, aliases, `eval` or globbing. When a command leaves a quote unbalanced the reading is ambiguous, and it returns the UNION of the plausible readings instead of one, so a gate may block a command it did not need to block; the fix is to split the command in two. It is rare, and deterministic when it happens.

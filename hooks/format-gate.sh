@@ -28,7 +28,7 @@ for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RUL
 done
 
 HOOK_MODE=0
-[ "${1:-}" = "--changed" ] && HOOK_MODE=1
+for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
 cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] && exit 0; exit 1; }
 TALLY=$(mktemp "${PRISMA_TMPDIR:-${TMPDIR:-/tmp}}/prisma-tally-XXXXXX" 2>/dev/null) || cannot_measure "the format gate could not create its tally file, so nothing was measured."
 [ -f "$TALLY" ] || cannot_measure "the format gate could not create its tally file, so nothing was measured."
@@ -204,7 +204,7 @@ case "$1" in
   --debt-freeze) debt_freeze; exit $? ;;
   --changed)
     STRICT=1
-    [ -d "$DOCS_ROOT/$DOCS_DIR" ] || exit 0
+    [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
     F=$(find "$DOCS_ROOT/$DOCS_DIR" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null)
     if [ $? -ne 0 ]; then
       echo "WARN: --changed could not list today's pages, so NOTHING was reviewed." >&2
@@ -212,7 +212,7 @@ case "$1" in
     fi
     [ -z "$F" ] && { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
     HOOK_MODE=1
-    for f in $F; do exempt "$f" || review "$f"; done
+    printf '%s\n' "$F" | while IFS= read -r f; do [ -n "$f" ] && { exempt "$f" || review "$f"; }; done
     ;;
   -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
