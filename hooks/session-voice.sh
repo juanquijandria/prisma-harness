@@ -57,10 +57,15 @@ if [ "$1" = "--selftest" ]; then
   trailing=$(printf '{}' | CLAUDE_PROJECT_DIR="$fresh_project/" /bin/sh "$SELF")
   if printf '%s' "$trailing" | grep -q 'PRISMA_VOICE'; then printf 'FAIL a trailing slash on the project path announces a second time\n'; ok=0; else printf 'PASS a trailing slash on the project path is the same project\n'; fi
   read_only=$(mktemp -d); chmod 500 "$read_only"
-  quiet=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
-  quiet_again=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
-  chmod 700 "$read_only"
-  if printf '%s' "$quiet$quiet_again" | grep -qiE 'PRISMA_VOICE|denied'; then printf 'FAIL a data directory it cannot write to announces forever or leaks an error\n'; ok=0; else printf 'PASS a data directory it cannot write to stays quiet instead of announcing every session\n'; fi
+  if mkdir "$read_only/probe" 2>/dev/null; then
+    chmod 700 "$read_only"
+    printf 'SKIP this filesystem does not enforce directory permissions, so an unwritable data directory cannot be tested here\n'
+  else
+    quiet=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
+    quiet_again=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
+    chmod 700 "$read_only"
+    if printf '%s' "$quiet$quiet_again" | grep -qiE 'PRISMA_VOICE|denied'; then printf 'FAIL a data directory it cannot write to announces forever or leaks an error\n'; ok=0; else printf 'PASS a data directory it cannot write to stays quiet instead of announcing every session\n'; fi
+  fi
   out=$(printf '{}' | PRISMA_VOICE=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_VOICE=0 switches it off\n'; else printf 'FAIL PRISMA_VOICE=0 still emitted output\n'; ok=0; fi
   [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 8/8\n' && exit 0

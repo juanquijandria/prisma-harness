@@ -16,8 +16,8 @@ for hook in gate-read-index format-gate check-canonical-sync blind-replica sessi
   [ "$hook" = "format-gate" ] && format_gate_cases="$ran"
   skipped=$(grep -cE '^ *SKIP' "$OUT")
   [ "$skipped" -gt 0 ] && printf '  %s case(s) skipped on this machine\n' "$skipped"
-  if [ -z "$declared" ]; then
-    printf 'FAIL %s printed no SELFTEST OK line, so its cases cannot be counted\n' "$hook"
+  if [ -z "$declared" ] && ! grep -q 'SELFTEST FAILED' "$OUT"; then
+    printf 'FAIL %s printed no count line and no failure either, so its cases cannot be accounted for\n' "$hook"
     failed=$((failed+1))
   elif [ "$declared" != "$ran" ]; then
     printf 'FAIL %s says %s cases and printed %s PASS or SKIP lines\n' "$hook" "$declared" "$ran"
