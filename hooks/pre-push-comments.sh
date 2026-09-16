@@ -74,14 +74,14 @@ done
 
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
 
-( cd "$dir" ) 2>/dev/null || { echo "WARN: the comments gate could not enter $dir, so nothing was measured." >&2; exit 0; }
+( cd "$dir" ) 2>/dev/null || { echo "WARN: the comments gate could not enter $dir, so nothing was measured." >&2; receipt_append comments-gate "$real_dir" not-measured; exit 0; }
 
 if [ -n "$segments" ]; then
   head_branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
   proven=1
   while IFS= read -r one_push; do
     [ -n "$one_push" ] || continue
-    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+    push_names_head "$head_branch" "$one_push" "$command_text" || { proven=0; break; }
   done <<PUSHES
 $real_pushes
 PUSHES
@@ -101,6 +101,7 @@ fi
 
 if [ "$status" != "1" ]; then
   echo "WARN: the comments gate could not measure in $dir, so nothing is blocked. $(printf '%s' "$output" | tail -1)" >&2
+  receipt_append comments-gate "$real_dir" not-measured
   exit 0
 fi
 

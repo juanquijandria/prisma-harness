@@ -86,6 +86,12 @@ git push origin main:main|refuses
 git push origin main feature|refuses
 git push --all origin|refuses
 git push --a-flag-nobody-taught-it origin feature|refuses
+git -C /tmp push origin feature|refuses
+git --git-dir=/tmp/elsewhere/.git push origin feature|refuses
+git --work-tree=/tmp/elsewhere push origin feature|refuses
+GIT_DIR=/tmp/elsewhere/.git git push origin feature|refuses
+git -c user.name=somebody push origin feature|measures
+git --no-pager push origin feature|measures
 SHAPES
 out=$(run pre-push-comments.sh "git push origin main" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ]; then printf 'PASS comments gate says nothing about a push it cannot prove is HEAD\n'; else printf 'FAIL comments gate answered for a push of another branch (rc=%s) %s\n' "$rc" "$out"; ok=0; fi

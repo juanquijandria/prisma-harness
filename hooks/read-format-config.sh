@@ -4,6 +4,8 @@
 FORMAT_CONFIG_FLAGS="RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG"
 FORMAT_CONFIG_NUMBERS="RULE_LINE_CEILING"
 FORMAT_CONFIG_LISTS="EXEMPT_NAMES EXEMPT_DIRS"
+FORMAT_CONFIG_CARRIAGE_RETURN=$(printf '\r')
+FORMAT_CONFIG_TAB=$(printf '\t')
 
 format_config_reject() {
   printf 'WARN: %s line %s ignored, %s.\n' "$1" "$2" "$3" >&2
@@ -16,24 +18,41 @@ format_config_kind() {
   return 1
 }
 
+format_config_wants() {
+  case "$1" in
+    flag) printf '0 or 1' ;;
+    number) printf 'a whole number of at most nine digits and no leading zero' ;;
+    list) printf 'names separated by spaces' ;;
+  esac
+}
+
+format_config_accepts() {
+  case "$1" in
+    flag) printf '%s' "$2" | grep -q '^[01]$' ;;
+    number) printf '%s' "$2" | grep -qE '^(0|[1-9][0-9]{0,8})$' ;;
+    list) printf '%s' "$2" | grep -q '^[A-Za-z0-9._ -]*$' ;;
+    *) return 1 ;;
+  esac
+}
+
 read_format_config() {
   file="$1"
   [ -f "$file" ] || return 0
   number=0
   while IFS= read -r line || [ -n "$line" ]; do
     number=$((number+1))
+    line=${line%"$FORMAT_CONFIG_CARRIAGE_RETURN"}
     case "$line" in ''|'#'*) continue ;; esac
     case "$line" in *=*) ;; *) format_config_reject "$file" "$number" "it is neither a comment nor a setting"; continue ;; esac
     key=${line%%=*}
     value=${line#*=}
-    case "$value" in \"*\") value=${value#\"}; value=${value%\"} ;; \'*\') value=${value#\'}; value=${value%\'} ;; esac
-    kind=$(format_config_kind "$key") || { format_config_reject "$file" "$number" "$key is not a setting this gate has"; continue; }
-    case "$kind" in
-      flag) pattern='^[01]$'; wanted="0 or 1" ;;
-      number) pattern='^[0-9][0-9]*$'; wanted="a whole number" ;;
-      list) pattern='^[A-Za-z0-9._ -]*$'; wanted="names separated by spaces" ;;
+    case "$value" in
+      \"*) value=${value#\"}; value=${value%%\"*} ;;
+      \'*) value=${value#\'}; value=${value%%\'*} ;;
+      *) value=${value%% #*}; value=${value%%"$FORMAT_CONFIG_TAB"#*} ;;
     esac
-    printf '%s' "$value" | grep -q "$pattern" || { format_config_reject "$file" "$number" "$key takes $wanted"; continue; }
+    kind=$(format_config_kind "$key") || { format_config_reject "$file" "$number" "$key is not a setting this gate has"; continue; }
+    format_config_accepts "$kind" "$value" || { format_config_reject "$file" "$number" "$key takes $(format_config_wants "$kind")"; continue; }
     eval "$key=\$value"
   done < "$file"
   return 0

@@ -68,15 +68,15 @@ done
 
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append lint-gate "$real_dir" escaped; exit 0; fi
 
-cd "$dir" 2>/dev/null || { echo "WARN: the lint gate could not enter $dir, so nothing was measured." >&2; exit 0; }
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the lint gate did not measure, $dir is not a git repository." >&2; exit 0; }
+cd "$dir" 2>/dev/null || { echo "WARN: the lint gate could not enter $dir, so nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the lint gate did not measure, $dir is not a git repository." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 
 if [ -n "$segments" ]; then
   head_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
   proven=1
   while IFS= read -r one_push; do
     [ -n "$one_push" ] || continue
-    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+    push_names_head "$head_branch" "$one_push" "$command_text" || { proven=0; break; }
   done <<PUSHES
 $real_pushes
 PUSHES
@@ -87,12 +87,13 @@ PUSHES
   fi
 fi
 
-merge_base=$("$COMPARE_BASE") || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
-[ -n "$merge_base" ] || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
+merge_base=$("$COMPARE_BASE") || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
+[ -n "$merge_base" ] || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 
 if [ -x vendor/bin/php-cs-fixer ] && [ -f .php-cs-fixer.php ]; then
   files=$(git diff --name-only --diff-filter=ACMR "$merge_base" -- '*.php') || {
     echo "WARN: the lint gate could not list the changed php files, so nothing was measured." >&2
+    receipt_append lint-gate "$real_dir" not-measured
     files=""
   }
   if [ -n "$files" ]; then
@@ -102,6 +103,7 @@ $files
 FILES
     runner=$(mktemp "${TMPDIR:-/tmp}/csfix-XXXXXX.php") || {
       echo "WARN: the lint gate could not create a temporary file, so nothing was measured." >&2
+      receipt_append lint-gate "$real_dir" not-measured
       exit 0
     }
     cat > "$runner" <<'PHP'
@@ -128,6 +130,7 @@ PHP
         exit 2
       fi
       echo "WARN: php-cs-fixer could not run here, nothing was measured. $(printf '%s' "$output" | tail -1)" >&2
+      receipt_append lint-gate "$real_dir" not-measured
     fi
   fi
 fi
@@ -135,6 +138,7 @@ fi
 if [ -f package.json ] && [ -x node_modules/.bin/eslint ]; then
   files=$(git diff --name-only --diff-filter=ACMR "$merge_base" -- '*.js' '*.mjs' '*.ts' '*.tsx' '*.vue') || {
     echo "WARN: the lint gate could not list the changed javascript files, so nothing was measured." >&2
+    receipt_append lint-gate "$real_dir" not-measured
     files=""
   }
   if [ -n "$files" ]; then
@@ -153,6 +157,7 @@ FILES
         exit 2
       fi
       echo "WARN: eslint could not run here, so nothing was measured. $(printf '%s' "$output" | tail -1)" >&2
+      receipt_append lint-gate "$real_dir" not-measured
     fi
   fi
 fi

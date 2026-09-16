@@ -119,7 +119,27 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push se cubren con 29 controles contra un repo de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 34 más para una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y todos estaban en rojo antes del cambio que los puso en verde. `tests/skills-controls.sh` suma 13 sobre el texto de las cuatro skills de los pasos, cinco de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/run-selftests.sh` corre todo, comprueba que las páginas de este repo cumplen las reglas que este repo publica, y compara cuántos casos dice cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió. La suite del gate de formato, la más grande con 32 casos, quedaba fuera de esa comparación hasta 0.6.0 porque su línea de cierre no traía conteo. Borrar las tres puertas pone 13 de los 29 controles en rojo; el resto afirma que una puerta calla, y eso no puede fallar cuando la puerta no está. Una puerta cuyas pruebas nunca fallan es decoración.
+Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el parser de comandos y el parser del escape. Las tres puertas de push están cubiertas por 52 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh` y `tests/page-gates-never-fabricate.sh` suman 41 más sobre una sola propiedad, que ninguna puerta reporta un veredicto que no midió, y cada uno estuvo rojo antes del cambio que lo puso verde. `tests/skills-controls.sh` suma 17 sobre el texto de las cuatro skills de paso, siete de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/runner-controls.sh` suma 19 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. `tests/run-selftests.sh` corre todo eso, comprueba que las páginas que este repositorio publica cumplen las reglas que este repositorio propone, y compara cuántos casos declara cada selftest contra cuántos imprimió de verdad, porque una suite en verde no prueba que cada caso corrió, y una suite que no imprime conteo falla. La suite propia del gate de formato, la más grande con 32 casos, quedó fuera de esa comparación hasta 0.6.0 porque su línea de cierre no llevaba número. Una puerta cuyas pruebas nunca fallan es decoración.
+
+## Las reglas de escritura, y cómo apagarlas
+
+Este plugin pone reglas de escritura al inicio de cada sesión, y lo avisa en la primera sesión de cada proyecto. Si quieres la verificación y no el estilo de prosa, pon esto en tu configuración de Claude Code.
+
+```json
+{ "env": { "PRISMA_VOICE": "0" } }
+```
+
+O díselo a tu agente con tus palabras, que es más corto.
+
+```
+Apaga las reglas de escritura de PRISMA en este proyecto.
+```
+
+## Dos cosas que se leen más pesadas de lo que son
+
+**Algo roto no pasa por la entrevista.** `skills/prisma-diagnose/SKILL.md` tiene su propio disparador y no pide registro de plan. El paso 1 es para trabajo que se está decidiendo, no para un defecto que se está reproduciendo.
+
+**La puerta de comentarios no frena hasta que se lo pidas.** Recién instalada mide el diff y dice qué encontró. `PRISMA_COMMENTS_BLOCK=1` convierte esa medición en un freno.
 
 ## Qué se hace cumplir, y quién
 
@@ -141,26 +161,6 @@ Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincron�
 | las puertas reducen los defectos escapados | evidencia externa | el recibo cuenta frenos, no si cada freno tenía razón |
 
 ## Configurar
-
-## Las reglas de escritura, y cómo apagarlas
-
-Este plugin pone reglas de escritura al inicio de cada sesión, y lo avisa en la primera sesión de cada proyecto. Si quieres la verificación y no el estilo de prosa, pon esto en tu configuración de Claude Code.
-
-```json
-{ "env": { "PRISMA_VOICE": "0" } }
-```
-
-O díselo a tu agente con tus palabras, que es más corto.
-
-```
-Apaga las reglas de escritura de PRISMA en este proyecto.
-```
-
-## Dos cosas que se leen más pesadas de lo que son
-
-**Algo roto no pasa por la entrevista.** `skills/prisma-diagnose/SKILL.md` tiene su propio disparador y no pide registro de plan. El paso 1 es para trabajo que se está decidiendo, no para un defecto que se está reproduciendo.
-
-**La puerta de comentarios no frena hasta que se lo pidas.** Recién instalada mide el diff y dice qué encontró. `PRISMA_COMMENTS_BLOCK=1` convierte esa medición en un freno.
 
 Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
 

@@ -14,10 +14,15 @@ ANNOUNCE
 
 first_session_here() {
   marker_dir="$DATA_DIR/announced"
-  marker="$marker_dir/$(printf '%s' "$PROJECT" | cksum | cut -d' ' -f1)"
+  project="$PROJECT"
+  while :; do
+    case "$project" in ?*/) project=${project%/} ;; *) break ;; esac
+  done
+  slug=$(printf '%s' "$project" | tr -c 'A-Za-z0-9' '-' | tail -c 80)
+  marker="$marker_dir/$slug-$(printf '%s' "$project" | cksum | tr -d ' ')"
   [ -f "$marker" ] && return 1
-  mkdir -p "$marker_dir" 2>/dev/null || return 0
-  : > "$marker" 2>/dev/null
+  mkdir -p "$marker_dir" 2>/dev/null || return 1
+  { : > "$marker"; } 2>/dev/null || return 1
   return 0
 }
 
@@ -49,9 +54,16 @@ if [ "$1" = "--selftest" ]; then
   second=$(printf '{}' | CLAUDE_PROJECT_DIR="$fresh_project" /bin/sh "$SELF")
   if printf '%s' "$first" | grep -q 'PRISMA_VOICE'; then printf 'PASS the first session of a project is told what set the rules and how to switch them off\n'; else printf 'FAIL the first session was never told: %s\n' "$first"; ok=0; fi
   if printf '%s' "$second" | grep -q 'PRISMA_VOICE'; then printf 'FAIL every session repeats the announcement\n'; ok=0; else printf 'PASS the announcement is made once per project and not every session\n'; fi
+  trailing=$(printf '{}' | CLAUDE_PROJECT_DIR="$fresh_project/" /bin/sh "$SELF")
+  if printf '%s' "$trailing" | grep -q 'PRISMA_VOICE'; then printf 'FAIL a trailing slash on the project path announces a second time\n'; ok=0; else printf 'PASS a trailing slash on the project path is the same project\n'; fi
+  read_only=$(mktemp -d); chmod 500 "$read_only"
+  quiet=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
+  quiet_again=$(printf '{}' | CLAUDE_PLUGIN_DATA="$read_only/data" CLAUDE_PROJECT_DIR="$(mktemp -d)" /bin/sh "$SELF" 2>&1)
+  chmod 700 "$read_only"
+  if printf '%s' "$quiet$quiet_again" | grep -qiE 'PRISMA_VOICE|denied'; then printf 'FAIL a data directory it cannot write to announces forever or leaks an error\n'; ok=0; else printf 'PASS a data directory it cannot write to stays quiet instead of announcing every session\n'; fi
   out=$(printf '{}' | PRISMA_VOICE=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_VOICE=0 switches it off\n'; else printf 'FAIL PRISMA_VOICE=0 still emitted output\n'; ok=0; fi
-  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 6/6\n' && exit 0
+  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 8/8\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 fi
 

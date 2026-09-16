@@ -178,4 +178,53 @@ else
   fail "C2 an unknown key passed without a word: $c2_out"
 fi
 
+# C3
+octal="$T/a-repo-with-an-octal-ceiling"
+mkdir -p "$octal/wiki"
+printf '# a page\n\nEsto tiene un guion largo \342\200\224 adentro.\n' > "$octal/wiki/p.md"
+for source in config environment; do
+  if [ "$source" = "config" ]; then
+    printf 'RULE_LINE_CEILING=08\n' > "$octal/.prisma-format.conf"
+    c3_out=$(PRISMA_DOCS_ROOT="$octal" PRISMA_FORMAT_CONFIG="$octal/.prisma-format.conf" sh "$HOOKS/format-gate.sh" --changed 2>&1)
+  else
+    rm -f "$octal/.prisma-format.conf"
+    c3_out=$(PRISMA_DOCS_ROOT="$octal" PRISMA_FORMAT_CONFIG="$octal/none" PRISMA_RULE_LINE_CEILING=08 sh "$HOOKS/format-gate.sh" --changed 2>&1)
+  fi
+  if printf '%s' "$c3_out" | grep -q 'PASS: 0 blocking'; then
+    fail "C3 a ceiling of 08 from the $source certified a page that breaks a rule"
+  else
+    pass "C3 a ceiling of 08 from the $source never certifies a page that breaks a rule"
+  fi
+done
+
+# C4
+for shape in crlf trailing-comment; do
+  spelled="$T/a-config-written-$shape"
+  mkdir -p "$spelled/wiki"
+  printf '# a page\n\nEsto tiene un guion largo \342\200\224 adentro.\n' > "$spelled/wiki/p.md"
+  if [ "$shape" = "crlf" ]; then
+    printf 'RULE_EM_DASH=0\r\n' > "$spelled/.prisma-format.conf"
+  else
+    printf 'RULE_EM_DASH=0 # we write dashes here\n' > "$spelled/.prisma-format.conf"
+  fi
+  c4_out=$(PRISMA_DOCS_ROOT="$spelled" PRISMA_FORMAT_CONFIG="$spelled/.prisma-format.conf" sh "$HOOKS/format-gate.sh" --strict "$spelled/wiki/p.md" 2>&1)
+  if printf '%s' "$c4_out" | grep -q 'em-dash'; then
+    fail "C4 a configuration written with $shape stopped being applied"
+  else
+    pass "C4 a configuration written with $shape is still applied"
+  fi
+done
+
+# C5
+missing_reader="$T/hooks-without-the-reader"
+mkdir -p "$missing_reader"
+cp "$HOOKS"/*.sh "$missing_reader/" 2>/dev/null
+rm -f "$missing_reader/read-format-config.sh"
+c5_out=$(PRISMA_HOOKS_DIR="$missing_reader" PRISMA_DOCS_ROOT="$T" sh "$missing_reader/format-gate.sh" --changed 2>&1); rc=$?
+if [ "$rc" = "0" ] && printf '%s' "$c5_out" | grep -q WARN; then
+  pass "C5 a missing configuration reader warns and never blocks a session"
+else
+  fail "C5 a missing configuration reader exited $rc with [$c5_out]"
+fi
+
 finish

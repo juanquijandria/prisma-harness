@@ -53,8 +53,8 @@ if permissions_bite; then
   out=$(payload "$locked" "git push origin feature" | sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
   after=$(receipt_lines)
   chmod 755 "$locked"
-  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$after" = "$before" ]; then
-    pass "A2 a directory it cannot enter warns instead of fabricating a block"
+  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$after" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q 'not-measured'; then
+    pass "A2 a directory it cannot enter warns, records that it did not measure, and fabricates nothing"
   else
     fail "A2 fabricated a verdict (rc=$rc receipts $before->$after) out=[$out]"
   fi

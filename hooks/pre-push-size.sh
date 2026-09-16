@@ -69,15 +69,15 @@ done
 
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append size-gate "$real_dir" escaped; exit 0; fi
 
-cd "$dir" 2>/dev/null || { echo "WARN: the size gate could not enter $dir, so nothing was measured." >&2; exit 0; }
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; exit 0; }
+cd "$dir" 2>/dev/null || { echo "WARN: the size gate could not enter $dir, so nothing was measured." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
 
 if [ -n "$segments" ]; then
   head_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
   proven=1
   while IFS= read -r one_push; do
     [ -n "$one_push" ] || continue
-    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+    push_names_head "$head_branch" "$one_push" "$command_text" || { proven=0; break; }
   done <<PUSHES
 $real_pushes
 PUSHES
@@ -89,12 +89,12 @@ PUSHES
 fi
 
 merge_base=$("$COMPARE_BASE"); rc=$?
-if [ "$rc" = "2" ]; then echo "WARN: the size gate measures HEAD and HEAD has nothing over its base, so nothing was measured. If you are pushing another branch from here, check it out first." >&2; exit 0; fi
-[ "$rc" = "0" ] && [ -n "$merge_base" ] || { echo "WARN: the size gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
+if [ "$rc" = "2" ]; then echo "WARN: the size gate measures HEAD and HEAD has nothing over its base, so nothing was measured. If you are pushing another branch from here, check it out first." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; fi
+[ "$rc" = "0" ] && [ -n "$merge_base" ] || { echo "WARN: the size gate could not find a base to compare against, nothing was measured." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
 
-lines=$("$MEASURE" "$(pwd)" "$merge_base" HEAD) || { echo "WARN: the size gate could not read the diff, nothing was measured." >&2; exit 0; }
+lines=$("$MEASURE" "$(pwd)" "$merge_base" HEAD) || { echo "WARN: the size gate could not read the diff, nothing was measured." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
 case "$lines" in
-  ''|*[!0-9]*) echo "WARN: the size gate could not measure, nothing is blocked." >&2; exit 0 ;;
+  ''|*[!0-9]*) echo "WARN: the size gate could not measure, nothing is blocked." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0 ;;
 esac
 
 STALE_BEHIND=10
@@ -125,6 +125,7 @@ fi
 
 if [ "$lines" -gt "$WARN_OVER" ]; then
   echo "WARN from the size gate: $lines lines changed, over the $WARN_OVER this repository warns at. Not blocking." >&2
+  receipt_append size-gate "$real_dir" warned
 fi
 
 exit 0

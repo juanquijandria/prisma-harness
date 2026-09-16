@@ -22,11 +22,18 @@ RULE_VERIFY_TAG=0
 EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md README.es.md SKILL.md METHOD.md STYLE.md CHANGELOG.md CONTRIBUTING.md SECURITY.md log.md"
 EXEMPT_DIRS="raw archive inbox Clippings"
 
+[ -r "$HOOKS_DIR/read-format-config.sh" ] || { echo "WARN: the format gate did not run, read-format-config.sh is missing." >&2; exit 0; }
 . "$HOOKS_DIR/read-format-config.sh"
 read_format_config "$CONFIG_FILE"
 for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG EXEMPT_NAMES EXEMPT_DIRS; do
   eval "override=\${PRISMA_$v:-}"
-  [ -n "$override" ] && eval "$v=\"\$override\""
+  [ -n "$override" ] || continue
+  kind=$(format_config_kind "$v")
+  if format_config_accepts "$kind" "$override"; then
+    eval "$v=\"\$override\""
+  else
+    printf 'WARN: PRISMA_%s ignored, it takes %s.\n' "$v" "$(format_config_wants "$kind")" >&2
+  fi
 done
 
 HOOK_MODE=0
