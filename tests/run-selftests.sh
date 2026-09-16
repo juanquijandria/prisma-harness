@@ -2,7 +2,9 @@
 # Prisma Harness. Runs every hook selftest and exits non-zero if any fails.
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
-export PRISMA_RECEIPT_FILE="$(mktemp -d)/receipts.log"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$HOOKS/selftest-env.sh"
+. "$ROOT/tests/shipped.sh"
 failed=0
 OUT=$(mktemp)
 for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes escape-declared receipt; do
@@ -13,18 +15,26 @@ for hook in gate-read-index format-gate check-canonical-sync blind-replica sessi
   ran=$(grep -cE '^ *(PASS|SKIP)' "$OUT")
   skipped=$(grep -cE '^ *SKIP' "$OUT")
   [ "$skipped" -gt 0 ] && printf '  %s case(s) skipped on this machine\n' "$skipped"
-  if [ -n "$declared" ] && [ "$declared" != "$ran" ]; then
+  if [ -z "$declared" ]; then
+    printf 'FAIL %s printed no SELFTEST OK line, so its cases cannot be counted\n' "$hook"
+    failed=$((failed+1))
+  elif [ "$declared" != "$ran" ]; then
     printf 'FAIL %s says %s cases and printed %s PASS or SKIP lines\n' "$hook" "$declared" "$ran"
     failed=$((failed+1))
   fi
 done
 rm -f "$OUT"
 printf '\n##### the pages of this repo under its own gate\n'
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PAGES=$(find "$ROOT" -name '*.md' -not -path '*/.git/*')
-GATE_OUT=$(PRISMA_DOCS_ROOT="$ROOT" PRISMA_EXEMPT_NAMES="none.md" PRISMA_RULE_KEBAB_CASE=0 PRISMA_RULE_H1_FIRST_LINE=0 PRISMA_RULE_LINE_CEILING=0 sh "$HOOKS/format-gate.sh" --strict $PAGES 2>&1)
+set --
+while IFS= read -r page; do
+  [ -n "$page" ] && set -- "$@" "$page"
+done <<PAGES
+$(shipped_pages "$ROOT")
+PAGES
+GATE_OUT=$(PRISMA_DOCS_ROOT="$ROOT" PRISMA_FORMAT_CONFIG="$ROOT/there-is-no-format-config-here" PRISMA_EXEMPT_NAMES="none.md" PRISMA_RULE_KEBAB_CASE=0 PRISMA_RULE_H1_FIRST_LINE=0 PRISMA_RULE_LINE_CEILING=0 sh "$HOOKS/format-gate.sh" --strict "$@" 2>&1)
 printf '%s\n' "$GATE_OUT" | tail -1
 printf '%s' "$GATE_OUT" | grep -q 'PASS: 0 blocking, 0 warnings' || { printf 'FAIL the repo pages do not pass the rules this repo ships\n'; failed=$((failed+1)); }
+printf '  %s pages, the ones this repo publishes and not every file under it\n' "$#"
 printf '  three rules are off for this check, file names and the H1 because the repo root uses uppercase names and an HTML title, and the line ceiling because both READMEs are longer than the 150 lines this repo proposes\n'
 
 printf '\n##### push gate controls\n'
@@ -54,10 +64,8 @@ if [ -n "$sk_declared" ] && [ "$sk_declared" != "$sk_ran" ]; then
   failed=$((failed+1))
 fi
 rm -f "$SK"
-printf '\n##### receipt written by the push gate controls\n'
-sh "$HOOKS/receipt.sh" --summary | grep -E 'gate +[0-9]' || { printf 'FAIL no gate wrote a receipt line during the controls\n'; failed=$((failed+1)); }
-printf '\n##### syntax of every hook\n'
-for f in "$HOOKS"/*.sh; do
+printf '\n##### syntax of every hook and every test\n'
+for f in "$HOOKS"/*.sh "$ROOT"/tests/*.sh; do
   case "$f" in *measure-comments.sh) bash -n "$f" ;; *) sh -n "$f" ;; esac || { printf 'SYNTAX ERROR %s\n' "$f"; failed=$((failed+1)); }
 done
 printf '\n'

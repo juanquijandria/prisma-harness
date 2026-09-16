@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside", and in STYLE.md.
+if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
 
 HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 DOCS_ROOT="${PRISMA_DOCS_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}"

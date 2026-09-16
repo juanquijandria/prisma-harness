@@ -2,13 +2,37 @@
 # Prisma Harness. Controls over the text of the step skills, and positive controls on mutated copies.
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/tests/shipped.sh"
 T=$(mktemp -d)
 ok=1
 CASES=0
 STEP_SKILLS="prisma-plan prisma-build prisma-fidelity-review prisma-diagnose"
+EXTERNAL_PLUGIN_PATTERN='pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs'
+EXTERNAL_PLUGIN_SKILL=mattpocock-skills:tdd
+EXTERNAL_PLUGIN_COMMAND=/implement
 
 pass() { CASES=$((CASES+1)); printf 'PASS %s\n' "$1"; }
+skip() { CASES=$((CASES+1)); printf 'SKIP %s\n' "$1"; }
 fail() { CASES=$((CASES+1)); printf 'FAIL %s\n' "$1"; ok=0; }
+
+external_plugin_hits() {
+  root="$1"
+  set --
+  while IFS= read -r shipped; do
+    [ -n "$shipped" ] && set -- "$@" "$shipped"
+  done <<PATHS
+$(shipped_paths "$root")
+PATHS
+  [ "$#" -gt 0 ] || return 0
+  grep -rnIiE "$EXTERNAL_PLUGIN_PATTERN" "$@" 2>/dev/null | while IFS= read -r hit; do
+    where=${hit%%:*}
+    where=${where#"$root"/}
+    for allowed in $FILES_THAT_MAY_NAME_THE_EXTERNAL_PLUGIN; do
+      [ "$where" = "$allowed" ] && continue 2
+    done
+    printf '%s\n' "$hit"
+  done
+}
 
 line_of() { grep -n -m1 -- "$2" "$1" | cut -d: -f1; }
 
@@ -68,9 +92,16 @@ check_diagnose_escape() {
 
 if check_frontmatter "$ROOT/skills"; then pass "every skill has its name, a description, and the step skills stay model-invocable"; else fail "frontmatter of the skills"; fi
 if check_no_em_dash "$ROOT/skills"; then pass "no em-dash in any skill, frontmatter and fences included"; else fail "an em-dash in a skill"; fi
-hits=$(grep -rniE 'mattpocock|pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs' "$ROOT" --exclude-dir=.git | grep -vE '^[^:]*(README(\.es)?\.md|skills-controls\.sh):' | wc -l | tr -d ' ')
+hits=$(external_plugin_hits "$ROOT" | wc -l | tr -d ' ')
 credit=$(grep -ciE 'pocock' "$ROOT/README.md"); credit_es=$(grep -ciE 'pocock' "$ROOT/README.es.md")
-if [ "$hits" = "0" ] && [ "$credit" = "1" ] && [ "$credit_es" = "1" ]; then pass "the external plugin is named once per README as credit and nowhere else"; else fail "external plugin references: $hits outside the READMEs and this file, $credit and $credit_es in them"; fi
+if [ "$hits" = "0" ] && [ "$credit" = "1" ] && [ "$credit_es" = "1" ]; then pass "the external plugin is named once per README as credit and nowhere else"; else fail "external plugin references: $hits in published paths outside the files allowed to name it, $credit and $credit_es in the READMEs"; fi
+if [ "$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$ROOT" ]; then
+  listed=$(shipped_pages "$ROOT" | while IFS= read -r page; do printf '%s\n' "${page#"$ROOT"/}"; done | sort)
+  tracked=$(git -C "$ROOT" ls-files '*.md' | sort)
+  if [ "$listed" = "$tracked" ]; then pass "the published page list covers every page this repository tracks"; else fail "the published page list and the repository index disagree: $(printf '%s\n%s\n' "$listed" "$tracked" | sort | uniq -u | tr '\n' ' ')"; fi
+else
+  skip "this tree is not the repository itself, the published page list was not compared against its index"
+fi
 if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and closes with the lane and the session ceiling"; else fail "prisma-plan closing section"; fi
 if check_build_order "$ROOT/skills"; then pass "prisma-build sees red before the review and the review before the commit"; else fail "prisma-build order"; fi
 if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the fixed point and keeps the two axes apart"; else fail "prisma-fidelity-review anchors"; fi
@@ -94,6 +125,18 @@ mutate; grep -v 'Escaped from' "$T/skills/prisma-diagnose/SKILL.md" > "$T/d.md";
 if check_diagnose_escape "$T/skills"; then fail "control: removing the escape line was not caught"; else pass "control: removing the escape line turns the diagnose case red"; fi
 mutate; printf 'disable-model-invocation: true\n' >> "$T/skills/prisma-plan/SKILL.md"
 if check_frontmatter "$T/skills"; then fail "control: a user-only plan skill was not caught"; else pass "control: a user-only plan skill turns the frontmatter case red"; fi
+mutate; printf '\nRun %s after building.\n' "$EXTERNAL_PLUGIN_SKILL" >> "$T/skills/prisma/SKILL.md"
+if [ "$(external_plugin_hits "$T" | wc -l | tr -d ' ')" = "0" ]; then fail "control: an injected reference to the external plugin was not caught"; else pass "control: an injected reference to the external plugin turns the mentions case red"; fi
+published_copy() {
+  rm -rf "$T/published"
+  mkdir -p "$T/published/skills"
+  cp -R "$ROOT/skills/prisma" "$T/published/skills/prisma"
+  cp "$ROOT/.prisma-format.conf.example" "$T/published/.prisma-format.conf.example"
+}
+published_copy; printf '\nRun %s after building.\n' "$EXTERNAL_PLUGIN_COMMAND" >> "$T/published/skills/prisma/SKILL.md"
+if [ "$(external_plugin_hits "$T/published" | wc -l | tr -d ' ')" = "0" ]; then fail "control: an injected command of the external plugin was not caught"; else pass "control: an injected command of the external plugin turns the mentions case red"; fi
+published_copy; printf 'Remember %s here.\n' "$EXTERNAL_PLUGIN_SKILL" >> "$T/published/.prisma-format.conf.example"
+if [ "$(external_plugin_hits "$T/published" | wc -l | tr -d ' ')" = "0" ]; then fail "control: a mention in a published file outside the directories was not caught"; else pass "control: a mention in a published file outside the directories turns the mentions case red"; fi
 
 rm -rf "$T"
 if [ "$ok" = "1" ]; then printf 'SELFTEST OK: %d/%d\n' "$CASES" "$CASES"; exit 0; fi

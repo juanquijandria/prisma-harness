@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside".
+# PRISMA_ESCAPE_ENTRYPOINT_MARKER, how this file knows it is the script being run and not a library.
 
 escape_declared() {
   token="$1"
@@ -24,6 +25,9 @@ escape_selftest() {
   printf 'SELFTEST FAILED\n'; exit 1
 }
 
+if [ "${1:-}" = "--selftest" ] && grep -q PRISMA_ESCAPE_ENTRYPOINT_MARKER "$0" 2>/dev/null; then
+  . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"
+fi
 [ "${PRISMA_ESCAPE_SOURCED:-0}" = "1" ] && return 0
 [ "$1" = "--selftest" ] && escape_selftest
 printf 'usage: escape-declared.sh --selftest, or source it and call escape_declared <token> <command>\n' >&2

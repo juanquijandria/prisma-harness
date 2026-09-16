@@ -116,9 +116,6 @@ else
   fail "W1 path rewriting turned a read index into a block (rc=$rc) out=[$out]"
 fi
 
-X1
-out=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/./wiki/p.md"}}' "$T/write-ok.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
-out2=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s//wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
 printf '{}\n' > "$T/empty.jsonl"
 r1=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/./wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)
 r2=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s//wiki/p.md"}}' "$T/empty.jsonl" "$root" | PRISMA_DOCS_ROOT="$root" sh "$HOOKS/gate-read-index.sh" >/dev/null 2>&1; echo $?)

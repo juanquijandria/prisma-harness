@@ -63,6 +63,9 @@ receipt_selftest() {
   printf 'SELFTEST FAILED\n'; exit 1
 }
 
+if [ "${1:-}" = "--selftest" ] && grep -q PRISMA_RECEIPT_ENTRYPOINT_MARKER "$0" 2>/dev/null; then
+  . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"
+fi
 [ "${PRISMA_RECEIPT_SOURCED:-0}" = "1" ] && { PRISMA_RECEIPT_SOURCED=0; return 0; }
 grep -q PRISMA_RECEIPT_ENTRYPOINT_MARKER "$0" 2>/dev/null || { return 0 2>/dev/null || exit 0; }
 

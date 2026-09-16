@@ -2,7 +2,7 @@
 # Prisma Harness. Positive and negative controls of the three push gates against a fixture repo.
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
-export PRISMA_RECEIPT_FILE="${PRISMA_RECEIPT_FILE:-$(mktemp -d)/receipts.log}"
+. "$HOOKS/selftest-env.sh"
 T=$(mktemp -d); ok=1
 git -C "$T" init -q && cd "$T" || exit 1
 git symbolic-ref HEAD refs/heads/main
@@ -59,6 +59,9 @@ out=$(cd / && payload "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate warns when the directory is not a git repository\n'; else printf 'FAIL size gate silent outside a repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 out=$(payload "cd /nonexistent-dir-xyz && git push origin feature" | sh "$HOOKS/pre-push-lint.sh" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS lint gate warns when it cannot locate the repo\n'; else printf 'FAIL lint gate silent on a missing repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+
+CHECKS=$((CHECKS+1))
+if sh "$HOOKS/receipt.sh" --summary | grep -qE 'gate +[0-9]'; then printf 'PASS a separate process reads back the receipt these gates wrote\n'; else printf 'FAIL the receipt summary shows no gate row\n'; ok=0; fi
 
 cd / && rm -rf "$T" "$T.remote"
 [ "$ok" = "1" ] && printf 'PUSH GATE CONTROLS OK: %s of %s\n' "$CHECKS" "$CHECKS" && exit 0

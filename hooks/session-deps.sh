@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside".
+if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
 
 REQUIRED_TOOLS=$(printf '%s' "${PRISMA_REQUIRED_TOOLS:-jq python3 git awk cmp bash mktemp find sed}" | tr ',' ' ')
 

@@ -25,7 +25,10 @@ jobs:
         run: |
           uname -a
           sh --version 2>/dev/null || echo "sh has no --version"
-          for t in sh bash jq python3 python git awk cmp mktemp find; do printf '%-8s %s\n' "$t" "$(command -v $t || echo MISSING)"; done
+          for t in sh bash jq python3 python git awk cmp mktemp find env cp; do printf '%-8s %s\n' "$t" "$(command -v $t || echo MISSING)"; done
       - name: Run every selftest
         shell: bash
         run: sh tests/run-selftests.sh
+      - name: Run the controls over the selftests themselves
+        shell: bash
+        run: sh tests/runner-controls.sh

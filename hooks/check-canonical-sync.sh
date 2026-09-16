@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside".
+if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)}"
 CANONICAL="${PRISMA_CANONICAL:-$PLUGIN_ROOT/docs/es/METHOD.md}"

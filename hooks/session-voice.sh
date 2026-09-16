@@ -1,5 +1,6 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside", and in STYLE.md.
+if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
 
 SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
 

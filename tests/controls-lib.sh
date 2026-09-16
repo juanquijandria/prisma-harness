@@ -2,8 +2,8 @@
 # Prisma Harness. Shared helpers for the controls that prove no gate fabricates a verdict.
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
+. "$HOOKS/selftest-env.sh"
 T=$(mktemp -d)
-export PRISMA_RECEIPT_FILE="$T/receipts.log"
 ok=1
 CASES=0
 
