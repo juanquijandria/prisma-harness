@@ -3,6 +3,7 @@
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 . "$HOOKS/selftest-env.sh"
+export PRISMA_COMMENTS_BLOCK=1
 T=$(mktemp -d); ok=1
 git -C "$T" init -q && cd "$T" || exit 1
 git symbolic-ref HEAD refs/heads/main
@@ -17,6 +18,8 @@ receipt_lines() { [ -f "$PRISMA_RECEIPT_FILE" ] && wc -l < "$PRISMA_RECEIPT_FILE
 printf 'export const A = 1;\n// stray comment\n' > a.js; git commit -qam comment
 expect "comments gate blocks a stray comment" 2 run pre-push-comments.sh "git push origin feature"
 expect "comments gate passes with the escape" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
+out=$(payload "git push origin feature" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
+CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qi 'comment'; then printf 'PASS comments gate measures and lets the push through until the repository asks it to block\n'; else printf 'FAIL comments gate without PRISMA_COMMENTS_BLOCK (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 expect "comments gate ignores a mention of git push" 0 run pre-push-comments.sh "echo git push"
 expect "comments gate lets a PR read through" 0 run pre-push-comments.sh "gh pr list"
 expect "comments gate lets a PR view through" 0 run pre-push-comments.sh "gh pr view 12"
@@ -48,9 +51,45 @@ expect "size gate lets a PR read through while the diff is over the ceiling" 0 r
 expect "size gate blocks a PR creation over the ceiling" 2 run pre-push-size.sh "gh pr create --fill"
 git init -q --bare "$T.remote"; git remote add origin "$T.remote"; git push -q origin main feature; git branch -q --set-upstream-to=origin/main main
 git checkout -q main
+before=$(receipt_lines)
 out=$(run pre-push-size.sh "git push origin feature" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate from main warns that it measured nothing\n'; else printf 'FAIL size gate from main (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+after_one=$(receipt_lines)
+CHECKS=$((CHECKS+1)); if [ "$after_one" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q 'not-measured'; then printf 'PASS one run that could not measure leaves exactly one line saying so\n'; else printf 'FAIL one run that could not measure left %s lines\n' "$((after_one-before))"; ok=0; fi
+run pre-push-size.sh "git push origin feature" >/dev/null 2>&1
+run pre-push-size.sh "git push origin feature" >/dev/null 2>&1
+CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" = "$((before+3))" ]; then printf 'PASS three runs that could not measure leave three lines, one each\n'; else printf 'FAIL three runs left %s lines\n' "$(($(receipt_lines)-before))"; ok=0; fi
+summary=$(sh "$HOOKS/receipt.sh" --summary)
+unmeasured=$(printf '%s\n' "$summary" | awk '$1=="size-gate"{print $4}')
+CHECKS=$((CHECKS+1)); if [ "$unmeasured" = "3" ] 2>/dev/null; then printf 'PASS the summary counts what a gate could not measure apart from what it blocked\n'; else printf 'FAIL the summary column for unmeasured events reads [%s]\n' "$unmeasured"; ok=0; fi
 git checkout -q feature
+
+seq 1 1500 > bigger.txt; printf 'export const C = 3;\n// a stray comment\n' > c.js; git add bigger.txt c.js; git commit -qm "over the base"
+while IFS='|' read -r shape verdict; do
+  [ -n "$shape" ] || continue
+  out=$(run pre-push-size.sh "$shape" 2>&1); rc=$?
+  CHECKS=$((CHECKS+1))
+  if [ "$verdict" = "measures" ]; then
+    if [ "$rc" = "2" ]; then printf 'PASS size gate measures [%s], which it can prove is HEAD\n' "$shape"; else printf 'FAIL size gate refused a push it could prove is HEAD, [%s] rc=%s %s\n' "$shape" "$rc" "$out"; ok=0; fi
+  else
+    if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate says nothing about [%s], which it cannot prove is HEAD\n' "$shape"; else printf 'FAIL size gate answered for [%s] it could not prove is HEAD, rc=%s %s\n' "$shape" "$rc" "$out"; ok=0; fi
+  fi
+done <<SHAPES
+git push|measures
+git push origin|measures
+git push origin feature|measures
+git push origin HEAD|measures
+git push -u origin feature|measures
+git push origin feature:main|measures
+git push origin main|refuses
+git push origin main:main|refuses
+git push origin main feature|refuses
+git push --all origin|refuses
+git push --a-flag-nobody-taught-it origin feature|refuses
+SHAPES
+out=$(run pre-push-comments.sh "git push origin main" 2>&1); rc=$?
+CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ]; then printf 'PASS comments gate says nothing about a push it cannot prove is HEAD\n'; else printf 'FAIL comments gate answered for a push of another branch (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+git reset -q --hard HEAD~1
 
 expect "lint gate passes a repo with no linter" 0 run pre-push-lint.sh "git push origin feature"
 expect "lint gate ignores a non-push command" 0 run pre-push-lint.sh "git status"

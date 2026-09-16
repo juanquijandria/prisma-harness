@@ -3,6 +3,23 @@
 if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
 
 SELF=$(cd "$(dirname "$0")" 2>/dev/null && pwd)/$(basename "$0")
+DATA_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.prisma-harness}"
+PROJECT="${CLAUDE_PROJECT_DIR:-$PWD}"
+
+announcement_text() {
+  cat <<'ANNOUNCE'
+This is the first session of this project with these rules. Tell the person, in one line of your first reply, that the Prisma Harness plugin is setting the writing rules of this session and that PRISMA_VOICE=0 in their Claude Code settings turns them off.
+ANNOUNCE
+}
+
+first_session_here() {
+  marker_dir="$DATA_DIR/announced"
+  marker="$marker_dir/$(printf '%s' "$PROJECT" | cksum | cut -d' ' -f1)"
+  [ -f "$marker" ] && return 1
+  mkdir -p "$marker_dir" 2>/dev/null || return 0
+  : > "$marker" 2>/dev/null
+  return 0
+}
 
 voice_text() {
   cat <<'VOICE'
@@ -14,7 +31,7 @@ PRISMA WRITING RULES, active in this session. They apply to every reply and ever
 5. Every proper name gets its role the first time or does not appear. Every "today" becomes an absolute date.
 6. Every figure that leaves the machine is a hypothesis until measured by two routes. Say what you verified, what you did not, and what you tried when you could not.
 7. A text the reader will paste elsewhere goes between two lines of the character ═, with nothing of yours inside, never in a code block or a quote.
-8. Spanish is Peruvian, tú and never vos. Code, identifiers and commits are in English.
+8. When you write Spanish here it is Peruvian, tú and never vos. Code, identifiers and commits are in English.
 VOICE
 }
 
@@ -27,14 +44,23 @@ if [ "$1" = "--selftest" ]; then
   n=$(voice_text | grep -c '^[0-9]\.')
   if [ "$n" -eq 8 ]; then printf 'PASS carries 8 numbered rules\n'; else printf 'FAIL carries %s rules\n' "$n"; ok=0; fi
   if voice_text | grep -q '—'; then printf 'FAIL the rules contain an em-dash\n'; ok=0; else printf 'PASS the rules obey their own em-dash rule\n'; fi
+  fresh_project=$(mktemp -d)
+  first=$(printf '{}' | CLAUDE_PROJECT_DIR="$fresh_project" /bin/sh "$SELF")
+  second=$(printf '{}' | CLAUDE_PROJECT_DIR="$fresh_project" /bin/sh "$SELF")
+  if printf '%s' "$first" | grep -q 'PRISMA_VOICE'; then printf 'PASS the first session of a project is told what set the rules and how to switch them off\n'; else printf 'FAIL the first session was never told: %s\n' "$first"; ok=0; fi
+  if printf '%s' "$second" | grep -q 'PRISMA_VOICE'; then printf 'FAIL every session repeats the announcement\n'; ok=0; else printf 'PASS the announcement is made once per project and not every session\n'; fi
   out=$(printf '{}' | PRISMA_VOICE=0 /bin/sh "$SELF")
   if [ -z "$out" ]; then printf 'PASS PRISMA_VOICE=0 switches it off\n'; else printf 'FAIL PRISMA_VOICE=0 still emitted output\n'; ok=0; fi
-  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 4/4\n' && exit 0
+  [ "$ok" -eq 1 ] && printf 'SELFTEST OK: 6/6\n' && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 fi
 
 [ "${PRISMA_VOICE:-1}" = "1" ] || exit 0
 cat >/dev/null
-command -v jq >/dev/null 2>&1 || { voice_text; exit 0; }
-voice_text | jq -Rs '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:.}}'
+session_text() {
+  voice_text
+  first_session_here && announcement_text
+}
+command -v jq >/dev/null 2>&1 || { session_text; exit 0; }
+session_text | jq -Rs '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:.}}'
 exit 0

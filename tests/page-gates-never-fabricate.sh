@@ -151,4 +151,31 @@ else
   fail "X4 --strict --changed exited $rc, which blocks a session on the command line"
 fi
 
+# C1
+cloned="$T/a-repo-you-cloned"
+mkdir -p "$cloned/wiki"
+canary="$T/the-config-ran-a-command"
+printf 'EXEMPT_DIRS="raw"\nprintf x > "%s"\n' "$canary" > "$cloned/.prisma-format.conf"
+printf '# a page\n\nplain text with nothing wrong.\n' > "$cloned/wiki/p.md"
+PRISMA_DOCS_ROOT="$cloned" PRISMA_FORMAT_CONFIG="$cloned/.prisma-format.conf" sh "$HOOKS/format-gate.sh" --changed >/dev/null 2>&1
+if [ -f "$canary" ]; then
+  fail "C1 the format configuration of a repository ran a command"
+else
+  pass "C1 the format configuration is read as data and cannot run a command"
+fi
+
+# C2
+configured="$T/a-repo-with-a-real-config"
+mkdir -p "$configured/wiki"
+printf 'RULE_EM_DASH=0\nNOT_A_RULE=whatever\n' > "$configured/.prisma-format.conf"
+printf '# a page\n\nEsto tiene un guion largo \342\200\224 adentro.\n' > "$configured/wiki/p.md"
+c2_out=$(PRISMA_DOCS_ROOT="$configured" PRISMA_FORMAT_CONFIG="$configured/.prisma-format.conf" sh "$HOOKS/format-gate.sh" --strict "$configured/wiki/p.md" 2>&1)
+if printf '%s' "$c2_out" | grep -q 'em-dash'; then
+  fail "C2 a known key in the configuration stopped being applied: $c2_out"
+elif printf '%s' "$c2_out" | grep -q 'NOT_A_RULE'; then
+  pass "C2 a known key still applies and an unknown key is named and ignored"
+else
+  fail "C2 an unknown key passed without a word: $c2_out"
+fi
+
 finish

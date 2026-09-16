@@ -11,6 +11,7 @@ PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
+. "$HOOKS_DIR/push-names-head.sh"
 [ -n "$JQ" ] || { echo "WARN: the lint gate did not run, jq is missing." >&2; exit 0; }
 
 payload=$(cat)
@@ -69,6 +70,22 @@ if escape_declared "$ESCAPE" "$bare_command"; then receipt_append lint-gate "$re
 
 cd "$dir" 2>/dev/null || { echo "WARN: the lint gate could not enter $dir, so nothing was measured." >&2; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the lint gate did not measure, $dir is not a git repository." >&2; exit 0; }
+
+if [ -n "$segments" ]; then
+  head_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  proven=1
+  while IFS= read -r one_push; do
+    [ -n "$one_push" ] || continue
+    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+  done <<PUSHES
+$real_pushes
+PUSHES
+  if [ "$proven" = "0" ]; then
+    echo "WARN: the lint gate measures the branch HEAD is on, and it cannot prove this push sends that branch, so nothing was measured." >&2
+    receipt_append lint-gate "$real_dir" not-measured
+    exit 0
+  fi
+fi
 
 merge_base=$("$COMPARE_BASE") || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }
 [ -n "$merge_base" ] || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; exit 0; }

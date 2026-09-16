@@ -14,6 +14,7 @@ PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
+. "$HOOKS_DIR/push-names-head.sh"
 
 [ -n "$JQ" ] || { echo "WARN: the size gate did not run, jq is missing." >&2; exit 0; }
 [ -x "$MEASURE" ] || { echo "WARN: the size gate did not run, measure-diff-size.sh is missing." >&2; exit 0; }
@@ -70,6 +71,22 @@ if escape_declared "$ESCAPE" "$bare_command"; then receipt_append size-gate "$re
 
 cd "$dir" 2>/dev/null || { echo "WARN: the size gate could not enter $dir, so nothing was measured." >&2; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; exit 0; }
+
+if [ -n "$segments" ]; then
+  head_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  proven=1
+  while IFS= read -r one_push; do
+    [ -n "$one_push" ] || continue
+    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+  done <<PUSHES
+$real_pushes
+PUSHES
+  if [ "$proven" = "0" ]; then
+    echo "WARN: the size gate measures the branch HEAD is on, and it cannot prove this push sends that branch, so nothing was measured." >&2
+    receipt_append size-gate "$real_dir" not-measured
+    exit 0
+  fi
+fi
 
 merge_base=$("$COMPARE_BASE"); rc=$?
 if [ "$rc" = "2" ]; then echo "WARN: the size gate measures HEAD and HEAD has nothing over its base, so nothing was measured. If you are pushing another branch from here, check it out first." >&2; exit 0; fi

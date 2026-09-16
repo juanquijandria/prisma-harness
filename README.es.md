@@ -113,7 +113,7 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/pre-push-lint.sh` | corre el linter del propio repo, `php-cs-fixer` o `eslint`, sobre el diff antes del push | `PreToolUse` en Bash |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
-| `hooks/session-voice.sh` | inyecta las reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. `PRISMA_VOICE=0` lo apaga | `SessionStart` |
+| `hooks/session-voice.sh` | inyecta las reglas de escritura de `STYLE.md` en cada sesión, así el agente escribe así sin que nadie se lo pida. Lo avisa una vez por proyecto y `PRISMA_VOICE=0` lo apaga | `SessionStart` |
 | `hooks/session-deps.sh` | al arrancar la sesión, le dice al agente qué herramientas o qué plugin faltan, con el comando para instalarlos, y que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
 | `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta, y con un auditor configurado su código de salida es el veredicto | lo llamas tú |
 | `hooks/receipt.sh` | una línea local por freno o escape, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
@@ -142,6 +142,26 @@ Nueve piezas tienen `--selftest`, el gate de índice, el de formato, la sincron�
 
 ## Configurar
 
+## Las reglas de escritura, y cómo apagarlas
+
+Este plugin pone reglas de escritura al inicio de cada sesión, y lo avisa en la primera sesión de cada proyecto. Si quieres la verificación y no el estilo de prosa, pon esto en tu configuración de Claude Code.
+
+```json
+{ "env": { "PRISMA_VOICE": "0" } }
+```
+
+O díselo a tu agente con tus palabras, que es más corto.
+
+```
+Apaga las reglas de escritura de PRISMA en este proyecto.
+```
+
+## Dos cosas que se leen más pesadas de lo que son
+
+**Algo roto no pasa por la entrevista.** `skills/prisma-diagnose/SKILL.md` tiene su propio disparador y no pide registro de plan. El paso 1 es para trabajo que se está decidiendo, no para un defecto que se está reproduciendo.
+
+**La puerta de comentarios no frena hasta que se lo pidas.** Recién instalada mide el diff y dice qué encontró. `PRISMA_COMMENTS_BLOCK=1` convierte esa medición en un freno.
+
 Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
 
 **De dónde salen 200 y 400.** Son la política de este repositorio, y toman su forma de una sola fuente, [un caso de diez meses sobre 2.500 revisiones](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) en un solo grupo de producto de Cisco, hecho y escrito en 2006 por el proveedor de la herramienta de revisión que midió. Su conclusión es que las líneas bajo revisión deben quedar bajo 200 y no pasar de 400.
@@ -152,7 +172,7 @@ Esa es la única afirmación que este repositorio hace sobre la literatura. No d
 
 ## El recibo
 
-Cada vez que una puerta frena algo, o alguien la pasa con el escape, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y si fue frenado o escapado. Nada más, y nunca sale de tu máquina salvo que lo pegues. Los hooks que corren dentro de Claude Code y el comando que corres en la terminal leen y escriben ese mismo archivo, a propósito.
+Cada vez que una puerta frena algo, alguien la pasa con el escape, mide algo que no le pidieron frenar, o no puede medir, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y cuál de las cuatro fue. El resumen las cuenta en columnas separadas, porque una puerta que no pudo medir no aprobó nada. Nada más, y nunca sale de tu máquina salvo que lo pegues. Los hooks que corren dentro de Claude Code y el comando que corres en la terminal leen y escriben ese mismo archivo, a propósito.
 
 ```
 sh hooks/receipt.sh --summary

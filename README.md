@@ -113,13 +113,33 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/pre-push-lint.sh` | runs the repo's own linter, `php-cs-fixer` or `eslint`, on the diff before the push | `PreToolUse` on Bash |
 | `hooks/format-gate.sh` | the format gate over pages touched today, rules in `.prisma-format.conf` | `Stop` |
 | `hooks/check-canonical-sync.sh` | compares the canonical block across every registered copy, never edits | `SessionStart` |
-| `hooks/session-voice.sh` | injects the writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. `PRISMA_VOICE=0` switches it off | `SessionStart` |
+| `hooks/session-voice.sh` | injects the writing rules of `STYLE.md` into every session, so the agent writes that way without being asked. It says so once per project and `PRISMA_VOICE=0` switches it off | `SessionStart` |
 | `hooks/session-deps.sh` | at session start, tells the agent which required tools are missing, with the install command, and to ask before installing. Silent when nothing is missing. `PRISMA_DEPS_CHECK=0` switches it off | `SessionStart` |
 | `hooks/blind-replica.sh` | builds the blind brief, claim and sources only, for the fifth gate, and with an auditor configured its exit code is the verdict | you call it |
 | `hooks/receipt.sh` | one local line per block or escape, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | the helpers the gates share | called by the gates |
 
 Nine pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the command parser and the escape parser. The three push gates are covered by 29 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh` and `tests/page-gates-never-fabricate.sh` add 34 more for a single property, that no gate ever reports a verdict it did not measure, and every one of them was red before the change that made it green. `tests/skills-controls.sh` adds 13 over the text of the four step skills, five of them on mutated copies that must go red. `tests/run-selftests.sh` runs all of it, checks that the pages of this repo obey the rules this repo ships, and compares the number of cases each selftest claims against the number it actually printed, because a suite that goes green does not prove every case ran. The format gate's own suite, the largest at 32 cases, was outside that comparison until 0.6.0 because its closing line did not carry a count. Deleting the three gates turns 13 of the 29 controls red; the rest assert that a gate stays quiet, and that cannot fail when the gate is gone. A gate whose tests never fail is decoration.
+
+## The writing rules, and how to turn them off
+
+This plugin sets writing rules at the start of every session, and it tells you so in the first session of each project. If you want the verification and not the prose style, put this in your Claude Code settings.
+
+```json
+{ "env": { "PRISMA_VOICE": "0" } }
+```
+
+Or say it in your own words to your agent, which is shorter.
+
+```
+Turn off the PRISMA writing rules for this project.
+```
+
+## Two things that read as heavier than they are
+
+**Something broken does not go through the interview.** `skills/prisma-diagnose/SKILL.md` has its own trigger and asks for no plan record. Step 1 is for work that is being decided, not for a defect that is being reproduced.
+
+**The comments gate does not block until you ask it to.** Out of the box it measures the diff and says what it found. `PRISMA_COMMENTS_BLOCK=1` turns that measurement into a block.
 
 ## What is enforced, and by what
 
@@ -153,6 +173,7 @@ Environment variables, all optional.
 | `PRISMA_CANONICAL`, `PRISMA_CANONICAL_COPIES` | the plugin's Spanish block, and `~/.claude/CLAUDE.md` plus the project `CLAUDE.md` when they carry the markers | what the sync check compares |
 | `PRISMA_SIZE_WARN_OVER`, `PRISMA_SIZE_BLOCK_OVER` | 200, 400 | the size gate thresholds |
 | `PRISMA_COMMENTS_MAX_PCT`, `PRISMA_COMMENTS_MAX_BLOCK` | 0, 0 | the comments gate ceilings |
+| `PRISMA_COMMENTS_BLOCK` | 0 | the comments gate measures and warns. Set it to 1 and the ceiling blocks the push |
 | `PRISMA_SKIP_REPOS` | empty | absolute paths where the push gates do not apply |
 | `PRISMA_AUDITOR_CMD` | empty | a command that receives the blind brief on stdin and answers as a second engine |
 | `PRISMA_VOICE` | 1 | set to 0 to stop injecting the writing rules at session start |
@@ -174,7 +195,7 @@ That is the only claim this repository makes about the literature. It does not c
 
 ## The receipt
 
-Every time a gate blocks something, or someone gets past it with an escape, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and whether it was blocked or escaped. Nothing else, and it never leaves your machine unless you paste it. The hooks running inside Claude Code and the command you run in a terminal read and write that same file, on purpose.
+Every time a gate blocks something, gets passed with an escape, measures something it was not asked to block, or cannot measure at all, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and which of those four it was. The summary counts them in separate columns, because a gate that could not measure did not pass anything. Nothing else, and it never leaves your machine unless you paste it. The hooks running inside Claude Code and the command you run in a terminal read and write that same file, on purpose.
 
 ```
 sh hooks/receipt.sh --summary

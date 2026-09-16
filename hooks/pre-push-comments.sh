@@ -10,6 +10,7 @@ PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
+. "$HOOKS_DIR/push-names-head.sh"
 
 command -v jq >/dev/null 2>&1 || { echo "WARN: the comments gate did not run, jq is missing." >&2; exit 0; }
 [ -x "$GATE" ] || { echo "WARN: the comments gate did not run, measure-comments.sh is missing." >&2; exit 0; }
@@ -74,6 +75,23 @@ done
 if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
 
 ( cd "$dir" ) 2>/dev/null || { echo "WARN: the comments gate could not enter $dir, so nothing was measured." >&2; exit 0; }
+
+if [ -n "$segments" ]; then
+  head_branch=$(cd "$dir" && git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  proven=1
+  while IFS= read -r one_push; do
+    [ -n "$one_push" ] || continue
+    push_names_head "$head_branch" "$one_push" || { proven=0; break; }
+  done <<PUSHES
+$real_pushes
+PUSHES
+  if [ "$proven" = "0" ]; then
+    echo "WARN: the comments gate measures the branch HEAD is on, and it cannot prove this push sends that branch, so nothing was measured." >&2
+    receipt_append comments-gate "$real_dir" not-measured
+    exit 0
+  fi
+fi
+
 output=$(cd "$dir" && "$GATE" 2>&1)
 status=$?
 
@@ -83,6 +101,13 @@ fi
 
 if [ "$status" != "1" ]; then
   echo "WARN: the comments gate could not measure in $dir, so nothing is blocked. $(printf '%s' "$output" | tail -1)" >&2
+  exit 0
+fi
+
+if [ "${PRISMA_COMMENTS_BLOCK:-0}" != "1" ]; then
+  echo "COMMENTS GATE, measured and not blocking. This repository has not asked it to block, so set PRISMA_COMMENTS_BLOCK=1 to turn the ceiling into a block." >&2
+  printf '%s\n' "$output" >&2
+  receipt_append comments-gate "$real_dir" warned
   exit 0
 fi
 

@@ -3,6 +3,7 @@
 
 HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 . "$HOOKS/selftest-env.sh"
+export PRISMA_COMMENTS_BLOCK=1
 T=$(mktemp -d)
 ok=1
 CASES=0
