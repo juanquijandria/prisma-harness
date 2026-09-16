@@ -37,12 +37,30 @@ run_suite() {
 USER_TEMP="$BASE/a-temp-dir-the-user-chose"
 mkdir -p "$USER_TEMP"
 
+RETURN_PROBE="$BASE/top-level-return.sh"
+printf 'printf started\nreturn 0\nprintf reached-the-end\n' > "$RETURN_PROBE"
+ENDS_ON_TOP_LEVEL_RETURN=""
+for candidate in sh dash bash; do
+  found=$(command -v "$candidate" 2>/dev/null)
+  [ -n "$found" ] || continue
+  if [ "$("$found" "$RETURN_PROBE" 2>/dev/null)" = "started" ]; then
+    ENDS_ON_TOP_LEVEL_RETURN="$found"
+    break
+  fi
+done
+
+if [ -n "$ENDS_ON_TOP_LEVEL_RETURN" ]; then
+  printf '  a top level return ends the script under %s, so the cases that need that run there\n' "$ENDS_ON_TOP_LEVEL_RETURN"
+else
+  printf '  no shell here ends the script on a top level return\n'
+fi
+
 while IFS='|' read -r knob hook wanted_shell; do
   [ -n "$knob" ] || continue
   case "$wanted_shell" in
-    dash)
-      shell_for_case=$(command -v dash 2>/dev/null)
-      [ -n "$shell_for_case" ] || { skip "$hook under $knob, this case needs a shell that ends the script on a top level return and there is no dash here"; continue; }
+    return-ends-the-script)
+      shell_for_case="$ENDS_ON_TOP_LEVEL_RETURN"
+      [ -n "$shell_for_case" ] || { skip "$hook under $knob, this case needs a shell that ends the script on a top level return and no shell on this machine does that"; continue; }
       ;;
     *) shell_for_case=sh ;;
   esac
@@ -61,8 +79,8 @@ PRISMA_TMPDIR=/nowhere-at-all|format-gate.sh
 PRISMA_VOICE=0|session-voice.sh
 PRISMA_DEPS_CHECK=0|session-deps.sh
 PRISMA_JQ=|check-canonical-sync.sh
-PRISMA_RECEIPT_SOURCED=1|receipt.sh|dash
-PRISMA_ESCAPE_SOURCED=1|escape-declared.sh|dash
+PRISMA_RECEIPT_SOURCED=1|receipt.sh|return-ends-the-script
+PRISMA_ESCAPE_SOURCED=1|escape-declared.sh|return-ends-the-script
 TMPDIR=$USER_TEMP|format-gate.sh
 HOME=$USER_TEMP|check-canonical-sync.sh
 KNOBS
