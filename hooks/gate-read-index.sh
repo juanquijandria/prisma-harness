@@ -39,31 +39,33 @@ if [ "$1" = "--selftest" ]; then
   exit 1
 fi
 
-JQ="${PRISMA_JQ:-$(command -v jq)}"
-[ -n "$JQ" ] || { echo "WARN: the index gate did not run, jq is missing." >&2; exit 0; }
-
-payload=$(cat)
-[ -n "$payload" ] || { echo "WARN: the index gate received an empty payload, so nothing was verified." >&2; exit 0; }
-printf '%s' "$payload" | "$JQ" -e . >/dev/null 2>&1 || { echo "WARN: the index gate could not parse the payload, so nothing was verified." >&2; exit 0; }
-file_path=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.file_path // empty')
-transcript=$(printf '%s' "$payload" | "$JQ" -r '.transcript_path // empty')
-
+not_measured() { echo "WARN: $1" >&2; receipt_append index-gate "$DOCS_ROOT" not-measured; exit 0; }
 normalise() { printf '%s' "$1" | sed 's|/\./|/|g; s|//*|/|g; s|/\.$||; s|/$||'; }
-file_path=$(normalise "$file_path")
 WATCHED=$(normalise "$DOCS_ROOT/$DOCS_DIR")
 INDEX_PATH=$(normalise "$INDEX_PATH")
-case "$file_path" in
-  "$WATCHED"/*) ;;
-  *) exit 0 ;;
-esac
+outside_docs() { case "$(normalise "$1")" in "$WATCHED"/*) return 1 ;; esac; return 0; }
+JQ="${PRISMA_JQ:-$(command -v jq)}"
 
-[ -n "$transcript" ] && [ -f "$transcript" ] || { echo "WARN: the index gate could not read the transcript, nothing was verified." >&2; exit 0; }
+payload=$(cat)
+[ -n "$payload" ] || not_measured "the index gate received an empty payload, so nothing was verified."
+if [ -z "$JQ" ]; then
+  guessed=$(printf '%s' "$payload" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+  [ -n "$guessed" ] && outside_docs "$guessed" && exit 0
+  not_measured "the index gate did not run, jq is missing."
+fi
+printf '%s' "$payload" | "$JQ" -e . >/dev/null 2>&1 || not_measured "the index gate could not parse the payload, so nothing was verified."
+file_path=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.file_path // empty' 2>/dev/null) || not_measured "the index gate could not read a file path from the payload, so nothing was verified."
+[ -n "$file_path" ] || not_measured "the index gate found no file path in the payload, so nothing was verified."
+transcript=$(printf '%s' "$payload" | "$JQ" -r '.transcript_path // empty' 2>/dev/null)
+outside_docs "$file_path" && exit 0
+
+[ -n "$transcript" ] && [ -f "$transcript" ] || not_measured "the index gate could not read the transcript, nothing was verified."
 
 touched=$("$JQ" -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | select((.id // "") != "") | select((.input.file_path // "") != "") | "\(.id)\t\(.input.file_path)"' "$transcript" 2>/dev/null)
 touched_status=$?
 errored=$("$JQ" -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
 errored_status=$?
-{ [ "$touched_status" = "0" ] && [ "$errored_status" = "0" ]; } || { echo "WARN: the index gate could not read the transcript, so nothing was verified." >&2; exit 0; }
+{ [ "$touched_status" = "0" ] && [ "$errored_status" = "0" ]; } || not_measured "the index gate could not read the transcript, so nothing was verified."
 opened=$(printf '%s\n' "$touched" | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
 
 while IFS= read -r call; do

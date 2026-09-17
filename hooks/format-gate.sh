@@ -22,7 +22,18 @@ RULE_VERIFY_TAG=0
 EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md README.es.md SKILL.md METHOD.md STYLE.md CHANGELOG.md CONTRIBUTING.md SECURITY.md log.md"
 EXEMPT_DIRS="raw archive inbox Clippings"
 
-[ -r "$HOOKS_DIR/read-format-config.sh" ] || { echo "WARN: the format gate did not run, read-format-config.sh is missing." >&2; exit 0; }
+HOOK_MODE=0
+for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
+PRISMA_RECEIPT_SOURCED=1
+. "$HOOKS_DIR/receipt.sh"
+cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] || exit 1; receipt_append format-gate "$DOCS_ROOT" not-measured; exit 0; }
+if [ "$HOOK_MODE" = "1" ]; then
+  [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
+  CHANGED_PAGES=$(find "$DOCS_ROOT/$DOCS_DIR" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages, so NOTHING was reviewed."
+  [ -n "$CHANGED_PAGES" ] || { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
+fi
+
+[ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
 . "$HOOKS_DIR/read-format-config.sh"
 read_format_config "$CONFIG_FILE"
 for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG EXEMPT_NAMES EXEMPT_DIRS; do
@@ -36,13 +47,6 @@ for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RUL
   fi
 done
 
-HOOK_MODE=0
-for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
-cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] && exit 0; exit 1; }
-TALLY=$(mktemp "${PRISMA_TMPDIR:-${TMPDIR:-/tmp}}/prisma-tally-XXXXXX" 2>/dev/null) || cannot_measure "the format gate could not create its tally file, so nothing was measured."
-[ -f "$TALLY" ] || cannot_measure "the format gate could not create its tally file, so nothing was measured."
-trap 'rm -f "$TALLY"' EXIT
-
 exempt() {
   name=$(basename "$1")
   for n in $EXEMPT_NAMES; do [ "$name" = "$n" ] && return 0; done
@@ -50,6 +54,15 @@ exempt() {
   for d in $EXEMPT_DIRS; do case "$1" in */"$d"/*) return 0 ;; esac; done
   return 1
 }
+
+if [ "$HOOK_MODE" = "1" ]; then
+  REVIEWABLE=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && ! exempt "$f" && printf '%s\n' "$f"; done)
+  [ -n "$REVIEWABLE" ] || { echo "no pages under $DOCS_DIR/ touched today that the rules apply to"; exit 0; }
+fi
+
+TALLY=$(mktemp "${PRISMA_TMPDIR:-${TMPDIR:-/tmp}}/prisma-tally-XXXXXX" 2>/dev/null) || cannot_measure "the format gate could not create its tally file, so nothing was measured."
+[ -f "$TALLY" ] || cannot_measure "the format gate could not create its tally file, so nothing was measured."
+trap 'rm -f "$TALLY"' EXIT
 
 ceiling_imposed() {
   head -10 "$1" 2>/dev/null | grep -q '<!-- *ceiling-imposed: *[^ ]' && return 0
@@ -200,8 +213,6 @@ review() {
 }
 
 . "$HOOKS_DIR/format-gate-tests.sh"
-PRISMA_RECEIPT_SOURCED=1
-. "$HOOKS_DIR/receipt.sh"
 . "$HOOKS_DIR/format-gate-debt.sh"
 STRICT=0
 if [ "$1" = "--strict" ]; then STRICT=1; shift; fi
@@ -213,15 +224,7 @@ case "$1" in
   --debt-freeze) debt_freeze; exit $? ;;
   --changed)
     STRICT=1
-    [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
-    F=$(find "$DOCS_ROOT/$DOCS_DIR" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null)
-    if [ $? -ne 0 ]; then
-      echo "WARN: --changed could not list today's pages, so NOTHING was reviewed." >&2
-      exit 0
-    fi
-    [ -z "$F" ] && { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
-    HOOK_MODE=1
-    printf '%s\n' "$F" | while IFS= read -r f; do [ -n "$f" ] && { exempt "$f" || review "$f"; }; done
+    printf '%s\n' "$REVIEWABLE" | while IFS= read -r f; do [ -n "$f" ] && review "$f"; done
     ;;
   -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;

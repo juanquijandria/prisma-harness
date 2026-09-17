@@ -170,6 +170,24 @@ case "$silent_out" in
   *) pass "a hook whose selftest prints nothing is reported, not passed over" ;;
 esac
 
+stale="$BASE/a-stale-count-in-its-own-sentence"
+copy_repo "$stale"
+published=$(sed -n 's/.*page-gates-receipts.sh` add \([0-9][0-9]*\) more.*/\1/p' "$stale/README.md")
+if [ -n "$published" ]; then
+  wrong=$((published + 1))
+  sed "s/page-gates-receipts.sh\` add $published more/page-gates-receipts.sh\` add $wrong more/" "$stale/README.md" > "$stale/README.md.new" && mv "$stale/README.md.new" "$stale/README.md"
+  sed "s/page-gates-receipts.sh\` suman $published más/page-gates-receipts.sh\` suman $wrong más/" "$stale/README.es.md" > "$stale/README.es.md.new" && mv "$stale/README.es.md.new" "$stale/README.es.md"
+  printf '\nThis copy repeats %s on purpose.\n' "$published" >> "$stale/README.md"
+  printf '\nEsta copia repite %s a propósito.\n' "$published" >> "$stale/README.es.md"
+  stale_out=$(run_suite "$stale")
+  case "$stale_out" in
+    *"FAIL the sentence that names tests/page-gates-never-fabricate.sh does not carry"*) pass "a stale count is caught in the sentence that names its suite, even when the true number sits in another sentence" ;;
+    *) fail "a stale count in the pages was not reported against its own sentence" ;;
+  esac
+else
+  fail "the count of the never-fabricate suites could not be read from README.md, so this control measured nothing"
+fi
+
 rm -rf "$BASE"
 [ "$ok" = "1" ] && printf 'SELFTEST OK: %d/%d\n' "$CASES" "$CASES" && exit 0
 printf 'SELFTEST FAILED\n'; exit 1

@@ -45,7 +45,7 @@ cat "$PUSH"
 push_gate_cases=$(grep -cE '^ *(PASS|SKIP)' "$PUSH")
 rm -f "$PUSH"
 
-for controls in push-gates-never-fabricate page-gates-never-fabricate; do
+for controls in push-gates-never-fabricate page-gates-never-fabricate page-gates-receipts; do
   printf '\n##### %s\n' "$controls"
   FAB=$(mktemp)
   if /bin/sh "$(dirname "$0")/$controls.sh" > "$FAB" 2>&1; then :; else failed=$((failed+1)); fi
@@ -72,21 +72,23 @@ fi
 rm -f "$SK"
 printf '\n##### the counts these pages publish\n'
 readme_carries() {
-  grep -q "[^0-9]$1[^0-9]" "$ROOT/README.md" && grep -q "[^0-9]$1[^0-9]" "$ROOT/README.es.md"
+  for page in "$ROOT/README.md" "$ROOT/README.es.md"; do
+    awk '{ gsub(/\. /, "\n"); print }' "$page" | grep -F -- "$2" | grep -qE "(^|[^0-9.])$1([^0-9.]|[.]([^0-9]|$)|$)" || return 1
+  done
 }
-while IFS='|' read -r label number; do
+while IFS='|' read -r label number anchor; do
   [ -n "$label" ] || continue
-  if readme_carries "$number"; then
-    printf '  both pages carry %s for %s\n' "$number" "$label"
+  if readme_carries "$number" "$anchor"; then
+    printf '  both pages carry %s for %s, in the sentence that names %s\n' "$number" "$label" "$anchor"
   else
-    printf 'FAIL neither page carries %s for %s, a count in prose that the suite can disprove\n' "$number" "$label"
+    printf 'FAIL the sentence that names %s does not carry %s for %s in both pages, a count in prose that the suite can disprove\n' "$anchor" "$number" "$label"
     failed=$((failed+1))
   fi
 done <<COUNTS
-the push gate controls|$push_gate_cases
-the two never-fabricate suites|$never_fabricate_cases
-the skills controls|$sk_ran
-the format gate suite|$format_gate_cases
+the push gate controls|$push_gate_cases|tests/push-gates-controls.sh
+the never-fabricate suites|$never_fabricate_cases|tests/page-gates-never-fabricate.sh
+the skills controls|$sk_ran|tests/skills-controls.sh
+the format gate suite|$format_gate_cases|hooks/format-gate.sh
 COUNTS
 
 printf '\n##### syntax of every hook and every test\n'
