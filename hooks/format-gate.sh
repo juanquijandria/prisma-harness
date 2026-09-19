@@ -30,14 +30,17 @@ for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] || exit 1; receipt_append format-gate "$DOCS_ROOT" not-measured; exit 0; }
+pages_touched_today() { find "$1" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null; }
 if [ "$HOOK_MODE" = "1" ]; then
   [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
-  CHANGED_PAGES=$(find "$DOCS_ROOT/$DOCS_DIR" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages, so NOTHING was reviewed."
+  CHANGED_PAGES=$(pages_touched_today "$DOCS_ROOT/$DOCS_DIR") || cannot_measure "--changed could not list today's pages, so NOTHING was reviewed."
   [ -n "$CHANGED_PAGES" ] || { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
 fi
 
 [ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
 . "$HOOKS_DIR/read-format-config.sh"
+[ -r "$HOOKS_DIR/rate-rule.sh" ] || cannot_measure "the format gate did not run, rate-rule.sh is missing."
+. "$HOOKS_DIR/rate-rule.sh"
 read_format_config "$CONFIG_FILE"
 for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_DIRS; do
   eval "override=\${PRISMA_$v:-}"
@@ -58,19 +61,13 @@ exempt() {
   return 1
 }
 
-rate_applies() {
-  [ "$RULE_RATE_SECOND_READING" = "1" ] || return 1
-  for d in $RATE_DIRS; do case "$1" in "$DOCS_ROOT/$d"/*) return 0 ;; esac; done
-  return 1
-}
-
 if [ "$HOOK_MODE" = "1" ]; then
   REVIEWABLE=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && ! exempt "$f" && printf '%s\n' "$f"; done)
   RATE_ONLY=""
   if [ "$RULE_RATE_SECOND_READING" = "1" ]; then
     for d in $RATE_DIRS; do
       [ -d "$DOCS_ROOT/$d" ] || continue
-      LISTED=$(find "$DOCS_ROOT/$d" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages under $d, so the rate rule reviewed NOTHING."
+      LISTED=$(pages_touched_today "$DOCS_ROOT/$d") || cannot_measure "--changed could not list today's pages under $d, so the rate rule reviewed NOTHING."
       [ -n "$LISTED" ] && RATE_ONLY=$(printf '%s\n%s' "$RATE_ONLY" "$LISTED")
     done
   fi
@@ -90,44 +87,10 @@ fail() { printf 'FAIL  %s\n' "$1"; printf 'F\n' >> "$TALLY"; }
 warn() { printf 'WARN  %s\n' "$1"; printf 'W\n' >> "$TALLY"; }
 strict_or_warn() { if [ "$STRICT" = "1" ]; then fail "$1"; else warn "$1"; fi; }
 
-rate_rule() {
-  rate_applies "$1" || return
-  COUNTS=$(rate_readings "$1")
-  RATE_CELLS=${COUNTS%% *}
-  RATE_TWO=${COUNTS##* }
-  [ "${RATE_CELLS:-0}" -ge "${RATE_CELLS_FLOOR:-6}" ] || return
-  [ "${RATE_TWO:-0}" = "0" ] || return
-  warn "${1#$DOCS_ROOT/} | $RATE_CELLS rate cells and not one of them published under a second definition. Two routes that share the definition are one route, so publish the cell that carries the conclusion under both and reconcile the difference with counted records"
-}
-
 page_checks() {
   rate_rule "$1"
   exempt "$1" && { printf 'SKIP  %s (exempt from page format)\n' "${1#$DOCS_ROOT/}"; return; }
   review "$1"
-}
-
-rate_readings() {
-  awk '
-    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
-    /^\|/ {
-      n = split($0, c, "|")
-      if ($0 ~ /^\|[ \t]*:?-+/) { insep = 1; next }
-      if (!inhdr) { for (i = 2; i < n; i++) hdr[i] = trim(c[i]); inhdr = 1; next }
-      if (insep) {
-        row = trim(c[2])
-        for (i = 3; i < n; i++) {
-          v = trim(c[i])
-          if (v !~ /%/) continue
-          cells++
-          k = row "\t" hdr[i]
-          if (!((k SUBSEP v) in seen)) { seen[k SUBSEP v] = 1; distinct[k]++ }
-        }
-      }
-      next
-    }
-    { inhdr = 0; insep = 0 }
-    END { for (k in distinct) if (distinct[k] > 1) two++; printf "%d %d\n", cells + 0, two + 0 }
-  ' "$1"
 }
 
 review() {

@@ -85,4 +85,11 @@ mkdir -p "$T/exempt-site/wiki/raw" && printf '# raw\n' > "$T/exempt-site/wiki/ra
 n=$(receipt_lines); ( PRISMA_DOCS_ROOT="$T/exempt-site" PRISMA_TMPDIR="$T/nonexistent-dir" run_format_gate --changed )
 expect_receipt "N19 counterexample, only exempt pages touched today leave nothing even with a broken tally" none "$n" "touched today"
 
+no_rate_rule="$T/hooks-without-the-rate-rule"
+cp -R "$HOOKS" "$no_rate_rule" && rm -f "$no_rate_rule/rate-rule.sh"
+n=$(receipt_lines); ( GATE_DIR="$no_rate_rule" PRISMA_HOOKS_DIR="$no_rate_rule" PRISMA_DOCS_ROOT="$site" run_format_gate --changed )
+expect_receipt "N20 the format gate without its rate rule leaves a not-measured line" "format-gate $site not-measured" "$n" "rate-rule.sh is missing"
+n=$(receipt_lines); ( GATE_DIR="$no_rate_rule" PRISMA_HOOKS_DIR="$no_rate_rule" PRISMA_DOCS_ROOT="$site" run_format_gate --strict "$site/wiki/p.md" )
+expect_receipt "N21 by hand, a missing rate rule exits 1 and writes no receipt" none "$n" "rc=1"
+
 finish
