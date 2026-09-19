@@ -29,7 +29,7 @@ scan() {
 
   ALLOW_LIST=""
   if [ -f "$NOTES_ROOT/$ALLOW_FILE" ]; then
-    ALLOW_LIST=$(sed 's/\r$//' "$NOTES_ROOT/$ALLOW_FILE" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^#' | grep -v '^$' | tr '\n' ' ')
+    ALLOW_LIST=$(sed 's/\r$//' "$NOTES_ROOT/$ALLOW_FILE" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^#' | grep -v '^$')
   fi
 
   set -- "$NOTES_ROOT"
@@ -51,6 +51,9 @@ scan() {
   [ "$?" = "0" ] || cannot_measure "the check could not list every directory under $NOTES_ROOT, so nothing was measured."
 
   hits=0
+  OUTER_IFS=$IFS
+  IFS=$(printf '\nx'); IFS=${IFS%x}
+  set -f
   for path in $FOUND; do
     relative=${path#"$NOTES_ROOT"/}
     case "$relative" in */*) ;; *) continue ;; esac
@@ -63,6 +66,8 @@ scan() {
     [ -e "$NOTES_ROOT/$entry" ] && continue
     printf 'NOTES: %s allows %s and there is nothing there any more, so the exception can go.\n' "$ALLOW_FILE" "$entry" >&2
   done
+  set +f
+  IFS=$OUTER_IFS
 
   [ "$hits" = "0" ] || receipt_append notes-machinery "$NOTES_ROOT" warned
 }
@@ -130,6 +135,17 @@ if [ "${1:-}" = "--selftest" ]; then
   mkdir -p "$NOTES_UNDER_TEST/wiki/deep/inside/.git"
   run "$NOTES_UNDER_TEST"
   expect_reports "a git repository nested inside the tree is reported" "wiki/deep/inside/.git"
+
+  tree spaced
+  mkdir -p "$NOTES_UNDER_TEST/wiki/qa de referidos/.git"
+  run "$NOTES_UNDER_TEST"
+  expect_reports "a path with a space in it is reported whole and not split in two" "wiki/qa de referidos/.git"
+
+  tree spaced-allowed
+  mkdir -p "$NOTES_UNDER_TEST/wiki/qa de referidos/.git"
+  printf 'wiki/qa de referidos\n' > "$NOTES_UNDER_TEST/$ALLOW_FILE"
+  run "$NOTES_UNDER_TEST"
+  expect_silent "an exception with a space in it covers the path it names"
 
   tree own-git
   mkdir -p "$NOTES_UNDER_TEST/.git"

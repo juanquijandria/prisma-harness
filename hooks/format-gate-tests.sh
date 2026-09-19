@@ -94,6 +94,18 @@ EOT
   one_reading "$T/wiki/inbox/delivery.md";                                       break_warn "a delivery drafted where every other rule steps aside" "$T/wiki/inbox/delivery.md"
   one_reading "$T/wiki/raw/dropped.md";                                          stay_quiet "what an ingestion dropped, which nobody wrote as a delivery" "$T/wiki/raw/dropped.md"
   CASES=$((CASES+1))
+  SIBLING=$(mktemp -d)
+  mkdir -p "$SIBLING/wiki" "$SIBLING/inbox"
+  printf '# A page\n\nPlain text with no figures.\n' > "$SIBLING/wiki/plain.md"
+  one_reading "$SIBLING/inbox/delivery.md"
+  RATE_SIBLING=$(PRISMA_DOCS_ROOT="$SIBLING" PRISMA_DOCS_DIR=wiki PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" --changed 2>&1)
+  rm -rf "$SIBLING"
+  case "$RATE_SIBLING" in
+    *"rate cells"*) printf '  PASS caught "%s"\n' "a delivery in a folder beside the pages folder, which is where deliveries actually live" ;;
+    *) printf '  BLIND on "%s"\n' "a delivery in a folder beside the pages folder, which is where deliveries actually live"; R=1 ;;
+  esac
+
+  CASES=$((CASES+1))
   RATE_AS_COMMAND=$(PRISMA_DOCS_ROOT="$T" PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" "$T/wiki/inbox/delivery.md" 2>&1)
   case "$RATE_AS_COMMAND" in
     *"rate cells"*) printf '  PASS caught "%s"\n' "the same delivery with the gate run as a command, which is how a person runs it" ;;

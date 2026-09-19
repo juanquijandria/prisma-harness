@@ -64,9 +64,23 @@ rate_exempt() {
   return 1
 }
 
+inside_pages_dir() {
+  case "$1" in "$DOCS_ROOT/$DOCS_DIR"/*) return 0 ;; esac
+  return 1
+}
+
 if [ "$HOOK_MODE" = "1" ]; then
   REVIEWABLE=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && ! exempt "$f" && printf '%s\n' "$f"; done)
-  RATE_ONLY=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && exempt "$f" && ! rate_exempt "$f" && printf '%s\n' "$f"; done)
+  RATE_ONLY=""
+  if [ "$RULE_RATE_SECOND_READING" = "1" ]; then
+    CHANGED_EVERYWHERE=$(find "$DOCS_ROOT" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages outside $DOCS_DIR, so the rate rule reviewed NOTHING."
+    RATE_ONLY=$(printf '%s\n' "$CHANGED_EVERYWHERE" | while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      rate_exempt "$f" && continue
+      if inside_pages_dir "$f" && ! exempt "$f"; then continue; fi
+      printf '%s\n' "$f"
+    done)
+  fi
   [ -n "$REVIEWABLE" ] || [ -n "$RATE_ONLY" ] || { echo "no pages under $DOCS_DIR/ touched today that the rules apply to"; exit 0; }
 fi
 
