@@ -17,6 +17,11 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/session-deps.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/notes-machinery.sh\"",
+            "timeout": 10
           }
         ]
       }
@@ -56,6 +61,11 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/format-gate.sh\" --changed",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/notes-machinery.sh\"",
+            "timeout": 10
           }
         ]
       }

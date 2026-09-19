@@ -19,8 +19,11 @@ RULE_LINE_CEILING=150
 RULE_SOURCES_FOOTER=0
 RULE_WIKILINKS=0
 RULE_VERIFY_TAG=0
+RULE_RATE_SECOND_READING=0
+RATE_CELLS_FLOOR=6
 EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md README.es.md SKILL.md METHOD.md STYLE.md CHANGELOG.md CONTRIBUTING.md SECURITY.md log.md"
 EXEMPT_DIRS="raw archive inbox Clippings"
+RATE_EXEMPT_DIRS="raw archive Clippings"
 
 HOOK_MODE=0
 for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
@@ -36,7 +39,7 @@ fi
 [ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
 . "$HOOKS_DIR/read-format-config.sh"
 read_format_config "$CONFIG_FILE"
-for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG EXEMPT_NAMES EXEMPT_DIRS; do
+for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_EXEMPT_DIRS; do
   eval "override=\${PRISMA_$v:-}"
   [ -n "$override" ] || continue
   kind=$(format_config_kind "$v")
@@ -55,9 +58,16 @@ exempt() {
   return 1
 }
 
+rate_exempt() {
+  [ "$RULE_RATE_SECOND_READING" = "1" ] || return 0
+  for d in $RATE_EXEMPT_DIRS; do case "$1" in */"$d"/*) return 0 ;; esac; done
+  return 1
+}
+
 if [ "$HOOK_MODE" = "1" ]; then
   REVIEWABLE=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && ! exempt "$f" && printf '%s\n' "$f"; done)
-  [ -n "$REVIEWABLE" ] || { echo "no pages under $DOCS_DIR/ touched today that the rules apply to"; exit 0; }
+  RATE_ONLY=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && exempt "$f" && ! rate_exempt "$f" && printf '%s\n' "$f"; done)
+  [ -n "$REVIEWABLE" ] || [ -n "$RATE_ONLY" ] || { echo "no pages under $DOCS_DIR/ touched today that the rules apply to"; exit 0; }
 fi
 
 TALLY=$(mktemp "${PRISMA_TMPDIR:-${TMPDIR:-/tmp}}/prisma-tally-XXXXXX" 2>/dev/null) || cannot_measure "the format gate could not create its tally file, so nothing was measured."
@@ -73,10 +83,46 @@ fail() { printf 'FAIL  %s\n' "$1"; printf 'F\n' >> "$TALLY"; }
 warn() { printf 'WARN  %s\n' "$1"; printf 'W\n' >> "$TALLY"; }
 strict_or_warn() { if [ "$STRICT" = "1" ]; then fail "$1"; else warn "$1"; fi; }
 
+rate_rule() {
+  rate_exempt "$1" && return
+  COUNTS=$(rate_readings "$1")
+  RATE_CELLS=${COUNTS%% *}
+  RATE_TWO=${COUNTS##* }
+  [ "${RATE_CELLS:-0}" -ge "${RATE_CELLS_FLOOR:-6}" ] || return
+  [ "${RATE_TWO:-0}" = "0" ] || return
+  warn "${1#$DOCS_ROOT/} | $RATE_CELLS rate cells and not one of them published under a second definition. Two routes that share the definition are one route, so publish the cell that carries the conclusion under both and reconcile the difference with counted records"
+}
+
+rate_readings() {
+  awk '
+    function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+    /^\|/ {
+      n = split($0, c, "|")
+      if ($0 ~ /^\|[ \t]*:?-+/) { insep = 1; next }
+      if (!inhdr) { for (i = 2; i < n; i++) hdr[i] = trim(c[i]); inhdr = 1; next }
+      if (insep) {
+        row = trim(c[2])
+        for (i = 3; i < n; i++) {
+          v = trim(c[i])
+          if (v !~ /%/) continue
+          cells++
+          k = row "\t" hdr[i]
+          if (!((k SUBSEP v) in seen)) { seen[k SUBSEP v] = 1; distinct[k]++ }
+        }
+      }
+      next
+    }
+    { inhdr = 0; insep = 0 }
+    END { for (k in distinct) if (distinct[k] > 1) two++; printf "%d %d\n", cells + 0, two + 0 }
+  ' "$1"
+}
+
 review() {
   F="$1"
   [ -f "$F" ] || { fail "$F | does not exist"; return; }
   REL="${F#$DOCS_ROOT/}"
+
+  rate_rule "$F"
   exempt "$F" && return
 
   if [ "$RULE_KEBAB_CASE" = "1" ]; then
@@ -224,11 +270,12 @@ case "$1" in
   --debt-freeze) debt_freeze; exit $? ;;
   --changed)
     STRICT=1
+    printf '%s\n' "$RATE_ONLY" | while IFS= read -r f; do [ -n "$f" ] && rate_rule "$f"; done
     printf '%s\n' "$REVIEWABLE" | while IFS= read -r f; do [ -n "$f" ] && review "$f"; done
     ;;
   -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
-  *)  for f in "$@"; do exempt "$f" && { printf 'SKIP  %s (exempt from page format)\n' "${f#$DOCS_ROOT/}"; continue; }; review "$f"; done ;;
+  *)  for f in "$@"; do exempt "$f" && { rate_rule "$f"; printf 'SKIP  %s (exempt from page format)\n' "${f#$DOCS_ROOT/}"; continue; }; review "$f"; done ;;
 esac
 
 printf '\n'

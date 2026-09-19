@@ -4,6 +4,7 @@ selftest() {
   STRICT=1
   RULE_KEBAB_CASE=1; RULE_H1_FIRST_LINE=1; RULE_EM_DASH=1; RULE_COLON_IN_PROSE=1; RULE_HEADING_COUNTS=1
   RULE_VOSEO=1; RULE_LINE_CEILING=150; RULE_SOURCES_FOOTER=1; RULE_WIKILINKS=1; RULE_VERIFY_TAG=1
+  RULE_RATE_SECOND_READING=1; RATE_CELLS_FLOOR=6; RATE_EXEMPT_DIRS="raw archive Clippings"
   T=$(mktemp -d)
   DOCS_ROOT="$T"; DOCS_DIR="wiki"
   mkdir -p "$T/wiki/a/b/c/d"
@@ -68,6 +69,36 @@ EOT
   sed 's/Nothing else./The rule is simple: never like this in prose./' "$GOOD" > "$T/wiki/colon.md";    break_warn "colon in prose" "$T/wiki/colon.md"
   sed 's/Nothing else./See [[page-that-never-exists]]./' "$GOOD" > "$T/wiki/broken-link.md";           break_warn "broken wikilink" "$T/wiki/broken-link.md"
   sed 's/Nothing else./See the drawing ![[no-such-drawing.svg]] next door./' "$GOOD" > "$T/wiki/broken-attachment.md"; break_warn "missing embedded attachment" "$T/wiki/broken-attachment.md"
+
+  one_reading() {
+    cat "$GOOD" > "$1"
+    printf '\n| Row | Week one | Week two |\n|---|---:|---:|\n| First | 16,9 %% | 9,7 %% |\n| Second | 2,9 %% | 4,0 %% |\n| Third | 3,3 %% | 4,5 %% |\n' >> "$1"
+  }
+  one_reading "$T/wiki/one-reading.md";                                          break_warn "a table of rates with no cell under a second definition" "$T/wiki/one-reading.md"
+  one_reading "$T/wiki/two-readings.md"
+  printf '\n| Row | Week one | Week two |\n|---|---:|---:|\n| First | 8,5 %% | 9,7 %% |\n' >> "$T/wiki/two-readings.md"
+  stay_quiet "the same cell published under a second definition" "$T/wiki/two-readings.md"
+  one_reading "$T/wiki/same-twice.md"
+  printf '\n| Row | Week one | Week two |\n|---|---:|---:|\n| First | 16,9 %% | 9,7 %% |\n' >> "$T/wiki/same-twice.md"
+  break_warn "the same value repeated, which is one reading printed twice" "$T/wiki/same-twice.md"
+  one_reading "$T/wiki/with-fractions.md"
+  printf '\n| Row | Week one | Week two |\n|---|---:|---:|\n| First | 12/71 | 3/31 |\n| Second | 6/204 | 4/99 |\n| Third | 2/61 | 1/22 |\n' >> "$T/wiki/with-fractions.md"
+  break_warn "the numerator and denominator of the same rate, which is the same definition written out" "$T/wiki/with-fractions.md"
+  cat "$GOOD" > "$T/wiki/few-rates.md"
+  printf '\n| Row | Week one | Week two |\n|---|---:|---:|\n| First | 16,9 %% | 9,7 %% |\n| Second | 2,9 %% | 4,0 %% |\n' >> "$T/wiki/few-rates.md"
+  stay_quiet "fewer rate cells than the floor, which is a figure in passing and not a table of rates" "$T/wiki/few-rates.md"
+  RULE_RATE_SECOND_READING=0
+  stay_quiet "the same table of rates with the rule switched off" "$T/wiki/one-reading.md"
+  RULE_RATE_SECOND_READING=1
+  mkdir -p "$T/wiki/inbox" "$T/wiki/raw"
+  one_reading "$T/wiki/inbox/delivery.md";                                       break_warn "a delivery drafted where every other rule steps aside" "$T/wiki/inbox/delivery.md"
+  one_reading "$T/wiki/raw/dropped.md";                                          stay_quiet "what an ingestion dropped, which nobody wrote as a delivery" "$T/wiki/raw/dropped.md"
+  CASES=$((CASES+1))
+  RATE_AS_COMMAND=$(PRISMA_DOCS_ROOT="$T" PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" "$T/wiki/inbox/delivery.md" 2>&1)
+  case "$RATE_AS_COMMAND" in
+    *"rate cells"*) printf '  PASS caught "%s"\n' "the same delivery with the gate run as a command, which is how a person runs it" ;;
+    *) printf '  BLIND on "%s"\n' "the same delivery with the gate run as a command, which is how a person runs it"; R=1 ;;
+  esac
   sed 's/Nothing else./Missing datum [verify] and nobody wrote when./' "$GOOD" > "$T/wiki/verify-real.md"; break_warn "[verify] real, without date (negative control)" "$T/wiki/verify-real.md"
 
   printf '\n=== cases that must stay QUIET (no false alarm) ===\n'
