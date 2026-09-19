@@ -23,7 +23,7 @@ RULE_RATE_SECOND_READING=0
 RATE_CELLS_FLOOR=6
 EXEMPT_NAMES="index.md CLAUDE.md MEMORY.md README.md README.es.md SKILL.md METHOD.md STYLE.md CHANGELOG.md CONTRIBUTING.md SECURITY.md log.md"
 EXEMPT_DIRS="raw archive inbox Clippings"
-RATE_EXEMPT_DIRS="raw archive Clippings"
+RATE_DIRS="inbox"
 
 HOOK_MODE=0
 for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
@@ -39,7 +39,7 @@ fi
 [ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
 . "$HOOKS_DIR/read-format-config.sh"
 read_format_config "$CONFIG_FILE"
-for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_EXEMPT_DIRS; do
+for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_DIRS; do
   eval "override=\${PRISMA_$v:-}"
   [ -n "$override" ] || continue
   kind=$(format_config_kind "$v")
@@ -58,14 +58,9 @@ exempt() {
   return 1
 }
 
-rate_exempt() {
-  [ "$RULE_RATE_SECOND_READING" = "1" ] || return 0
-  for d in $RATE_EXEMPT_DIRS; do case "$1" in */"$d"/*) return 0 ;; esac; done
-  return 1
-}
-
-inside_pages_dir() {
-  case "$1" in "$DOCS_ROOT/$DOCS_DIR"/*) return 0 ;; esac
+rate_applies() {
+  [ "$RULE_RATE_SECOND_READING" = "1" ] || return 1
+  for d in $RATE_DIRS; do case "$1" in "$DOCS_ROOT/$d"/*) return 0 ;; esac; done
   return 1
 }
 
@@ -73,13 +68,11 @@ if [ "$HOOK_MODE" = "1" ]; then
   REVIEWABLE=$(printf '%s\n' "$CHANGED_PAGES" | while IFS= read -r f; do [ -n "$f" ] && ! exempt "$f" && printf '%s\n' "$f"; done)
   RATE_ONLY=""
   if [ "$RULE_RATE_SECOND_READING" = "1" ]; then
-    CHANGED_EVERYWHERE=$(find "$DOCS_ROOT" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages outside $DOCS_DIR, so the rate rule reviewed NOTHING."
-    RATE_ONLY=$(printf '%s\n' "$CHANGED_EVERYWHERE" | while IFS= read -r f; do
-      [ -n "$f" ] || continue
-      rate_exempt "$f" && continue
-      if inside_pages_dir "$f" && ! exempt "$f"; then continue; fi
-      printf '%s\n' "$f"
-    done)
+    for d in $RATE_DIRS; do
+      [ -d "$DOCS_ROOT/$d" ] || continue
+      LISTED=$(find "$DOCS_ROOT/$d" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null) || cannot_measure "--changed could not list today's pages under $d, so the rate rule reviewed NOTHING."
+      [ -n "$LISTED" ] && RATE_ONLY=$(printf '%s\n%s' "$RATE_ONLY" "$LISTED")
+    done
   fi
   [ -n "$REVIEWABLE" ] || [ -n "$RATE_ONLY" ] || { echo "no pages under $DOCS_DIR/ touched today that the rules apply to"; exit 0; }
 fi
@@ -98,13 +91,19 @@ warn() { printf 'WARN  %s\n' "$1"; printf 'W\n' >> "$TALLY"; }
 strict_or_warn() { if [ "$STRICT" = "1" ]; then fail "$1"; else warn "$1"; fi; }
 
 rate_rule() {
-  rate_exempt "$1" && return
+  rate_applies "$1" || return
   COUNTS=$(rate_readings "$1")
   RATE_CELLS=${COUNTS%% *}
   RATE_TWO=${COUNTS##* }
   [ "${RATE_CELLS:-0}" -ge "${RATE_CELLS_FLOOR:-6}" ] || return
   [ "${RATE_TWO:-0}" = "0" ] || return
   warn "${1#$DOCS_ROOT/} | $RATE_CELLS rate cells and not one of them published under a second definition. Two routes that share the definition are one route, so publish the cell that carries the conclusion under both and reconcile the difference with counted records"
+}
+
+page_checks() {
+  rate_rule "$1"
+  exempt "$1" && { printf 'SKIP  %s (exempt from page format)\n' "${1#$DOCS_ROOT/}"; return; }
+  review "$1"
 }
 
 rate_readings() {
@@ -135,8 +134,6 @@ review() {
   F="$1"
   [ -f "$F" ] || { fail "$F | does not exist"; return; }
   REL="${F#$DOCS_ROOT/}"
-
-  rate_rule "$F"
   exempt "$F" && return
 
   if [ "$RULE_KEBAB_CASE" = "1" ]; then
@@ -289,7 +286,7 @@ case "$1" in
     ;;
   -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
   "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
-  *)  for f in "$@"; do exempt "$f" && { rate_rule "$f"; printf 'SKIP  %s (exempt from page format)\n' "${f#$DOCS_ROOT/}"; continue; }; review "$f"; done ;;
+  *)  for f in "$@"; do page_checks "$f"; done ;;
 esac
 
 printf '\n'

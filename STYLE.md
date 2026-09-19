@@ -25,7 +25,7 @@ They belong to a wiki kept in Obsidian and are switched on in `.prisma-format.co
 | Sources footer | `RULE_SOURCES_FOOTER` | a page without a final `Sources:` or `Fuentes:` line |
 | Wikilinks resolve | `RULE_WIKILINKS` | `[[page]]` or `![[file.svg]]` that points to nothing under the docs dir |
 | Verify tag with date | `RULE_VERIFY_TAG` | `[verify]` or `[verificar]` without a date next to it |
-| Rates carry a second reading | `RULE_RATE_SECOND_READING` | a page with six or more rate cells in its tables and not one of them published under a second definition. `RATE_CELLS_FLOOR` moves the six, `RATE_EXEMPT_DIRS` says where it does not apply, and unlike every other rule it still runs on the folders `EXEMPT_DIRS` lists, because a delivery is drafted there |
+| Rates carry a second reading | `RULE_RATE_SECOND_READING` | a page with six or more rate cells in its tables and not one of them published under a second definition. `RATE_CELLS_FLOOR` moves the six, and `RATE_DIRS` says which folders under the docs root it looks at, `inbox` by default, because a delivery is drafted there and a page elsewhere is a record that may carry its own control |
 
 ## The rules the gate cannot enforce
 

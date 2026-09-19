@@ -25,7 +25,7 @@ Son de un wiki en Obsidian y se encienden en `.prisma-format.conf` cuando ese es
 | Pie de fuentes | `RULE_SOURCES_FOOTER` | una página sin línea final `Fuentes:` o `Sources:` |
 | Los wikilinks resuelven | `RULE_WIKILINKS` | `[[pagina]]` o `![[archivo.svg]]` que no apunta a nada bajo la carpeta de docs |
 | Etiqueta de verificar con fecha | `RULE_VERIFY_TAG` | `[verificar]` o `[verify]` sin una fecha al lado |
-| Las tasas llevan segunda lectura | `RULE_RATE_SECOND_READING` | una página con seis celdas de tasa o más en sus tablas y ninguna publicada bajo una segunda definición. `RATE_CELLS_FLOOR` mueve el seis, `RATE_EXEMPT_DIRS` dice dónde no aplica, y a diferencia de las demás reglas sí corre sobre las carpetas que lista `EXEMPT_DIRS`, porque una entrega se redacta ahí |
+| Las tasas llevan segunda lectura | `RULE_RATE_SECOND_READING` | una página con seis celdas de tasa o más en sus tablas y ninguna publicada bajo una segunda definición. `RATE_CELLS_FLOOR` mueve el seis, y `RATE_DIRS` dice qué carpetas bajo la raíz mira, `inbox` por defecto, porque una entrega se redacta ahí y una página en otro lado es un registro que puede traer su propio control |
 
 ## Las reglas que el gate no puede hacer cumplir
 
