@@ -51,7 +51,7 @@ hooks/format-gate.sh --changed             toda página bajo la carpeta de docs 
 hooks/format-gate.sh --debt                inventario de toda la carpeta, contado y no gritado
 hooks/format-gate.sh --debt-freeze         congela el inventario de hoy como baseline de regresión
 hooks/format-gate.sh --match pagina.md     inyecta cinco defectos en una copia de una página REAL y comprueba que los caza
-hooks/format-gate.sh --selftest            el gate sobre 42 casos armados
+hooks/format-gate.sh --selftest            el gate sobre 43 casos armados
 ```
 
 Fuentes: las reglas de escritura del autor al 19/09/2026, y el selftest del gate, que es la versión ejecutable de esta página.

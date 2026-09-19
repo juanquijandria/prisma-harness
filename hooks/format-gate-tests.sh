@@ -91,6 +91,9 @@ EOT
   stay_quiet "the same table of rates with the rule switched off" "$T/inbox/one-reading.md"
   RULE_RATE_SECOND_READING=1
   one_reading "$T/inbox/delivery.md";                                            break_warn "a delivery drafted where every other rule steps aside" "$T/inbox/delivery.md"
+  cat "$GOOD" > "$T/inbox/prose-about-rates.md"
+  printf '\n| Criterion | What it asks | Verdict |\n|---|---|---|\n| First | the two routes agree within 5 %% of each other | not met |\n| Second | under 5 %% of sessions disagree | met |\n| Third | the share stays over 90 %% of the week | met |\n| Fourth | growth over 10 %% counts | met |\n| Fifth | error under 1 %% counts | met |\n| Sixth | coverage over 80 %% counts | met |\n' >> "$T/inbox/prose-about-rates.md"
+  stay_quiet "a table whose cells talk about percentages instead of being one" "$T/inbox/prose-about-rates.md"
   one_reading "$T/wiki/record-with-rates.md";                                    stay_quiet "a page of rates outside the deliveries folder, which is a record and may carry its own control" "$T/wiki/record-with-rates.md"
   CASES=$((CASES+1))
   SIBLING=$(mktemp -d)

@@ -51,7 +51,7 @@ hooks/format-gate.sh --changed             every page under the docs dir touched
 hooks/format-gate.sh --debt                inventory of the whole docs dir, counted and not shouted
 hooks/format-gate.sh --debt-freeze         freeze today's inventory as the regression baseline
 hooks/format-gate.sh --match page.md       inject five defects into a copy of a REAL page and check they get caught
-hooks/format-gate.sh --selftest            the gate over 42 built cases
+hooks/format-gate.sh --selftest            the gate over 43 built cases
 ```
 
 Sources: the author's writing rules as of 2026-09-19, and the format gate's selftest, which is the executable version of this page.

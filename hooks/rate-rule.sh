@@ -17,7 +17,7 @@ rate_readings() {
         row = trim(c[2])
         for (i = 3; i < n; i++) {
           v = trim(c[i])
-          if (v !~ /%/) continue
+          if (v !~ /^\*{0,2}[0-9]+([.,][0-9]+)?[ ]*%\*{0,2}$/) continue
           cells++
           k = row "\t" hdr[i]
           if (!((k SUBSEP v) in seen)) { seen[k SUBSEP v] = 1; distinct[k]++ }
