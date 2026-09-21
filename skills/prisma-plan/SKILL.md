@@ -41,6 +41,8 @@ Two declarations close the interview, and both are said out loud to the person, 
 
 **The session estimate.** Say whether the work fits in one session, which is about 140k tokens of useful context. Count what the session will have to read, the files it touches and their neighbors, what the tests will print, the review round trip, and every unknown that still needs exploration. Work that touches more than about a dozen files, or that depends on more than one unknown, does not fit. If it does not fit, split it into session-sized tickets before anything is built. Each ticket carries the destination, what this ticket builds, its own exit condition, and what it depends on.
 
+**The facts a transversal rule touches.** When the interview adopts a rule that applies to the whole system, list every fact that rule touches and review the list whole before anything is built. A rule applied only to the facts that already failed leaves the next one out.
+
 ```
 Ticket 2 of 4: the import endpoint
 Destination: the nightly file lands in the table and the chart reads it
