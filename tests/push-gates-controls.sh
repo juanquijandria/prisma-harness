@@ -155,6 +155,25 @@ out=$(lint_at "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
 if [ "$rc" = "0" ] && [ -z "$out" ]; then printf 'PASS lint gate measures and passes when the uncommitted lint error is in a file the push does not send\n'; else printf 'FAIL lint gate answered for a file the push does not send (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 rm -rf "$L"
 
+P=$(mktemp -d)
+git -C "$P" init -q; git -C "$P" symbolic-ref HEAD refs/heads/main
+git -C "$P" config user.email t@t; git -C "$P" config user.name t
+mkdir -p "$P/vendor/bin" "$P/fake-bin"; : > "$P/vendor/bin/php-cs-fixer"; chmod +x "$P/vendor/bin/php-cs-fixer"; : > "$P/.php-cs-fixer.php"
+printf '#!/bin/sh\nfor arg in "$@"; do case "$arg" in *.php) grep -q BAD "$arg" && bad=1 ;; esac; done\n[ -z "$bad" ] && exit 0\necho "   1) a.php"; echo "Found 1 of 1 files that can be fixed"; exit 8\n' > "$P/fake-bin/php"; chmod +x "$P/fake-bin/php"
+printf 'vendor/\nfake-bin/\n' > "$P/.gitignore"
+printf '<?php $base = 1;\n' > "$P/base.php"; printf '<?php $a = 1;\n' > "$P/a.php"
+git -C "$P" add -A; git -C "$P" commit -qm base; git -C "$P" checkout -qb feature
+php_at() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$P" "$1" | PATH="$P/fake-bin:$PATH" sh "$HOOKS/pre-push-lint.sh"; }
+printf '<?php $a = BAD;\n' > "$P/a.php"; git -C "$P" commit -qam "php error committed"
+expect "lint gate blocks a php-cs-fixer finding that is committed" 2 php_at "git push origin feature"
+printf '<?php $a = 2;\n' > "$P/a.php"
+before=$(receipt_lines); out=$(php_at "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$(receipt_lines)" = "$((before+1))" ]; then printf 'PASS lint gate says it measured nothing when a committed php finding is fixed only on disk\n'; else printf 'FAIL lint gate on a php finding fixed only on disk (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+git -C "$P" commit -qam "php fixed"; printf '<?php $base = BAD;\n' > "$P/base.php"
+out=$(php_at "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+if [ "$rc" = "0" ] && [ -z "$out" ]; then printf 'PASS lint gate measures and passes when the php finding is in a file the push does not send\n'; else printf 'FAIL lint gate answered for a php file the push does not send (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+rm -rf "$P"
+
 out=$(cd / && payload "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate warns when the directory is not a git repository\n'; else printf 'FAIL size gate silent outside a repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 out=$(payload "cd /nonexistent-dir-xyz && git push origin feature" | sh "$HOOKS/pre-push-lint.sh" 2>&1); rc=$?
