@@ -39,6 +39,14 @@ expect "comments gate passes a push with the escape" 0 run pre-push-comments.sh 
 CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" -gt "$before" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q escaped; then printf 'PASS an escape on a real push is recorded as escaped\n'; else printf 'FAIL the escaped push was not recorded\n'; ok=0; fi
 printf 'export const A = 1;\n' > a.js; git commit -qam clean
 expect "comments gate passes a clean diff" 0 run pre-push-comments.sh "git push origin feature"
+printf '// only on disk\n' >> a.js
+expect "comments gate passes a push whose comment is only on disk" 0 run pre-push-comments.sh "git push origin feature"
+expect "comments gate blocks a comment on disk when the same command commits it" 2 run pre-push-comments.sh "git commit -qam more && git push origin feature"
+git checkout -q -- a.js
+printf 'export const D = 4;\n// stray comment\n' > d.js; git add d.js; git commit -qm "comment committed"
+printf 'export const D = 4;\n' > d.js
+expect "comments gate blocks a committed comment deleted only on disk" 2 run pre-push-comments.sh "git push origin feature"
+git reset -q --hard HEAD~1
 printf 'case "$1" in\n  *stop*) exit 0 ;;\n  */dir/*) exit 1 ;;\nesac\n' > run.sh; git add run.sh; git commit -qm shellcase
 expect "comments gate does not count a shell case pattern starting with * as a comment" 0 run pre-push-comments.sh "git push origin feature"
 printf '/**\n * a docblock line\n */\nexport const B = 2;\n' > b.js; git add b.js; git commit -qm docblock
@@ -72,6 +80,8 @@ while IFS='|' read -r shape verdict; do
   CHECKS=$((CHECKS+1))
   if [ "$verdict" = "measures" ]; then
     if [ "$rc" = "2" ]; then printf 'PASS size gate measures [%s], which it can prove is HEAD\n' "$shape"; else printf 'FAIL size gate refused a push it could prove is HEAD, [%s] rc=%s %s\n' "$shape" "$rc" "$out"; ok=0; fi
+  elif [ "$verdict" = "skips" ]; then
+    if [ "$rc" = "0" ] && [ -z "$out" ]; then printf 'PASS size gate stays silent on [%s], which sends no branch\n' "$shape"; else printf 'FAIL size gate spoke about [%s], which sends no branch, rc=%s %s\n' "$shape" "$rc" "$out"; ok=0; fi
   else
     if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate says nothing about [%s], which it cannot prove is HEAD\n' "$shape"; else printf 'FAIL size gate answered for [%s] it could not prove is HEAD, rc=%s %s\n' "$shape" "$rc" "$out"; ok=0; fi
   fi
@@ -92,14 +102,58 @@ git --git-dir=/tmp/elsewhere/.git push origin feature|refuses
 git --work-tree=/tmp/elsewhere push origin feature|refuses
 GIT_DIR=/tmp/elsewhere/.git git push origin feature|refuses
 git -c user.name=somebody push origin feature|measures
+git push --tags origin feature|measures
+git push origin feature --tags|measures
+git push origin feature refs/tags/v1|measures
+git push origin feature && git push --tags|measures
+git push --tags|skips
+git push --tags origin|skips
+git push origin refs/tags/v1|skips
+git push origin +refs/tags/v1|skips
+git push origin HEAD:refs/tags/v1|skips
+git push origin --delete old|skips
 git --no-pager push origin feature|measures
 SHAPES
+for odd_branch in fix--delete-modal chore--tags; do
+  git checkout -qb "$odd_branch"
+  expect "size gate measures a branch named $odd_branch" 2 run pre-push-size.sh "git push origin $odd_branch"
+  git checkout -q feature; git branch -qD "$odd_branch"
+done
+expect "comments gate measures a branch pushed together with every tag" 2 run pre-push-comments.sh "git push --tags origin feature"
 out=$(run pre-push-comments.sh "git push origin main" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ]; then printf 'PASS comments gate says nothing about a push it cannot prove is HEAD\n'; else printf 'FAIL comments gate answered for a push of another branch (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 git reset -q --hard HEAD~1
 
 expect "lint gate passes a repo with no linter" 0 run pre-push-lint.sh "git push origin feature"
 expect "lint gate ignores a non-push command" 0 run pre-push-lint.sh "git status"
+
+L=$(mktemp -d)
+git -C "$L" init -q; git -C "$L" symbolic-ref HEAD refs/heads/main
+git -C "$L" config user.email t@t; git -C "$L" config user.name t
+mkdir -p "$L/node_modules/.bin"; printf '{"private":true}\n' > "$L/package.json"
+printf '#!/bin/sh\nif grep -q BAD "$@"; then echo "1 error"; exit 1; fi\nexit 0\n' > "$L/node_modules/.bin/eslint"; chmod +x "$L/node_modules/.bin/eslint"
+printf 'node_modules/\n' > "$L/.gitignore"
+printf 'export const BASE = 1;\n' > "$L/base.js"; printf 'export const A = 1;\n' > "$L/a.js"
+git -C "$L" add -A; git -C "$L" commit -qm base; git -C "$L" checkout -qb feature
+lint_at() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$L" "$1" | sh "$HOOKS/pre-push-lint.sh"; }
+lint_warns_unmeasured() {
+  name="$1"; before=$(receipt_lines); out=$(lint_at "$2" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q not-measured; then printf 'PASS %s\n' "$name"; else printf 'FAIL %s (rc=%s) %s\n' "$name" "$rc" "$out"; ok=0; fi
+}
+printf 'export const A = BAD;\n' > "$L/a.js"; git -C "$L" commit -qam "lint error committed"
+expect "lint gate blocks a lint error that is committed" 2 lint_at "git push origin feature"
+expect "lint gate blocks a lint error when the branch goes out with every tag" 2 lint_at "git push --tags origin feature"
+printf 'export const A = 2;\n' > "$L/a.js"
+lint_warns_unmeasured "lint gate says it measured nothing when a committed lint error is fixed only on disk" "git push origin feature"
+git -C "$L" commit -qam "fixed"
+printf 'export const A = BAD;\n' > "$L/a.js"
+lint_warns_unmeasured "lint gate says it measured nothing when a pushed file has an uncommitted lint error" "git push origin feature"
+expect "lint gate blocks a lint error on disk when the same command commits it" 2 lint_at "git commit -qam more && git push origin feature"
+git -C "$L" checkout -q -- a.js
+printf 'export const BASE = BAD;\n' > "$L/base.js"
+out=$(lint_at "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+if [ "$rc" = "0" ] && [ -z "$out" ]; then printf 'PASS lint gate measures and passes when the uncommitted lint error is in a file the push does not send\n'; else printf 'FAIL lint gate answered for a file the push does not send (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+rm -rf "$L"
 
 out=$(cd / && payload "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate warns when the directory is not a git repository\n'; else printf 'FAIL size gate silent outside a repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi

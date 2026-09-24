@@ -46,7 +46,7 @@ pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || 
 [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 
 if [ -n "$segments" ]; then
-  real_pushes=$(printf '%s\n' "$segments" | grep -vE -- '--delete|--tags|refs/tags' || true)
+  real_pushes=$(pushes_that_send_a_branch "$segments")
 else
   real_pushes="$pr_segments"
 fi

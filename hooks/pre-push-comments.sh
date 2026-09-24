@@ -45,7 +45,7 @@ else
 fi
 
 if [ -n "$segments" ]; then
-  real_pushes=$(printf '%s\n' "$segments" | grep -vE -- '--delete|--tags|refs/tags' || true)
+  real_pushes=$(pushes_that_send_a_branch "$segments")
 else
   real_pushes="$pr_segments"
 fi
@@ -92,7 +92,8 @@ PUSHES
   fi
 fi
 
-output=$(cd "$dir" && "$GATE" 2>&1)
+pushed_content=$(content_the_push_sends "$INVOKES" "$command_text")
+output=$(cd "$dir" && "$GATE" ${pushed_content:+--to "$pushed_content"} 2>&1)
 status=$?
 
 if [ "$status" = "0" ]; then
