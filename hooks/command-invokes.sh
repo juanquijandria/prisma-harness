@@ -56,7 +56,12 @@ mv 'notes/Meeting 1 of 5' archive/x"
   }
   case_contains "15 stray DOUBLE QUOTE with the path in double quotes" "$(printf '%s' "$stray_double" | "$SELF" --arguments mv)" "$PATHS"
   case_contains "16 stray APOSTROPHE with the path in single quotes" "$(printf '%s' "$stray_single" | "$SELF" --arguments mv)" "$PATHS"
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 18/18" && exit 0
+  case_check "19 ARITHMETIC glued to a semicolon does not hide the push" "$(printf '%s' 'n=$((n+1)); git push origin main' | "$SELF" git push)" "git push origin main"
+  case_check "20 SUBSTITUTION glued to a semicolon does not hide the push" "$(printf '%s' 'x=$(date); git push origin main' | "$SELF" git push)" "git push origin main"
+  case_check "21 SUBSTITUTION glued to a pipe does not hide the push" "$(printf '%s' 'echo $(date)|git push origin main' | "$SELF" git push)" "git push origin main"
+  case_check "22 REDIRECTION glued to a separator skips its target" "$(printf '%s' 'ls;>/dev/null git push origin main' | "$SELF" git push)" "git push origin main"
+  case_check "23 a quoted push after the arithmetic is not an invocation" "$(printf '%s' 'n=$((n+1)); echo "git push origin main"' | "$SELF" git push; echo "exit=$?")" "exit=0"
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 23/23" && exit 0
   echo "SELFTEST FAILED"; exit 1
 fi
 
@@ -117,6 +122,16 @@ def punctuation_pieces(token):
     return pieces[:-1]
 
 
+SEPARATORS_INSIDE_PUNCTUATION = set(";&|()")
+
+
+def is_separator(piece):
+    if piece in SHLEX_SEPARATORS:
+        return True
+    characters = set(piece)
+    return characters <= set(PUNCTUATION) and bool(characters & SEPARATORS_INSIDE_PUNCTUATION)
+
+
 def segments_with_shlex(text):
     lexer = shlex.shlex(io.StringIO(text), posix=True, punctuation_chars=PUNCTUATION)
     lexer.whitespace = WHITESPACE
@@ -128,9 +143,10 @@ def segments_with_shlex(text):
                 skip = False
             elif piece in REDIRECTIONS:
                 skip = True
-            elif piece in SHLEX_SEPARATORS:
+            elif is_separator(piece):
                 output.append(current)
                 current = []
+                skip = piece[-1] in HAND_REDIRECTIONS
             else:
                 current.append(piece)
     output.append(current)

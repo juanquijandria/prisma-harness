@@ -17,6 +17,7 @@ receipt_lines() { [ -f "$PRISMA_RECEIPT_FILE" ] && wc -l < "$PRISMA_RECEIPT_FILE
 
 printf 'export const A = 1;\n// stray comment\n' > a.js; git commit -qam comment
 expect "comments gate blocks a stray comment" 2 run pre-push-comments.sh "git push origin feature"
+expect "comments gate blocks a push that follows an arithmetic expansion" 2 run pre-push-comments.sh 'n=$((n+1)); git push origin feature'
 expect "comments gate passes with the escape" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
 out=$(payload "git push origin feature" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qi 'comment'; then printf 'PASS comments gate measures and lets the push through until the repository asks it to block\n'; else printf 'FAIL comments gate without PRISMA_COMMENTS_BLOCK (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
