@@ -7,6 +7,7 @@ T=$(mktemp -d)
 ok=1
 CASES=0
 PLAN_DECISION_FILTER="Not every open choice is the person's"
+PLAN_DECISION_CLAUSES="change what gets built|spend someone's money|be hard to undo|reach an audience|Open the first round with the answer"
 STEP_SKILLS="prisma-plan prisma-build prisma-fidelity-review prisma-diagnose"
 EXTERNAL_PLUGIN_PATTERN='pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs'
 EXTERNAL_PLUGIN_SKILL=mattpocock-skills:tdd
@@ -71,7 +72,13 @@ check_plan_filters_decisions() {
   a=$(line_of "$f" '^## The interview is a tree'); b=$(line_of "$f" '^## What the interview must settle')
   c=$(line_of "$f" "$PLAN_DECISION_FILTER")
   [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] || return 1
-  [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ]
+  [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ] || return 1
+  filter_line=$(sed -n "${c}p" "$f")
+  old_ifs=$IFS; IFS='|'
+  for clause in $PLAN_DECISION_CLAUSES; do
+    case "$filter_line" in *"$clause"*) ;; *) IFS=$old_ifs; return 1 ;; esac
+  done
+  IFS=$old_ifs
 }
 
 check_build_order() {
@@ -131,6 +138,8 @@ mutate; grep -v '140k' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md
 if check_plan_closes "$T/skills"; then fail "control: removing the session ceiling was not caught"; else pass "control: removing the session ceiling turns the plan case red"; fi
 mutate; grep -v "$PLAN_DECISION_FILTER" "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
 if check_plan_filters_decisions "$T/skills"; then fail "control: removing the decision filter was not caught"; else pass "control: removing the decision filter turns the plan filter case red"; fi
+mutate; sed 's/, or reach an audience//' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
+if check_plan_filters_decisions "$T/skills"; then fail "control: dropping one condition of the decision filter was not caught"; else pass "control: dropping one condition of the decision filter turns the plan filter case red"; fi
 mutate; f="$T/skills/prisma-build/SKILL.md"; { printf '## The commit\n\nMoved up.\n\n'; grep -v '^## The commit' "$f"; } > "$T/b.md"; mv "$T/b.md" "$f"
 if check_build_order "$T/skills"; then fail "control: the commit moved above the red run was not caught"; else pass "control: the commit above the red run turns the order case red"; fi
 mutate; grep -v 'Escaped from' "$T/skills/prisma-diagnose/SKILL.md" > "$T/d.md"; mv "$T/d.md" "$T/skills/prisma-diagnose/SKILL.md"

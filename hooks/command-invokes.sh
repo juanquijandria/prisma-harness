@@ -61,7 +61,8 @@ mv 'notes/Meeting 1 of 5' archive/x"
   case_check "21 SUBSTITUTION glued to a pipe does not hide the push" "$(printf '%s' 'echo $(date)|git push origin main' | "$SELF" git push)" "git push origin main"
   case_check "22 REDIRECTION glued to a separator skips its target" "$(printf '%s' 'ls;>/dev/null git push origin main' | "$SELF" git push)" "git push origin main"
   case_check "23 a quoted push after the arithmetic is not an invocation" "$(printf '%s' 'n=$((n+1)); echo "git push origin main"' | "$SELF" git push; echo "exit=$?")" "exit=0"
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 23/23" && exit 0
+  case_check "24 an append of both streams is a redirection and not a separator" "$(printf '%s' 'ls &>>log git push origin main' | "$SELF" git push; echo "exit=$?")" "exit=0"
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 24/24" && exit 0
   echo "SELFTEST FAILED"; exit 1
 fi
 
@@ -100,7 +101,8 @@ command = sys.stdin.read()
 
 SHLEX_SEPARATORS = {";", "&", "&&", "|", "||", "(", ")", "{", "}", "\n", "<", ">", ">>"}
 PUNCTUATION = "();<>|&\n"
-REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "&>", ">|"}
+SEPARATORS_INSIDE_PUNCTUATION = set(";&|()")
+REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "&>", "&>>", ">|"}
 HAND_SEPARATORS = ";&|\n(){}<>"
 HAND_REDIRECTIONS = "<>"
 QUOTES = "\"'"'"'"
@@ -120,9 +122,6 @@ def punctuation_pieces(token):
             pieces.append(part)
         pieces.append("\n")
     return pieces[:-1]
-
-
-SEPARATORS_INSIDE_PUNCTUATION = set(";&|()")
 
 
 def is_separator(piece):

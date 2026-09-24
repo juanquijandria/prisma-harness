@@ -9,7 +9,7 @@ This is step 1 of the five steps in `METHOD.md`. It ends with a record that step
 
 ## The interview is a tree worked in rounds
 
-Every decision branches into the decisions that hang off it. The frontier is the set of decisions whose prerequisites are already settled, so they can be asked now without guessing at an answer nobody has given. Ask the whole frontier in one round, numbered, each question with the answer you would pick and why in one line. Then wait. A question whose answer depends on another question still open in this round belongs to a later round.
+Every decision branches into the decisions that hang off it. The frontier is the set of decisions whose prerequisites are already settled, so they can be asked now without guessing at an answer nobody has given. Ask the person's part of the frontier in one round, numbered, each question with the answer you would pick and why in one line. Then wait. A question whose answer depends on another question still open in this round belongs to a later round.
 
 Each question looks like this.
 

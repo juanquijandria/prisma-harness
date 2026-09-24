@@ -6,11 +6,13 @@ HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 ESCAPE="PRISMA_SHELL_TRAPS_OK=1"
-GATE_NAME="shell-traps"
-UNQUOTED_INCLUDE_GLOB='(^|[[:space:]])--include=[^'"'"'"[:space:]]*[*?[]'
+GATE_NAME="shell-traps-gate"
+UNQUOTED_INCLUDE_GLOB='(^|[[:space:]])--include(=|[[:space:]]+)([^'"'"'"[:space:]\\]|\\.)*[*?[]'
 SEARCH_PROGRAMS="grep egrep fgrep ugrep"
-REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-timeout}"
+DEFAULT_WRAPPERS="timeout"
+REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-$DEFAULT_WRAPPERS}"
 PARSER_FAILED=3
+SELFTEST_CASES=22
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -43,7 +45,7 @@ invokes_a_search() {
 }
 
 has_unquoted_include_glob() {
-  case "${SHELL:-}" in */zsh) printf '%s' "$1" | grep -qE "$UNQUOTED_INCLUDE_GLOB" ;; *) return 1 ;; esac
+  case "${SHELL:-}" in */zsh|zsh) printf '%s' "$1" | grep -qE "$UNQUOTED_INCLUDE_GLOB" ;; *) return 1 ;; esac
 }
 
 missing_wrappers_named() {
@@ -53,7 +55,7 @@ missing_wrappers_named() {
 }
 
 check_include_glob() {
-  has_unquoted_include_glob "$bare_command" && invokes_a_search "$command_text" && block "this search will not run." \
+  has_unquoted_include_glob "$bare_command" && invokes_a_search "$command_text" && block "a command on this line will not run." \
     "Under zsh an unquoted --include pattern is read as a file glob. It matches no file, zsh aborts that command with 'no matches found', and the rest of the line goes on as if the search had found nothing." \
     "quote the pattern, for example --include='*.md'."
 }
@@ -82,38 +84,64 @@ run_gate() {
   exit 0
 }
 
+run_payload() {
+  printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s}}' "$(printf '%s' "$1" | jq -Rs .)" \
+    | SHELL="$2" PATH="${3:-$PATH}" PRISMA_REQUIRED_WRAPPERS="${4:-$DEFAULT_WRAPPERS}" sh "$SELF" >/dev/null 2>&1
+  echo "$?"
+}
+
+expect() {
+  cases=$((cases+1))
+  if [ "$2" = "$3" ]; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s, expected %s and got %s\n' "$1" "$3" "$2"; ok=0; fi
+}
+
+selftest_include_glob() {
+  expect "1 an unquoted include glob under zsh blocks" "$(run_payload 'grep -rn --include=*.md foo .' "$ZSH")" 2
+  expect "2 the same pattern in single quotes passes" "$(run_payload "grep -rn --include='*.md' foo ." "$ZSH")" 0
+  expect "3 the whole flag in double quotes passes" "$(run_payload 'grep -rn "--include=*.md" foo .' "$ZSH")" 0
+  expect "4 a search only mentioned inside quotes passes" "$(run_payload 'echo "grep -rn --include=*.md foo ."' "$ZSH")" 0
+  expect "5 a real search next to a quoted mention of the glob passes" "$(run_payload 'grep -rn foo . && echo "next time use --include=*.md"' "$ZSH")" 0
+  expect "6 an escaped quote inside double quotes does not hide the glob" "$(run_payload 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' "$ZSH")" 2
+  expect "7 under bash the unquoted glob reaches grep and passes" "$(run_payload 'grep -rn --include=*.md foo .' /bin/bash)" 0
+  expect "8 a brace glob after a cd and before a pipe blocks" "$(run_payload 'cd notes && grep -rln --include=*.{md,txt} foo . | wc -l' /usr/bin/zsh)" 2
+  expect "9 a brace list with no glob character expands and passes" "$(run_payload 'grep -rn --include={a.md,b.md} foo .' "$ZSH")" 0
+  expect "10 a search written only in a trailing comment passes" "$(run_payload 'ls -la # then grep -rn --include=*.md foo .' "$ZSH")" 0
+  expect "11 the escape lets the unquoted glob through" "$(run_payload "$ESCAPE grep -rn --include=*.md foo ." "$ZSH")" 0
+  expect "12 the pattern as a separate word blocks too" "$(run_payload 'grep -rn --include *.md foo .' "$ZSH")" 2
+  expect "13 a glob character escaped with a backslash passes" "$(run_payload 'grep -rn --include=\*.md foo .' "$ZSH")" 0
+  expect "14 egrep counts as a search" "$(run_payload 'egrep -rn --include=*.md foo .' "$ZSH")" 2
+  expect "15 a SHELL named without its path still counts as zsh" "$(run_payload 'grep -rn --include=*.md foo .' zsh)" 2
+}
+
+selftest_wrappers_and_input() {
+  expect "16 a wrapper that is not installed blocks" "$(run_payload "$MISSING_WRAPPER 10 curl -s https://example.com" "$ZSH" "$PATH" "$MISSING_WRAPPER")" 2
+  expect "17 an installed timeout passes" "$(run_payload "$DEFAULT_WRAPPERS 10 curl -s https://example.com" "$ZSH" "$fake_bin:$PATH")" 0
+  expect "18 a missing wrapper only mentioned passes" "$(run_payload "echo $MISSING_WRAPPER is missing" "$ZSH" "$PATH" "$MISSING_WRAPPER")" 0
+  expect "19 input that is not JSON passes" "$(printf 'this is not json' | sh "$SELF" >/dev/null 2>&1; echo "$?")" 0
+  expect "20 a tool other than Bash passes" "$(printf '{"tool_name":"Write","tool_input":{"command":"grep --include=*.md x"}}' | SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1; echo "$?")" 0
+}
+
+selftest_receipt() {
+  receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
+  blocked_rc=$(run_payload 'grep -rn --include=*.md foo .' "$ZSH")
+  expect "21 a block leaves its line in the receipt" "$blocked_rc $(grep -c "	$GATE_NAME	.*	blocked$" "$receipt")" "2 1"
+  fault_rc=$(PRISMA_PARSER_FAULT=1 run_payload 'grep -rn --include=*.md foo .' "$ZSH")
+  expect "22 a parser that fails lets the command through and says so in the receipt" "$fault_rc $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
+}
+
 selftest() {
   SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+  ZSH=/bin/zsh
+  MISSING_WRAPPER=no-such-wrapper-alpha
   fake_bin=$(mktemp -d)
-  printf '#!/bin/sh\nexit 0\n' > "$fake_bin/timeout"; chmod +x "$fake_bin/timeout"
+  printf '#!/bin/sh\nexit 0\n' > "$fake_bin/$DEFAULT_WRAPPERS"; chmod +x "$fake_bin/$DEFAULT_WRAPPERS"
   ok=1; cases=0
-  run() {
-    printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s}}' "$(printf '%s' "$1" | jq -Rs .)" \
-      | SHELL="$2" PATH="${3:-$PATH}" PRISMA_REQUIRED_WRAPPERS="${4:-timeout}" sh "$SELF" >/dev/null 2>&1
-    echo "$?"
-  }
-  expect() {
-    cases=$((cases+1))
-    if [ "$2" = "$3" ]; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s, expected exit %s and got %s\n' "$1" "$3" "$2"; ok=0; fi
-  }
-  expect "1 an unquoted include glob under zsh blocks" "$(run 'grep -rn --include=*.md foo .' /bin/zsh)" 2
-  expect "2 the same pattern in single quotes passes" "$(run "grep -rn --include='*.md' foo ." /bin/zsh)" 0
-  expect "3 the whole flag in double quotes passes" "$(run 'grep -rn "--include=*.md" foo .' /bin/zsh)" 0
-  expect "4 a search only mentioned inside quotes passes" "$(run 'echo "grep -rn --include=*.md foo ."' /bin/zsh)" 0
-  expect "5 a real search next to a quoted mention of the glob passes" "$(run 'grep -rn foo . && echo "next time use --include=*.md"' /bin/zsh)" 0
-  expect "6 an escaped quote inside double quotes does not hide the glob" "$(run 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' /bin/zsh)" 2
-  expect "7 under bash the unquoted glob reaches grep and passes" "$(run 'grep -rn --include=*.md foo .' /bin/bash)" 0
-  expect "8 a brace glob after a cd and before a pipe blocks" "$(run 'cd notes && grep -rln --include=*.{md,txt} foo . | wc -l' /usr/bin/zsh)" 2
-  expect "9 a brace list with no glob character expands and passes" "$(run 'grep -rn --include={a.md,b.md} foo .' /bin/zsh)" 0
-  expect "10 a search written only in a trailing comment passes" "$(run 'ls -la # then grep -rn --include=*.md foo .' /bin/zsh)" 0
-  expect "11 the escape lets the unquoted glob through" "$(run "$ESCAPE grep -rn --include=*.md foo ." /bin/zsh)" 0
-  expect "12 a wrapper that is not installed blocks" "$(run 'no-such-wrapper-alpha 10 curl -s https://example.com' /bin/zsh "$PATH" no-such-wrapper-alpha)" 2
-  expect "13 an installed timeout passes" "$(run 'timeout 10 curl -s https://example.com' /bin/zsh "$fake_bin:$PATH")" 0
-  expect "14 a missing wrapper only mentioned passes" "$(run 'echo no-such-wrapper-alpha is missing' /bin/zsh "$PATH" no-such-wrapper-alpha)" 0
-  expect "15 input that is not JSON passes" "$(printf 'this is not json' | sh "$SELF" >/dev/null 2>&1; echo "$?")" 0
-  expect "16 a tool other than Bash passes" "$(printf '{"tool_name":"Write","tool_input":{"command":"grep --include=*.md x"}}' | SHELL=/bin/zsh sh "$SELF" >/dev/null 2>&1; echo "$?")" 0
+  selftest_include_glob
+  selftest_wrappers_and_input
+  selftest_receipt
   rm -rf "$fake_bin"
-  [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$cases" "$cases" && exit 0
+  [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
+  [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && exit 0
   printf 'SELFTEST FAILED\n'; exit 1
 }
 
