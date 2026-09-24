@@ -158,7 +158,7 @@ rm -rf "$L"
 P=$(mktemp -d)
 git -C "$P" init -q; git -C "$P" symbolic-ref HEAD refs/heads/main
 git -C "$P" config user.email t@t; git -C "$P" config user.name t
-mkdir -p "$P/vendor/bin" "$P/fake-bin"; : > "$P/vendor/bin/php-cs-fixer"; chmod +x "$P/vendor/bin/php-cs-fixer"; : > "$P/.php-cs-fixer.php"
+mkdir -p "$P/vendor/bin" "$P/fake-bin"; printf '#!/bin/sh\nexit 0\n' > "$P/vendor/bin/php-cs-fixer"; chmod +x "$P/vendor/bin/php-cs-fixer"; : > "$P/.php-cs-fixer.php"
 printf '#!/bin/sh\nfor arg in "$@"; do case "$arg" in *.php) grep -q BAD "$arg" && bad=1 ;; esac; done\n[ -z "$bad" ] && exit 0\necho "   1) a.php"; echo "Found 1 of 1 files that can be fixed"; exit 8\n' > "$P/fake-bin/php"; chmod +x "$P/fake-bin/php"
 printf 'vendor/\nfake-bin/\n' > "$P/.gitignore"
 printf '<?php $base = 1;\n' > "$P/base.php"; printf '<?php $a = 1;\n' > "$P/a.php"
