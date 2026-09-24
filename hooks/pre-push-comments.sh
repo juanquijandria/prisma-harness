@@ -92,8 +92,8 @@ PUSHES
   fi
 fi
 
-pushed_content=$(content_the_push_sends "$INVOKES" "$command_text")
-output=$(cd "$dir" && "$GATE" ${pushed_content:+--to "$pushed_content"} 2>&1)
+pushed_ref=$(ref_the_push_sends "$INVOKES" "$command_text")
+output=$(cd "$dir" && "$GATE" ${pushed_ref:+--to "$pushed_ref"} 2>&1)
 status=$?
 
 if [ "$status" = "0" ]; then

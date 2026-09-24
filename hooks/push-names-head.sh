@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Decides whether a push command can be proven to send the branch HEAD is on, from the repository the gate is standing in. Documented in README.md, section "What is inside".
+# Prisma Harness. Reads a push command token by token, to tell whether it sends a branch, whether it can be proven to send the branch HEAD is on, and which ref holds what it sends. Documented in README.md, section "What is inside".
 
 GIT_FLAGS_BEFORE_THE_SUBCOMMAND="--no-pager --paginate -p --no-replace-objects --literal-pathspecs --no-optional-locks --no-lazy-fetch"
 GIT_FLAGS_THAT_TAKE_THE_NEXT_TOKEN="-c"
@@ -7,7 +7,8 @@ PUSH_FLAGS_THAT_TAKE_NO_VALUE="-u --set-upstream -f --force --force-with-lease -
 PUSH_FLAG_FOR_ALL_TAGS="--tags"
 PUSH_FLAG_FOR_DELETE="--delete"
 TAG_REFS="refs/tags/"
-PUSHED_COMMIT="HEAD"
+BRANCH_REFS="refs/heads/"
+HEAD_REF="HEAD"
 
 is_one_of() {
   needle="$1"
@@ -80,9 +81,10 @@ pushes_that_send_a_branch() {
 
 push_names_head() {
   head_branch="$1"
+  push_command="$2"
   raw_command="$3"
   case "$raw_command" in *GIT_DIR=*|*GIT_WORK_TREE=*|*GIT_COMMON_DIR=*) return 1 ;; esac
-  read_push_tokens "$2" || return 1
+  read_push_tokens "$push_command" || return 1
   [ "$push_deletes" = "0" ] || return 1
   [ "$push_branch_refspecs" -le 1 ] || return 1
   if [ "$push_branch_refspecs" = "0" ]; then
@@ -91,15 +93,15 @@ push_names_head() {
   fi
   source_ref=${refspec%%:*}
   source_ref=${source_ref#+}
-  source_ref=${source_ref#refs/heads/}
-  [ "$source_ref" = "HEAD" ] && return 0
+  source_ref=${source_ref#"$BRANCH_REFS"}
+  [ "$source_ref" = "$HEAD_REF" ] && return 0
   [ -n "$head_branch" ] && [ "$source_ref" = "$head_branch" ] && return 0
   return 1
 }
 
-content_the_push_sends() {
+ref_the_push_sends() {
   invokes="$1"
-  [ -x "$invokes" ] || { printf '%s' "$PUSHED_COMMIT"; return 0; }
-  commits=$(printf '%s' "$2" | "$invokes" git commit 2>/dev/null)
-  [ -n "$commits" ] || printf '%s' "$PUSHED_COMMIT"
+  [ -x "$invokes" ] || { printf '%s' "$HEAD_REF"; return 0; }
+  commit_segments=$(printf '%s' "$2" | "$invokes" git commit 2>/dev/null)
+  [ -n "$commit_segments" ] || printf '%s' "$HEAD_REF"
 }
