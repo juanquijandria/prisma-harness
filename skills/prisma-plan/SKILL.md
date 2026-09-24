@@ -19,9 +19,11 @@ Q3  Where does the exported file land
     Recommended: the shared drive, because the thread is not searchable and step 3 needs a surface to look at.
 ```
 
-Facts are your job and decisions are the person's. When a question needs a fact from the repository, the filesystem or a tool, look it up or send a subagent to look it up, and never ask the person for something you could read. Do not block the round on it. A running lookup is an unsettled prerequisite, so only the questions downstream of it wait; ask the rest of the frontier now.
+Facts are your job. When a question needs a fact from the repository, the filesystem or a tool, look it up or send a subagent to look it up, and never ask the person for something you could read. Do not block the round on it. A running lookup is an unsettled prerequisite, so only the questions downstream of it wait; ask the rest of the frontier now.
 
 Each answered round reshapes the tree. Settled decisions push the frontier outward and unblock what depended on them. Recompute and ask the next round. The interview is over when the frontier is empty, every branch visited and nothing silently assumed.
+
+**Not every open choice is the person's.** A question goes to the person only when a different answer would change what gets built, spend someone's money, be hard to undo, or reach an audience. Every other choice is a default you pick, say in one plain sentence, and record under Decisions with yourself as who decided, so the person can veto it. Open the first round with the answer to what the person actually asked, and explain in the same sentence any term the person did not use.
 
 ## What the interview must settle before it can close
 
@@ -53,7 +55,7 @@ Depends on: ticket 1
 
 ## The record
 
-Write the record where the repository already keeps plans or specs. If it keeps none, ask the person once and reuse the answer for the session. The record has these fields, in this order, because the fidelity reviewer reads them by name.
+Write the record where the repository already keeps plans or specs. If it keeps none, pick a folder next to the code, say which in one sentence, and reuse it for the session. The record has these fields, in this order, because the fidelity reviewer reads them by name.
 
 ```
 # Plan record: <name in kebab-case>

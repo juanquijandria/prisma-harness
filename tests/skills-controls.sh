@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 T=$(mktemp -d)
 ok=1
 CASES=0
+PLAN_DECISION_FILTER="Not every open choice is the person's"
 STEP_SKILLS="prisma-plan prisma-build prisma-fidelity-review prisma-diagnose"
 EXTERNAL_PLUGIN_PATTERN='pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs'
 EXTERNAL_PLUGIN_SKILL=mattpocock-skills:tdd
@@ -65,6 +66,14 @@ check_plan_closes() {
   sed -n "${a},${b}p" "$f" | grep -qi 'lane'
 }
 
+check_plan_filters_decisions() {
+  f="$1/prisma-plan/SKILL.md"
+  a=$(line_of "$f" '^## The interview is a tree'); b=$(line_of "$f" '^## What the interview must settle')
+  c=$(line_of "$f" "$PLAN_DECISION_FILTER")
+  [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] || return 1
+  [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ]
+}
+
 check_build_order() {
   f="$1/prisma-build/SKILL.md"
   grep -q 'step 2' "$f" || return 1
@@ -103,6 +112,7 @@ else
   skip "this tree is not the repository itself, the published page list was not compared against its index"
 fi
 if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and closes with the lane and the session ceiling"; else fail "prisma-plan closing section"; fi
+if check_plan_filters_decisions "$ROOT/skills"; then pass "prisma-plan keeps for the person only the choices that change the work, cost money, cannot be undone or reach an audience"; else fail "prisma-plan decision filter"; fi
 if check_build_order "$ROOT/skills"; then pass "prisma-build sees red before the review and the review before the commit"; else fail "prisma-build order"; fi
 if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the fixed point and keeps the two axes apart"; else fail "prisma-fidelity-review anchors"; fi
 if check_diagnose_escape "$ROOT/skills"; then pass "prisma-diagnose names step 2b and closes by naming the step the defect escaped from"; else fail "prisma-diagnose closing"; fi
@@ -119,6 +129,8 @@ mutate; printf '\nA line with an em-dash \342\200\224 inside.\n' >> "$T/skills/p
 if check_no_em_dash "$T/skills"; then fail "control: an injected em-dash was not caught"; else pass "control: an injected em-dash turns the em-dash case red"; fi
 mutate; grep -v '140k' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
 if check_plan_closes "$T/skills"; then fail "control: removing the session ceiling was not caught"; else pass "control: removing the session ceiling turns the plan case red"; fi
+mutate; grep -v "$PLAN_DECISION_FILTER" "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
+if check_plan_filters_decisions "$T/skills"; then fail "control: removing the decision filter was not caught"; else pass "control: removing the decision filter turns the plan filter case red"; fi
 mutate; f="$T/skills/prisma-build/SKILL.md"; { printf '## The commit\n\nMoved up.\n\n'; grep -v '^## The commit' "$f"; } > "$T/b.md"; mv "$T/b.md" "$f"
 if check_build_order "$T/skills"; then fail "control: the commit moved above the red run was not caught"; else pass "control: the commit above the red run turns the order case red"; fi
 mutate; grep -v 'Escaped from' "$T/skills/prisma-diagnose/SKILL.md" > "$T/d.md"; mv "$T/d.md" "$T/skills/prisma-diagnose/SKILL.md"
