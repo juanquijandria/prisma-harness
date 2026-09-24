@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/tests/shipped.sh"
 failed=0
 OUT=$(mktemp)
-for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes escape-declared receipt notes-machinery; do
+for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-deps command-invokes escape-declared receipt notes-machinery shell-traps; do
   printf '\n##### %s\n' "$hook"
   if sh "$HOOKS/$hook.sh" --selftest > "$OUT" 2>&1; then :; else failed=$((failed+1)); fi
   cat "$OUT"
