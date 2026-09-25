@@ -148,6 +148,7 @@ git config push.default matching
 warns_unmeasured "comments gate says it measured nothing when push.default matching decides what a bare push sends" run pre-push-comments.sh "git push"
 warns_unmeasured "comments gate reads the push configuration of the repository even when it runs from elsewhere" run_from_root "git push"
 git config --unset push.default
+expect "comments gate measures the repository and blocks even when it runs from elsewhere" 2 run_from_root "git push origin feature"
 git config push.default nothing
 warns_unmeasured "size gate says it measured nothing when push.default nothing decides what a bare push sends" run pre-push-size.sh "git push"
 git config --unset push.default
