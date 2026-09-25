@@ -14,6 +14,10 @@ CHECKS=0
 expect() { name="$1"; want="$2"; shift 2; CHECKS=$((CHECKS+1)); "$@" >/dev/null 2>&1; got=$?; if [ "$got" = "$want" ]; then printf 'PASS %s (exit %s)\n' "$name" "$got"; else printf 'FAIL %s, expected %s got %s\n' "$name" "$want" "$got"; ok=0; fi; }
 run() { gate="$1"; cmd="$2"; payload "$cmd" | sh "$HOOKS/$gate"; }
 receipt_lines() { [ -f "$PRISMA_RECEIPT_FILE" ] && wc -l < "$PRISMA_RECEIPT_FILE" | tr -d ' ' || echo 0; }
+warns_unmeasured() {
+  name="$1"; shift; before=$(receipt_lines); out=$("$@" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q not-measured; then printf 'PASS %s\n' "$name"; else printf 'FAIL %s (rc=%s) %s\n' "$name" "$rc" "$out"; ok=0; fi
+}
 
 printf 'export const A = 1;\n// stray comment\n' > a.js; git commit -qam comment
 expect "comments gate blocks a stray comment" 2 run pre-push-comments.sh "git push origin feature"
@@ -41,11 +45,12 @@ printf 'export const A = 1;\n' > a.js; git commit -qam clean
 expect "comments gate passes a clean diff" 0 run pre-push-comments.sh "git push origin feature"
 printf '// only on disk\n' >> a.js
 expect "comments gate passes a push whose comment is only on disk" 0 run pre-push-comments.sh "git push origin feature"
-expect "comments gate blocks a comment on disk when the same command commits it" 2 run pre-push-comments.sh "git commit -qam more && git push origin feature"
+warns_unmeasured "comments gate says it measured nothing when the same command commits before it pushes" run pre-push-comments.sh "git commit -qam more && git push origin feature"
 git checkout -q -- a.js
 printf 'export const D = 4;\n// stray comment\n' > d.js; git add d.js; git commit -qm "comment committed"
 printf 'export const D = 4;\n' > d.js
 expect "comments gate blocks a committed comment deleted only on disk" 2 run pre-push-comments.sh "git push origin feature"
+expect "comments gate blocks a committed comment deleted only on disk when a commit follows the push" 2 run pre-push-comments.sh "git push origin feature && git commit --allow-empty -m marker"
 git reset -q --hard HEAD~1
 printf 'case "$1" in\n  *stop*) exit 0 ;;\n  */dir/*) exit 1 ;;\nesac\n' > run.sh; git add run.sh; git commit -qm shellcase
 expect "comments gate does not count a shell case pattern starting with * as a comment" 0 run pre-push-comments.sh "git push origin feature"
@@ -136,19 +141,20 @@ printf 'node_modules/\n' > "$L/.gitignore"
 printf 'export const BASE = 1;\n' > "$L/base.js"; printf 'export const A = 1;\n' > "$L/a.js"
 git -C "$L" add -A; git -C "$L" commit -qm base; git -C "$L" checkout -qb feature
 lint_at() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$L" "$1" | sh "$HOOKS/pre-push-lint.sh"; }
-lint_warns_unmeasured() {
-  name="$1"; before=$(receipt_lines); out=$(lint_at "$2" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
-  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q not-measured; then printf 'PASS %s\n' "$name"; else printf 'FAIL %s (rc=%s) %s\n' "$name" "$rc" "$out"; ok=0; fi
-}
 printf 'export const A = BAD;\n' > "$L/a.js"; git -C "$L" commit -qam "lint error committed"
 expect "lint gate blocks a lint error that is committed" 2 lint_at "git push origin feature"
 expect "lint gate blocks a lint error when the branch goes out with every tag" 2 lint_at "git push --tags origin feature"
+expect "lint gate blocks a committed lint error when a commit follows the push" 2 lint_at "git push origin feature && git commit --allow-empty -m marker"
+expect "lint gate blocks a committed lint error when the words git commit are only quoted text" 2 lint_at "echo 'git commit' && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when an empty commit comes before the push" lint_at "git commit --allow-empty -m marker && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when the command switches branch before the push" lint_at "git switch feature && git push origin feature"
 printf 'export const A = 2;\n' > "$L/a.js"
-lint_warns_unmeasured "lint gate says it measured nothing when a committed lint error is fixed only on disk" "git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when a committed lint error is fixed only on disk" lint_at "git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when the fix is only on disk and a commit follows the push" lint_at "git push origin feature && git commit --allow-empty -m marker"
 git -C "$L" commit -qam "fixed"
 printf 'export const A = BAD;\n' > "$L/a.js"
-lint_warns_unmeasured "lint gate says it measured nothing when a pushed file has an uncommitted lint error" "git push origin feature"
-expect "lint gate blocks a lint error on disk when the same command commits it" 2 lint_at "git commit -qam more && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when a pushed file has an uncommitted lint error" lint_at "git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when the same command commits before it pushes" lint_at "git commit -qam more && git push origin feature"
 git -C "$L" checkout -q -- a.js
 printf 'export const BASE = BAD;\n' > "$L/base.js"
 out=$(lint_at "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))

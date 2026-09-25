@@ -88,27 +88,30 @@ PUSHES
 fi
 
 files_measurable_on_disk() {
-  pushed_ref="$1"
-  listed="$2"
+  listed="$1"
   [ -n "$listed" ] || return 0
-  [ -n "$pushed_ref" ] || { printf '%s\n' "$listed"; return 0; }
-  uncommitted=$(git diff --name-only "$pushed_ref")
+  uncommitted=$(git diff --name-only "$HEAD_REF")
   if [ -z "$uncommitted" ] || ! printf '%s\n' "$listed" | grep -Fxq -e "$uncommitted"; then printf '%s\n' "$listed"; return 0; fi
   echo "WARN: the lint gate reads files from disk, and a file this push sends has changes that are not committed, so nothing was measured. Commit them or push from a clean tree to have it measured." >&2
   receipt_append lint-gate "$real_dir" not-measured
 }
 
-pushed_ref=$(ref_the_push_sends "$INVOKES" "$command_text")
+if git_changes_before_push "$INVOKES" "$command_text"; then
+  echo "WARN: this command changes what is committed before its push, so the lint gate cannot know what the push sends and measured nothing. Push in a command of its own to have it measured." >&2
+  receipt_append lint-gate "$real_dir" not-measured
+  exit 0
+fi
+
 merge_base=$("$COMPARE_BASE") || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 [ -n "$merge_base" ] || { echo "WARN: the lint gate could not find a base to compare against, nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 
 if [ -x vendor/bin/php-cs-fixer ] && [ -f .php-cs-fixer.php ]; then
-  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" ${pushed_ref:+"$pushed_ref"} -- '*.php') || {
+  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" "$HEAD_REF" -- '*.php') || {
     echo "WARN: the lint gate could not list the changed php files, so nothing was measured." >&2
     receipt_append lint-gate "$real_dir" not-measured
     files=""
   }
-  files=$(files_measurable_on_disk "$pushed_ref" "$files")
+  files=$(files_measurable_on_disk "$files")
   if [ -n "$files" ]; then
     set --
     while IFS= read -r changed; do [ -n "$changed" ] && set -- "$@" "$changed"; done <<FILES
@@ -149,12 +152,12 @@ PHP
 fi
 
 if [ -f package.json ] && [ -x node_modules/.bin/eslint ]; then
-  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" ${pushed_ref:+"$pushed_ref"} -- '*.js' '*.mjs' '*.ts' '*.tsx' '*.vue') || {
+  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" "$HEAD_REF" -- '*.js' '*.mjs' '*.ts' '*.tsx' '*.vue') || {
     echo "WARN: the lint gate could not list the changed javascript files, so nothing was measured." >&2
     receipt_append lint-gate "$real_dir" not-measured
     files=""
   }
-  files=$(files_measurable_on_disk "$pushed_ref" "$files")
+  files=$(files_measurable_on_disk "$files")
   if [ -n "$files" ]; then
     set --
     while IFS= read -r changed; do [ -n "$changed" ] && set -- "$@" "$changed"; done <<FILES

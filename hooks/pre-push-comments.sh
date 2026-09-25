@@ -92,8 +92,13 @@ PUSHES
   fi
 fi
 
-pushed_ref=$(ref_the_push_sends "$INVOKES" "$command_text")
-output=$(cd "$dir" && "$GATE" ${pushed_ref:+--to "$pushed_ref"} 2>&1)
+if git_changes_before_push "$INVOKES" "$command_text"; then
+  echo "WARN: this command changes what is committed before its push, so the comments gate cannot know what the push sends and measured nothing. Push in a command of its own to have it measured." >&2
+  receipt_append comments-gate "$real_dir" not-measured
+  exit 0
+fi
+
+output=$(cd "$dir" && "$GATE" --to "$HEAD_REF" 2>&1)
 status=$?
 
 if [ "$status" = "0" ]; then

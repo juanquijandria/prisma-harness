@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prisma Harness. Reads a push command token by token, to tell whether it sends a branch, whether it can be proven to send the branch HEAD is on, and which ref holds what it sends. Documented in README.md, section "What is inside".
+# Prisma Harness. Reads a push command token by token, to tell whether it sends a branch, whether it can be proven to send the branch HEAD is on, and whether the command changes what is committed before its push. Documented in README.md, section "What is inside".
 
 GIT_FLAGS_BEFORE_THE_SUBCOMMAND="--no-pager --paginate -p --no-replace-objects --literal-pathspecs --no-optional-locks --no-lazy-fetch"
 GIT_FLAGS_THAT_TAKE_THE_NEXT_TOKEN="-c"
@@ -9,6 +9,8 @@ PUSH_FLAG_FOR_DELETE="--delete"
 TAG_REFS="refs/tags/"
 BRANCH_REFS="refs/heads/"
 HEAD_REF="HEAD"
+PUSH_SUBCOMMAND="push"
+GIT_SUBCOMMANDS_THAT_CHANGE_WHAT_IS_PUSHED="commit switch checkout reset rebase merge pull cherry-pick revert am"
 
 is_one_of() {
   needle="$1"
@@ -24,12 +26,42 @@ is_tag_refspec() {
   return 1
 }
 
-read_push_tokens() {
+split_git_segment() {
   set -f
   set -- $1
   set +f
-  past_push=0
-  skip_next=0
+  git_subcommand=""
+  git_arguments=""
+  [ "$#" -gt 0 ] || return 1
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -*)
+        if is_one_of "$1" $GIT_FLAGS_THAT_TAKE_THE_NEXT_TOKEN; then
+          [ "$#" -gt 1 ] || return 1
+          shift 2
+          continue
+        fi
+        is_one_of "$1" $GIT_FLAGS_BEFORE_THE_SUBCOMMAND || return 1
+        shift
+        ;;
+      *)
+        git_subcommand="$1"
+        shift
+        git_arguments="$*"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+read_push_tokens() {
+  split_git_segment "$1" || return 1
+  [ "$git_subcommand" = "$PUSH_SUBCOMMAND" ] || return 1
+  set -f
+  set -- $git_arguments
+  set +f
   remote_seen=0
   push_branch_refspecs=0
   push_tag_refspecs=0
@@ -37,17 +69,6 @@ read_push_tokens() {
   push_deletes=0
   refspec=""
   for token in "$@"; do
-    if [ "$skip_next" = "1" ]; then skip_next=0; continue; fi
-    if [ "$past_push" = "0" ]; then
-      [ "$token" = "push" ] && { past_push=1; continue; }
-      case "$token" in
-        -*)
-          is_one_of "$token" $GIT_FLAGS_THAT_TAKE_THE_NEXT_TOKEN && { skip_next=1; continue; }
-          is_one_of "$token" $GIT_FLAGS_BEFORE_THE_SUBCOMMAND || return 1
-          ;;
-      esac
-      continue
-    fi
     [ "$token" = "$PUSH_FLAG_FOR_ALL_TAGS" ] && { push_all_tags=1; continue; }
     [ "$token" = "$PUSH_FLAG_FOR_DELETE" ] && { push_deletes=1; continue; }
     case "$token" in
@@ -62,7 +83,7 @@ read_push_tokens() {
     push_branch_refspecs=$((push_branch_refspecs+1))
     refspec="$token"
   done
-  [ "$past_push" = "1" ]
+  return 0
 }
 
 push_sends_no_branch() {
@@ -99,9 +120,17 @@ push_names_head() {
   return 1
 }
 
-ref_the_push_sends() {
+git_changes_before_push() {
   invokes="$1"
-  [ -x "$invokes" ] || { printf '%s' "$HEAD_REF"; return 0; }
-  commit_segments=$(printf '%s' "$2" | "$invokes" git commit 2>/dev/null)
-  [ -n "$commit_segments" ] || printf '%s' "$HEAD_REF"
+  [ -x "$invokes" ] || return 0
+  git_segments=$(printf '%s' "$2" | "$invokes" git 2>/dev/null) || return 0
+  while IFS= read -r git_segment; do
+    [ -n "$git_segment" ] || continue
+    split_git_segment "$git_segment" || return 0
+    [ "$git_subcommand" = "$PUSH_SUBCOMMAND" ] && return 1
+    is_one_of "$git_subcommand" $GIT_SUBCOMMANDS_THAT_CHANGE_WHAT_IS_PUSHED && return 0
+  done <<SEGMENTS
+$git_segments
+SEGMENTS
+  return 1
 }
