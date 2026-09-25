@@ -90,8 +90,8 @@ fi
 files_measurable_on_disk() {
   listed="$1"
   [ -n "$listed" ] || return 0
-  if git diff --quiet "$HEAD_REF"; then printf '%s\n' "$listed"; return 0; fi
-  echo "WARN: the lint gate runs the linter on the files and the configuration on disk, and the working tree has changes that are not committed, so nothing was measured. Commit or stash them to have it measured." >&2
+  if [ -z "$(git status --porcelain --untracked-files=normal)" ]; then printf '%s\n' "$listed"; return 0; fi
+  echo "WARN: the lint gate runs the linter on the files and the configuration on disk, and the working tree has changes or files that are not committed, so nothing was measured. Commit, stash or remove them to have it measured." >&2
   receipt_append lint-gate "$real_dir" not-measured
 }
 

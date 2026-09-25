@@ -21,6 +21,11 @@ warns_unmeasured() {
 
 printf 'export const A = 1;\n// stray comment\n' > a.js; git commit -qam comment
 expect "comments gate blocks a stray comment" 2 run pre-push-comments.sh "git push origin feature"
+for diff_setting in diff.external=true color.ui=always diff.noprefix=true; do
+  git config "${diff_setting%%=*}" "${diff_setting#*=}"
+  expect "comments gate reads the same diff with $diff_setting" 2 run pre-push-comments.sh "git push origin feature"
+  git config --unset "${diff_setting%%=*}"
+done
 expect "comments gate blocks a push that follows an arithmetic expansion" 2 run pre-push-comments.sh 'n=$((n+1)); git push origin feature'
 expect "comments gate passes with the escape" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
 out=$(payload "git push origin feature" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
@@ -128,6 +133,12 @@ for odd_branch in fix--delete-modal chore--tags; do
   git checkout -q feature; git branch -qD "$odd_branch"
 done
 expect "comments gate measures a branch pushed together with every tag" 2 run pre-push-comments.sh "git push --tags origin feature"
+git config remote.origin.push refs/heads/main:refs/heads/main
+warns_unmeasured "size gate says it measured nothing when a configured push refspec decides what a bare push sends" run pre-push-size.sh "git push"
+git config --unset remote.origin.push
+git config push.default matching
+warns_unmeasured "comments gate says it measured nothing when push.default matching decides what a bare push sends" run pre-push-comments.sh "git push"
+git config --unset push.default
 out=$(run pre-push-comments.sh "git push origin main" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ]; then printf 'PASS comments gate says nothing about a push it cannot prove is HEAD\n'; else printf 'FAIL comments gate answered for a push of another branch (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 git reset -q --hard HEAD~1
@@ -154,6 +165,11 @@ printf '{"private":true,"eslintConfig":{}}\n' > "$L/package.json"
 warns_unmeasured "lint gate says it measured nothing when only the linter configuration changed on disk" lint_at "git push origin feature"
 git -C "$L" checkout -q -- package.json
 expect "lint gate blocks a committed lint error when the words git commit are only quoted text" 2 lint_at "echo 'git commit' && git push origin feature"
+expect "lint gate blocks a committed lint error after a git call that leaves commits alone" 2 lint_at "git status && git fetch && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing for a git subcommand it does not know to leave commits alone" lint_at "git stash branch sb && git push origin feature"
+printf 'scratch\n' > "$L/notes.txt"
+warns_unmeasured "lint gate says it measured nothing when an untracked file sits in the working tree" lint_at "git push origin feature"
+rm -f "$L/notes.txt"
 warns_unmeasured "lint gate says it measured nothing when an empty commit comes before the push" lint_at "git commit --allow-empty -m marker && git push origin feature"
 warns_unmeasured "lint gate says it measured nothing when the command switches branch before the push" lint_at "git switch feature && git push origin feature"
 printf 'export const A = 2;\n' > "$L/a.js"
