@@ -10,9 +10,11 @@ TAG_REFS="refs/tags/"
 BRANCH_REFS="refs/heads/"
 HEAD_REF="HEAD"
 PUSH_SUBCOMMAND="push"
-GIT_SUBCOMMANDS_THAT_LEAVE_COMMITS_ALONE="push status log diff show rev-parse merge-base ls-files ls-remote describe remote config fetch add tag branch blame grep shortlog rev-list cat-file for-each-ref"
-PUSH_DEFAULT_THAT_SENDS_EVERY_BRANCH="matching"
-CONFIGURED_PUSH_REFSPECS="^remote\..*\.push$"
+GIT_SUBCOMMANDS_THAT_LEAVE_COMMITS_ALONE="push status log diff show rev-parse merge-base ls-files ls-remote describe fetch add tag branch blame shortlog rev-list cat-file for-each-ref"
+PUSH_DEFAULTS_THAT_DO_NOT_SEND_HEAD="matching nothing"
+CONFIGURED_PUSH_TARGETS="^remote\..*\.(push|mirror)$"
+PUSH_SETTING_KEYS="push. remote."
+GIT_CONFIG_ENVIRONMENT="GIT_CONFIG"
 
 is_one_of() {
   needle="$1"
@@ -103,8 +105,16 @@ pushes_that_send_a_branch() {
 }
 
 push_configuration_decides_what_is_sent() {
-  [ "$(git config --get push.default 2>/dev/null)" = "$PUSH_DEFAULT_THAT_SENDS_EVERY_BRANCH" ] && return 0
-  git config --get-regexp "$CONFIGURED_PUSH_REFSPECS" >/dev/null 2>&1
+  is_one_of "$(git config --get push.default 2>/dev/null)" $PUSH_DEFAULTS_THAT_DO_NOT_SEND_HEAD && return 0
+  git config --get-regexp "$CONFIGURED_PUSH_TARGETS" >/dev/null 2>&1
+}
+
+command_sets_push_settings() {
+  case "$1" in *"$GIT_CONFIG_ENVIRONMENT"*) return 0 ;; esac
+  for key in $PUSH_SETTING_KEYS; do
+    case "$1" in *"-c $key"*|*"-c=$key"*|*"--config-env=$key"*) return 0 ;; esac
+  done
+  return 1
 }
 
 push_names_head() {
@@ -112,6 +122,7 @@ push_names_head() {
   push_command="$2"
   raw_command="$3"
   case "$raw_command" in *GIT_DIR=*|*GIT_WORK_TREE=*|*GIT_COMMON_DIR=*) return 1 ;; esac
+  command_sets_push_settings "$raw_command" && return 1
   read_push_tokens "$push_command" || return 1
   [ "$push_deletes" = "0" ] || return 1
   [ "$push_branch_refspecs" -le 1 ] || return 1

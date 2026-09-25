@@ -13,6 +13,7 @@ payload() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}
 CHECKS=0
 expect() { name="$1"; want="$2"; shift 2; CHECKS=$((CHECKS+1)); "$@" >/dev/null 2>&1; got=$?; if [ "$got" = "$want" ]; then printf 'PASS %s (exit %s)\n' "$name" "$got"; else printf 'FAIL %s, expected %s got %s\n' "$name" "$want" "$got"; ok=0; fi; }
 run() { gate="$1"; cmd="$2"; payload "$cmd" | sh "$HOOKS/$gate"; }
+run_from_root() { ( cd / && payload "$1" | sh "$HOOKS/pre-push-comments.sh" ); }
 receipt_lines() { [ -f "$PRISMA_RECEIPT_FILE" ] && wc -l < "$PRISMA_RECEIPT_FILE" | tr -d ' ' || echo 0; }
 warns_unmeasured() {
   name="$1"; shift; before=$(receipt_lines); out=$("$@" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
@@ -26,6 +27,10 @@ for diff_setting in diff.external=true color.ui=always diff.noprefix=true; do
   expect "comments gate reads the same diff with $diff_setting" 2 run pre-push-comments.sh "git push origin feature"
   git config --unset "${diff_setting%%=*}"
 done
+mkdir -p "$T/sub"; git config diff.relative true
+out=$(printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$T/sub" "git push origin feature" | sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+if [ "$rc" = "2" ]; then printf 'PASS comments gate reads the whole diff from a subdirectory with diff.relative\n'; else printf 'FAIL comments gate from a subdirectory with diff.relative (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+git config --unset diff.relative; rmdir "$T/sub"
 expect "comments gate blocks a push that follows an arithmetic expansion" 2 run pre-push-comments.sh 'n=$((n+1)); git push origin feature'
 expect "comments gate passes with the escape" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
 out=$(payload "git push origin feature" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
@@ -115,6 +120,9 @@ git --git-dir=/tmp/elsewhere/.git push origin feature|refuses
 git --work-tree=/tmp/elsewhere push origin feature|refuses
 GIT_DIR=/tmp/elsewhere/.git git push origin feature|refuses
 git -c user.name=somebody push origin feature|measures
+git -c push.default=matching push origin|refuses
+git -c remote.origin.push=refs/heads/main:refs/heads/main push origin|refuses
+GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=push.default GIT_CONFIG_VALUE_0=matching git push origin|refuses
 git push --tags origin feature|measures
 git push origin feature --tags|measures
 git push origin feature refs/tags/v1|measures
@@ -138,7 +146,14 @@ warns_unmeasured "size gate says it measured nothing when a configured push refs
 git config --unset remote.origin.push
 git config push.default matching
 warns_unmeasured "comments gate says it measured nothing when push.default matching decides what a bare push sends" run pre-push-comments.sh "git push"
+warns_unmeasured "comments gate reads the push configuration of the repository even when it runs from elsewhere" run_from_root "git push"
 git config --unset push.default
+git config push.default nothing
+warns_unmeasured "size gate says it measured nothing when push.default nothing decides what a bare push sends" run pre-push-size.sh "git push"
+git config --unset push.default
+git config remote.origin.mirror true
+warns_unmeasured "size gate says it measured nothing when the remote is a mirror" run pre-push-size.sh "git push origin"
+git config --unset remote.origin.mirror
 out=$(run pre-push-comments.sh "git push origin main" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ]; then printf 'PASS comments gate says nothing about a push it cannot prove is HEAD\n'; else printf 'FAIL comments gate answered for a push of another branch (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
 git reset -q --hard HEAD~1
@@ -167,6 +182,8 @@ git -C "$L" checkout -q -- package.json
 expect "lint gate blocks a committed lint error when the words git commit are only quoted text" 2 lint_at "echo 'git commit' && git push origin feature"
 expect "lint gate blocks a committed lint error after a git call that leaves commits alone" 2 lint_at "git status && git fetch && git push origin feature"
 warns_unmeasured "lint gate says it measured nothing for a git subcommand it does not know to leave commits alone" lint_at "git stash branch sb && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when the command sets git configuration" lint_at "git config push.default matching && git push origin"
+warns_unmeasured "lint gate says it measured nothing when git grep could run a program" lint_at "git grep -O true x && git push origin feature"
 printf 'scratch\n' > "$L/notes.txt"
 warns_unmeasured "lint gate says it measured nothing when an untracked file sits in the working tree" lint_at "git push origin feature"
 rm -f "$L/notes.txt"

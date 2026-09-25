@@ -6,7 +6,7 @@ PCT_MAX="${PRISMA_COMMENTS_MAX_PCT:-0}"
 BLOCK_MAX="${PRISMA_COMMENTS_MAX_BLOCK:-0}"
 BASE=""
 DIFF_FILE=""
-PLAIN_DIFF="--no-ext-diff --no-color --src-prefix=a/ --dst-prefix=b/"
+PLAIN_DIFF="--no-ext-diff --no-color --no-relative --src-prefix=a/ --dst-prefix=b/"
 
 while [ $# -gt 0 ]; do
   case "$1" in
