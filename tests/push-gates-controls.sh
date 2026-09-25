@@ -186,7 +186,7 @@ warns_unmeasured "lint gate says it measured nothing for a git subcommand it doe
 warns_unmeasured "lint gate says it measured nothing when the command sets git configuration" lint_at "git config push.default matching && git push origin"
 warns_unmeasured "lint gate says it measured nothing when git grep could run a program" lint_at "git grep -O true x && git push origin feature"
 printf 'scratch\n' > "$L/notes.txt"
-warns_unmeasured "lint gate says it measured nothing when an untracked file sits in the working tree" lint_at "git push origin feature"
+expect "lint gate still measures when only an untracked file sits in the working tree" 2 lint_at "git push origin feature"
 rm -f "$L/notes.txt"
 warns_unmeasured "lint gate says it measured nothing when an empty commit comes before the push" lint_at "git commit --allow-empty -m marker && git push origin feature"
 warns_unmeasured "lint gate says it measured nothing when the command switches branch before the push" lint_at "git switch feature && git push origin feature"
