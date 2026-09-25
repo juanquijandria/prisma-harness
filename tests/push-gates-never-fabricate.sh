@@ -36,7 +36,7 @@ git -C "$repo" checkout -qb feature
 printf 'export const A = 1;\n// stray comment\n' > "$repo/a.js"; git -C "$repo" commit -qam comment
 blind="$T/hooks-without-strip"
 mkdir -p "$blind" && cp "$HOOKS"/*.sh "$blind"/ && rm -f "$blind/strip-quotes.sh"
-hidden='git push origin feature && git commit --allow-empty -m \"x; PRISMA_COMMENTS_OK=1 y\"'
+hidden='echo \"x; PRISMA_COMMENTS_OK=1 y\" && git push origin feature'
 before=$(receipt_lines)
 out=$(payload "$repo" "$hidden" | PRISMA_HOOKS_DIR="$blind" sh "$blind/pre-push-comments.sh" 2>&1); rc=$?
 after=$(receipt_lines)

@@ -90,15 +90,13 @@ fi
 files_measurable_on_disk() {
   listed="$1"
   [ -n "$listed" ] || return 0
-  uncommitted=$(git diff --name-only "$HEAD_REF")
-  if [ -z "$uncommitted" ] || ! printf '%s\n' "$listed" | grep -Fxq -e "$uncommitted"; then printf '%s\n' "$listed"; return 0; fi
-  echo "WARN: the lint gate reads files from disk, and a file this push sends has changes that are not committed, so nothing was measured. Commit them or push from a clean tree to have it measured." >&2
+  if git diff --quiet "$HEAD_REF"; then printf '%s\n' "$listed"; return 0; fi
+  echo "WARN: the lint gate runs the linter on the files and the configuration on disk, and the working tree has changes that are not committed, so nothing was measured. Commit or stash them to have it measured." >&2
   receipt_append lint-gate "$real_dir" not-measured
 }
 
-if git_changes_before_push "$INVOKES" "$command_text"; then
-  echo "WARN: this command changes what is committed before its push, so the lint gate cannot know what the push sends and measured nothing. Push in a command of its own to have it measured." >&2
-  receipt_append lint-gate "$real_dir" not-measured
+if git_may_change_what_is_pushed "$INVOKES" "$command_text"; then
+  unmeasured_because_git_may_change "the lint gate" lint-gate "$real_dir"
   exit 0
 fi
 

@@ -6,14 +6,12 @@ PCT_MAX="${PRISMA_COMMENTS_MAX_PCT:-0}"
 BLOCK_MAX="${PRISMA_COMMENTS_MAX_BLOCK:-0}"
 BASE=""
 DIFF_FILE=""
-TO_REF=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --pct)    PCT_MAX="$2"; shift 2 ;;
     --block)  BLOCK_MAX="$2"; shift 2 ;;
     --diff)   DIFF_FILE="$2"; shift 2 ;;
-    --to)     TO_REF="$2"; shift 2 ;;
     *)        BASE="$1"; shift ;;
   esac
 done
@@ -35,7 +33,7 @@ else
   [ -n "$BASE" ] || { echo "could not infer the remote base branch" >&2; exit 2; }
   git rev-parse --verify "$BASE" >/dev/null 2>&1 || { echo "base '$BASE' does not exist" >&2; exit 2; }
   MB=$(git merge-base "$BASE" HEAD) || { echo "no merge-base with '$BASE'" >&2; exit 2; }
-  DIFF=$(git diff "$MB" ${TO_REF:+"$TO_REF"}) || { echo "could not read the diff against '$MB'" >&2; exit 2; }
+  DIFF=$(git diff "$MB" HEAD) || { echo "could not read the diff against '$MB'" >&2; exit 2; }
 fi
 
 [ -n "$DIFF" ] || { echo "comments gate: empty diff, nothing to measure"; exit 0; }

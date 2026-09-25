@@ -92,13 +92,12 @@ PUSHES
   fi
 fi
 
-if git_changes_before_push "$INVOKES" "$command_text"; then
-  echo "WARN: this command changes what is committed before its push, so the comments gate cannot know what the push sends and measured nothing. Push in a command of its own to have it measured." >&2
-  receipt_append comments-gate "$real_dir" not-measured
+if git_may_change_what_is_pushed "$INVOKES" "$command_text"; then
+  unmeasured_because_git_may_change "the comments gate" comments-gate "$real_dir"
   exit 0
 fi
 
-output=$(cd "$dir" && "$GATE" --to "$HEAD_REF" 2>&1)
+output=$(cd "$dir" && "$GATE" 2>&1)
 status=$?
 
 if [ "$status" = "0" ]; then
