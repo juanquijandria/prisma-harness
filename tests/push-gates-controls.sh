@@ -149,6 +149,7 @@ expect "lint gate blocks a lint error that is committed" 2 lint_at "git push ori
 expect "lint gate blocks a lint error when the branch goes out with every tag" 2 lint_at "git push --tags origin feature"
 warns_unmeasured "lint gate says it measured nothing when a commit follows the push" lint_at "git push origin feature && git commit --allow-empty -m marker"
 warns_unmeasured "lint gate says it measured nothing when the command moves a branch with update-ref" lint_at "git update-ref refs/heads/feature HEAD && git push origin feature"
+warns_unmeasured "lint gate says it measured nothing when a git call in the command cannot be read" lint_at "git -C . status && git push origin feature"
 printf '{"private":true,"eslintConfig":{}}\n' > "$L/package.json"
 warns_unmeasured "lint gate says it measured nothing when only the linter configuration changed on disk" lint_at "git push origin feature"
 git -C "$L" checkout -q -- package.json
