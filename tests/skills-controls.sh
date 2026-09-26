@@ -12,6 +12,9 @@ STEP_SKILLS="prisma-plan prisma-build prisma-fidelity-review prisma-diagnose"
 EXTERNAL_PLUGIN_PATTERN='pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs'
 EXTERNAL_PLUGIN_SKILL=mattpocock-skills:tdd
 EXTERNAL_PLUGIN_COMMAND=/implement
+BUILD_BRANCH_RULE="Build on a work branch"
+BUILD_BRANCH_CLAUSES="$BUILD_BRANCH_RULE|default branch, create a branch|not committed yet|Commit to the work branch"
+REVIEW_UNCOMMITTED_CLAUSES="When the work is not committed yet|git status --porcelain|git merge-base <fixed point> HEAD|git ls-files --others --exclude-standard|untracked files included"
 
 pass() { CASES=$((CASES+1)); printf 'PASS %s\n' "$1"; }
 skip() { CASES=$((CASES+1)); printf 'SKIP %s\n' "$1"; }
@@ -37,6 +40,14 @@ PATHS
 }
 
 line_of() { grep -n -m1 -- "$2" "$1" | cut -d: -f1; }
+
+carries_every_clause() {
+  text="$1"; old_ifs=$IFS; IFS='|'
+  for clause in $2; do
+    case "$text" in *"$clause"*) ;; *) IFS=$old_ifs; return 1 ;; esac
+  done
+  IFS=$old_ifs
+}
 
 check_frontmatter() {
   for name in prisma $STEP_SKILLS; do
@@ -73,12 +84,7 @@ check_plan_filters_decisions() {
   c=$(line_of "$f" "$PLAN_DECISION_FILTER")
   [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] || return 1
   [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ] || return 1
-  filter_line=$(sed -n "${c}p" "$f")
-  old_ifs=$IFS; IFS='|'
-  for clause in $PLAN_DECISION_CLAUSES; do
-    case "$filter_line" in *"$clause"*) ;; *) IFS=$old_ifs; return 1 ;; esac
-  done
-  IFS=$old_ifs
+  carries_every_clause "$(sed -n "${c}p" "$f")" "$PLAN_DECISION_CLAUSES"
 }
 
 check_build_order() {
@@ -92,6 +98,14 @@ check_build_order() {
 check_review_axes() {
   f="$1/prisma-fidelity-review/SKILL.md"
   grep -q 'no more and no less' "$f" && grep -q '<fixed point>\.\.\.HEAD' "$f" && grep -q 'rev-parse' "$f" && grep -q '## Fidelity' "$f" && grep -q '## Standards' "$f"
+}
+
+check_build_work_branch() {
+  carries_every_clause "$(cat "$1/prisma-build/SKILL.md")" "$BUILD_BRANCH_CLAUSES"
+}
+
+check_review_uncommitted() {
+  carries_every_clause "$(cat "$1/prisma-fidelity-review/SKILL.md")" "$REVIEW_UNCOMMITTED_CLAUSES"
 }
 
 check_diagnose_escape() {
@@ -122,6 +136,8 @@ if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and clo
 if check_plan_filters_decisions "$ROOT/skills"; then pass "prisma-plan keeps for the person only the choices that change the work, cost money, cannot be undone or reach an audience"; else fail "prisma-plan decision filter"; fi
 if check_build_order "$ROOT/skills"; then pass "prisma-build sees red before the review and the review before the commit"; else fail "prisma-build order"; fi
 if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the fixed point and keeps the two axes apart"; else fail "prisma-fidelity-review anchors"; fi
+if check_build_work_branch "$ROOT/skills"; then pass "prisma-build works on a branch of its own when it stands on the default branch, and tells the reviewer the work is not committed yet"; else fail "prisma-build work branch"; fi
+if check_review_uncommitted "$ROOT/skills"; then pass "prisma-fidelity-review measures uncommitted work from the merge base and counts untracked files"; else fail "prisma-fidelity-review uncommitted work"; fi
 if check_diagnose_escape "$ROOT/skills"; then pass "prisma-diagnose names step 2b and closes by naming the step the defect escaped from"; else fail "prisma-diagnose closing"; fi
 orphan=0
 for name in $STEP_SKILLS; do
@@ -148,6 +164,10 @@ mutate; printf 'disable-model-invocation: true\n' >> "$T/skills/prisma-plan/SKIL
 if check_frontmatter "$T/skills"; then fail "control: a user-only plan skill was not caught"; else pass "control: a user-only plan skill turns the frontmatter case red"; fi
 mutate; printf '\nRun %s after building.\n' "$EXTERNAL_PLUGIN_SKILL" >> "$T/skills/prisma/SKILL.md"
 if [ "$(external_plugin_hits "$T" | wc -l | tr -d ' ')" = "0" ]; then fail "control: an injected reference to the external plugin was not caught"; else pass "control: an injected reference to the external plugin turns the mentions case red"; fi
+mutate; grep -vF "$BUILD_BRANCH_RULE" "$T/skills/prisma-build/SKILL.md" > "$T/b.md"; mv "$T/b.md" "$T/skills/prisma-build/SKILL.md"
+if check_build_work_branch "$T/skills"; then fail "control: removing the work branch rule was not caught"; else pass "control: removing the work branch rule turns the work branch case red"; fi
+mutate; grep -vF "git merge-base" "$T/skills/prisma-fidelity-review/SKILL.md" > "$T/r.md"; mv "$T/r.md" "$T/skills/prisma-fidelity-review/SKILL.md"
+if check_review_uncommitted "$T/skills"; then fail "control: removing the merge base measure was not caught"; else pass "control: removing the merge base measure turns the uncommitted case red"; fi
 published_copy() {
   rm -rf "$T/published"
   mkdir -p "$T/published/skills"

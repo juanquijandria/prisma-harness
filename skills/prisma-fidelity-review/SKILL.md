@@ -20,7 +20,15 @@ git log <fixed point>..HEAD --oneline
 git diff <fixed point>...HEAD
 ```
 
-The three-dot form compares against the merge base. Confirm the ref resolves and the diff is not empty before reading anything else. A bad ref or an empty diff is a finding of this step, reported and stopped here, never discovered halfway through a review.
+The three-dot form compares against the merge base. When the work is not committed yet, because the caller says so or the working tree shows changes, measure the working tree against that same merge base, and read every untracked file whole as added.
+
+```
+git status --porcelain
+git diff $(git merge-base <fixed point> HEAD)
+git ls-files --others --exclude-standard
+```
+
+Confirm the ref resolves and the change is not empty, untracked files included, before reading anything else. A bad ref or an empty diff is a finding of this step, reported and stopped here, never discovered halfway through a review.
 
 ## Find the plan record
 
