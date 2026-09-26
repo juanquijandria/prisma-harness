@@ -65,7 +65,7 @@ The options, with what each one means.
 - **Step 1, the plan.** The interview never asked, or the shared understanding was wrong.
 - **Step 2, the build.** No test at that seam, a test that could not go red on it, or a review that passed it.
 - **Step 3, end to end.** The surface was not looked at, or the wrong surface was.
-- **Step 4, QA of the QA.** The oracle was never falsified with this defect; the mutation chosen was a convenient one.
+- **Step 4, mutation testing.** The oracle was never falsified with this defect; the mutation chosen was a convenient one.
 - **Step 5, verify.** The exit condition was checked by the same route, or an earlier run was cited instead of reality.
 - **The route.** The work took a cheaper lane than it deserved and never ran the steps.
 
