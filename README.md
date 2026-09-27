@@ -36,7 +36,7 @@ a duplicate page or leave the index stale, then retry.
 
 SIZE GATE: 1202 lines changed, the push is blocked.
 This repository blocks a push over 400 changed lines and warns
-over 200. Reviewers stop finding things long before they finish reading.
+over 200.
 ```
 
 PRISMA is a verification method for work that an agent produces, and this repository is the method packaged as a Claude Code plugin. Five lanes decide how much verification a request needs, five steps run for code with logic, and five gates with distinct names decide whether the work leaves the machine. The hooks block what the method says must not pass, the skills run the steps, and the written method says why.
@@ -121,7 +121,7 @@ Every selftest and every push gate control runs on GitHub Actions on Ubuntu, mac
 | `hooks/receipt.sh` | one local line per block, escape, warning, or gate that could not measure, and a summary you paste to whoever asks | the gates write it, you read it |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | the helpers the gates share | called by the gates |
 
-Eleven pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the machinery detector, the command parser, the escape parser and the shell traps gate. The three push gates are covered by 109 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` and `tests/page-gates-receipts.sh` add 62 more on what a gate reports when it did not measure, that it never reports a verdict and that it leaves its line in the receipt. `tests/skills-controls.sh` adds 24 over the text of the four step skills, twelve of them on mutated copies that must go red. `tests/runner-controls.sh` adds 20 over the suite itself, run from outside it because a runner cannot run itself. `tests/run-selftests.sh` runs all of it, checks that the pages this repository publishes obey the rules it ships, and fails any suite whose printed cases do not match the count it claims, or that prints no count at all. The largest suite, 43 cases, lives in `hooks/format-gate.sh`. A gate whose tests never fail is decoration.
+Eleven pieces have a `--selftest`, the index gate, the format gate, the sync check, the blind replica, the session voice, the dependency check, the receipt, the machinery detector, the command parser, the escape parser and the shell traps gate. The three push gates are covered by 120 controls against a fixture repo in `tests/push-gates-controls.sh`, which block a real defect and then let the corrected diff through. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` and `tests/page-gates-receipts.sh` add 62 more on what a gate reports when it did not measure, that it never reports a verdict and that it leaves its line in the receipt. `tests/skills-controls.sh` adds 24 over the text of the four step skills, twelve of them on mutated copies that must go red. `tests/runner-controls.sh` adds 20 over the suite itself, run from outside it because a runner cannot run itself. `tests/run-selftests.sh` runs all of it, checks that the pages this repository publishes obey the rules it ships, and fails any suite whose printed cases do not match the count it claims, or that prints no count at all. The largest suite, 43 cases, lives in `hooks/format-gate.sh`. A gate whose tests never fail is decoration.
 
 ## The writing rules, and how to turn them off
 
@@ -198,7 +198,7 @@ Read it before trusting the defaults. Its defect counts come from a hand-coded s
 
 ## The receipt
 
-Every time a gate blocks something, gets passed with an escape, measures something it was not asked to block, or cannot measure at all, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and which of those four it was, and nothing else. A gate that could not measure did not pass anything, so the summary counts each kind in its own column. The file never leaves your machine unless you paste it, and the hooks and the terminal command share it on purpose.
+Every time a gate blocks something, gets passed with an escape where it would have blocked, measures something it was not asked to block, or cannot measure at all, one line lands in `~/.prisma-harness/receipts.log` with the date and time, the gate, the repository, and which of those four it was, and nothing else. A gate that could not measure did not pass anything, so the summary counts each kind in its own column. The file never leaves your machine unless you paste it, and the hooks and the terminal command share it on purpose.
 
 ```
 sh hooks/receipt.sh --summary

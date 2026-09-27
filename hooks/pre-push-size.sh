@@ -67,8 +67,6 @@ for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$real_dir" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
-if escape_declared "$ESCAPE" "$bare_command"; then receipt_append size-gate "$real_dir" escaped; exit 0; fi
-
 cd "$dir" 2>/dev/null || { echo "WARN: the size gate could not enter $dir, so nothing was measured." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the size gate did not measure, $dir is not a git repository." >&2; receipt_append size-gate "$real_dir" not-measured; exit 0; }
 
@@ -102,11 +100,12 @@ behind=$(git rev-list --count "HEAD..@{upstream}" 2>/dev/null)
 case "$behind" in ''|*[!0-9]*) behind=0 ;; esac
 
 if [ "$lines" -gt "$BLOCK_OVER" ]; then
+  if escape_declared "$ESCAPE" "$bare_command"; then receipt_append size-gate "$real_dir" escaped; exit 0; fi
   {
     echo "SIZE GATE: $lines lines changed, the push is blocked."
     echo
     echo "This repository blocks a push over $BLOCK_OVER changed lines and warns"
-    echo "over $WARN_OVER. Reviewers stop finding things long before they finish reading."
+    echo "over $WARN_OVER."
     echo
     if [ "$behind" -ge "$STALE_BEHIND" ]; then
       echo "NOTE: this branch is $behind commits BEHIND its upstream. Much of those"

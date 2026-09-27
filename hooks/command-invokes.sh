@@ -62,7 +62,16 @@ mv 'notes/Meeting 1 of 5' archive/x"
   case_check "22 REDIRECTION glued to a separator skips its target" "$(printf '%s' 'ls;>/dev/null git push origin main' | "$SELF" git push)" "git push origin main"
   case_check "23 a quoted push after the arithmetic is not an invocation" "$(printf '%s' 'n=$((n+1)); echo "git push origin main"' | "$SELF" git push; echo "exit=$?")" "exit=0"
   case_check "24 an append of both streams is a redirection and not a separator" "$(printf '%s' 'ls &>>log git push origin main' | "$SELF" git push; echo "exit=$?")" "exit=0"
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 24/24" && exit 0
+  case_check "25 a STREAM NUMBER glued to a redirection is not an argument" "$(printf '%s' 'git push origin main 2>&1 | tail -8' | "$SELF" git push)" "git push origin main"
+  case_check "26 a number SEPARATED from the redirection is an argument" "$(printf '%s' 'git push origin main 2 >log' | "$SELF" git push)" "git push origin main 2"
+  case_check "27 a QUOTED number before a redirection is an argument" "$(printf '%s' 'git push origin main "2">log' | "$SELF" git push)" "git push origin main 2"
+  apostrophe_before_stream="cat >> log.md <<'EOF'
+the review's own fixture
+EOF
+git push origin main 2>&1"
+  case_check "28 APOSTROPHE in a heredoc does not keep the stream number" "$(printf '%s' "$apostrophe_before_stream" | "$SELF" git push)" "git push origin main"
+  case_check "29 an APPEND and a stream number one are redirections too" "$(printf '%s' 'git push origin main 2>>err 1>out' | "$SELF" git push)" "git push origin main"
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 29/29" && exit 0
   echo "SELFTEST FAILED"; exit 1
 fi
 
@@ -105,12 +114,39 @@ SEPARATORS_INSIDE_PUNCTUATION = set(";&|()")
 REDIRECTIONS = {"<", ">", ">>", "<<", "<<<", ">&", "&>", "&>>", ">|"}
 HAND_SEPARATORS = ";&|\n(){}<>"
 HAND_REDIRECTIONS = "<>"
-QUOTES = "\"'"'"'"
+SINGLE_QUOTE = "'"'"'"
+QUOTES = "\"" + SINGLE_QUOTE
 WHITESPACE = " \t\r"
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 VALUE_FLAGS = {"git": ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"),
               "gh": ("-R", "--repo", "--hostname")}
 CONTROL_WORDS = {"then", "do", "else", "elif", "fi", "done", "!", "time", "sudo", "command", "exec", "env", "nohup"}
+WORD_BOUNDARIES = WHITESPACE + "\n;|()"
+
+
+def without_stream_numbers(text, quotes=QUOTES):
+    kept, quote, i, word_start = [], None, 0, True
+    while i < len(text):
+        char = text[i]
+        step = 2 if char == "\\" and quote != SINGLE_QUOTE and i + 1 < len(text) else 1
+        if not quote and step == 1 and word_start and char.isdigit():
+            end = i
+            while end < len(text) and text[end].isdigit():
+                end += 1
+            if end < len(text) and text[end] in HAND_REDIRECTIONS:
+                i = end
+                continue
+        if not quote and step == 1 and char in quotes:
+            quote = char
+        elif quote == char:
+            quote = None
+        kept.append(text[i:i + step])
+        after_separator = char in WORD_BOUNDARIES or (char == "&" and text[i - 1:i] not in HAND_REDIRECTIONS)
+        word_start = not quote and step == 1 and after_separator
+        i += step
+    if quote:
+        return without_stream_numbers(text, quotes.replace(quote, ""))
+    return "".join(kept)
 
 
 def punctuation_pieces(token):
@@ -209,10 +245,11 @@ def segments_reversed(text):
     return [[token[::-1] for token in reversed(tokens)] for tokens in reversed(inverted)]
 
 
+readable = without_stream_numbers(command)
 try:
-    segments = segments_with_shlex(command)
+    segments = segments_with_shlex(readable)
 except ValueError:
-    segments = segments_by_hand(command) + segments_reversed(command)
+    segments = segments_by_hand(readable) + segments_reversed(command)
 
 found = []
 for tokens in segments:

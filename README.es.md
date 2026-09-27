@@ -36,7 +36,7 @@ a duplicate page or leave the index stale, then retry.
 
 SIZE GATE: 1202 lines changed, the push is blocked.
 This repository blocks a push over 400 changed lines and warns
-over 200. Reviewers stop finding things long before they finish reading.
+over 200.
 ```
 
 PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar, las skills corren los pasos, y el método escrito dice por qué.
@@ -121,7 +121,7 @@ Todos los selftests y los controles de las puertas de push corren en GitHub Acti
 | `hooks/receipt.sh` | una línea local por freno, escape, aviso o puerta que no pudo medir, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
 | `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
 
-Once piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el detector de maquinaria, el parser de comandos, el parser del escape y el gate de trampas de shell. Las tres puertas de push están cubiertas por 109 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 62 más sobre lo que reporta una puerta cuando no midió, que nunca reporta un veredicto y que deja su línea en el recibo. `tests/skills-controls.sh` suma 24 sobre el texto de las cuatro skills de paso, doce de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/runner-controls.sh` suma 20 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. `tests/run-selftests.sh` corre todo eso, comprueba que las páginas que este repositorio publica cumplen las reglas que propone, y hace fallar a la suite cuyos casos impresos no coinciden con los que declara, o que no imprime conteo. La suite más grande, de 43 casos, vive en `hooks/format-gate.sh`. Una puerta cuyas pruebas nunca fallan es decoración.
+Once piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el chequeo de dependencia, el recibo, el detector de maquinaria, el parser de comandos, el parser del escape y el gate de trampas de shell. Las tres puertas de push están cubiertas por 120 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 62 más sobre lo que reporta una puerta cuando no midió, que nunca reporta un veredicto y que deja su línea en el recibo. `tests/skills-controls.sh` suma 24 sobre el texto de las cuatro skills de paso, doce de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/runner-controls.sh` suma 20 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. `tests/run-selftests.sh` corre todo eso, comprueba que las páginas que este repositorio publica cumplen las reglas que propone, y hace fallar a la suite cuyos casos impresos no coinciden con los que declara, o que no imprime conteo. La suite más grande, de 43 casos, vive en `hooks/format-gate.sh`. Una puerta cuyas pruebas nunca fallan es decoración.
 
 ## Las reglas de escritura, y cómo apagarlas
 
@@ -172,7 +172,7 @@ Léelo antes de confiar en los defaults. Sus conteos de defectos salen de una mu
 
 ## El recibo
 
-Cada vez que una puerta frena algo, alguien la pasa con el escape, mide algo que no le pidieron frenar, o no puede medir, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y cuál de las cuatro fue, y nada más. Una puerta que no pudo medir no aprobó nada, así que el resumen cuenta cada tipo en su propia columna. El archivo nunca sale de tu máquina salvo que lo pegues, y los hooks y el comando de la terminal lo comparten a propósito.
+Cada vez que una puerta frena algo, alguien la pasa con el escape donde iba a frenar, mide algo que no le pidieron frenar, o no puede medir, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y cuál de las cuatro fue, y nada más. Una puerta que no pudo medir no aprobó nada, así que el resumen cuenta cada tipo en su propia columna. El archivo nunca sale de tu máquina salvo que lo pegues, y los hooks y el comando de la terminal lo comparten a propósito.
 
 ```
 sh hooks/receipt.sh --summary

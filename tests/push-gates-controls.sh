@@ -19,9 +19,16 @@ warns_unmeasured() {
   name="$1"; shift; before=$(receipt_lines); out=$("$@" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
   if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q not-measured; then printf 'PASS %s\n' "$name"; else printf 'FAIL %s (rc=%s) %s\n' "$name" "$rc" "$out"; ok=0; fi
 }
+records_escapes() {
+  name="$1"; want="$2"; shift 2; before=$(receipt_lines); "$@" >/dev/null 2>&1; rc=$?; CHECKS=$((CHECKS+1))
+  escapes=$(tail -n "+$((before+1))" "$PRISMA_RECEIPT_FILE" 2>/dev/null | grep -c escaped)
+  if [ "$rc" = "0" ] && [ "$escapes" = "$want" ]; then printf 'PASS %s\n' "$name"; else printf 'FAIL %s, expected %s escape lines and exit 0, got %s lines and exit %s\n' "$name" "$want" "$escapes" "$rc"; ok=0; fi
+}
+run_comments_without_block() { payload "$1" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh"; }
 
 printf 'export const A = 1;\n// stray comment\n' > a.js; git commit -qam comment
 expect "comments gate blocks a stray comment" 2 run pre-push-comments.sh "git push origin feature"
+expect "comments gate blocks a stray comment pushed with its errors joined to the output" 2 run pre-push-comments.sh "git push origin feature 2>&1"
 for diff_setting in diff.external=true color.ui=always diff.noprefix=true; do
   git config "${diff_setting%%=*}" "${diff_setting#*=}"
   expect "comments gate reads the same diff with $diff_setting" 2 run pre-push-comments.sh "git push origin feature"
@@ -35,6 +42,7 @@ expect "comments gate blocks a push that follows an arithmetic expansion" 2 run 
 expect "comments gate passes with the escape" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
 out=$(payload "git push origin feature" | PRISMA_COMMENTS_BLOCK=0 sh "$HOOKS/pre-push-comments.sh" 2>&1); rc=$?
 CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -qi 'comment'; then printf 'PASS comments gate measures and lets the push through until the repository asks it to block\n'; else printf 'FAIL comments gate without PRISMA_COMMENTS_BLOCK (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+records_escapes "comments gate records no escape when it was not asked to block" 0 run_comments_without_block "PRISMA_COMMENTS_OK=1 git push origin feature"
 expect "comments gate ignores a mention of git push" 0 run pre-push-comments.sh "echo git push"
 expect "comments gate lets a PR read through" 0 run pre-push-comments.sh "gh pr list"
 expect "comments gate lets a PR view through" 0 run pre-push-comments.sh "gh pr view 12"
@@ -53,6 +61,7 @@ expect "comments gate passes a push with the escape" 0 run pre-push-comments.sh 
 CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" -gt "$before" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q escaped; then printf 'PASS an escape on a real push is recorded as escaped\n'; else printf 'FAIL the escaped push was not recorded\n'; ok=0; fi
 printf 'export const A = 1;\n' > a.js; git commit -qam clean
 expect "comments gate passes a clean diff" 0 run pre-push-comments.sh "git push origin feature"
+records_escapes "comments gate records no escape on a clean diff" 0 run pre-push-comments.sh "PRISMA_COMMENTS_OK=1 git push origin feature"
 printf '// only on disk\n' >> a.js
 expect "comments gate passes a push whose comment is only on disk" 0 run pre-push-comments.sh "git push origin feature"
 warns_unmeasured "comments gate says it measured nothing when the same command commits before it pushes" run pre-push-comments.sh "git commit -qam more && git push origin feature"
@@ -71,9 +80,10 @@ printf '/**\n * a docblock line\n */\nexport const B = 2;\n' > b.js; git add b.j
 expect "comments gate still counts a docblock line starting with * in JavaScript" 2 run pre-push-comments.sh "git push origin feature"
 git reset -q --hard HEAD~1
 
+records_escapes "size gate records no escape on a push under the ceiling" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
-expect "size gate passes with the escape" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
+records_escapes "size gate passes with the escape and records it on a push over the ceiling" 1 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 expect "size gate lets a PR read through while the diff is over the ceiling" 0 run pre-push-size.sh "gh pr list"
 expect "size gate blocks a PR creation over the ceiling" 2 run pre-push-size.sh "gh pr create --fill"
 git init -q --bare "$T.remote"; git remote add origin "$T.remote"; git push -q origin main feature; git branch -q --set-upstream-to=origin/main main
@@ -107,6 +117,9 @@ done <<SHAPES
 git push|measures
 git push origin|measures
 git push origin feature|measures
+git push origin feature 2>&1|measures
+git push origin feature 2>/dev/null|measures
+git push origin feature 2 >log|refuses
 git push origin HEAD|measures
 git push -u origin feature|measures
 git push origin feature:main|measures
@@ -135,6 +148,7 @@ git push origin HEAD:refs/tags/v1|skips
 git push origin --delete old|skips
 git --no-pager push origin feature|measures
 SHAPES
+expect "size gate measures a push with its errors joined to the output after a heredoc with an apostrophe" 2 run pre-push-size.sh "cat >> log.md <<'EOF'\\nthe review's fixture\\nEOF\\ngit push origin feature 2>&1"
 for odd_branch in fix--delete-modal chore--tags; do
   git checkout -qb "$odd_branch"
   expect "size gate measures a branch named $odd_branch" 2 run pre-push-size.sh "git push origin $odd_branch"
@@ -173,6 +187,8 @@ git -C "$L" add -A; git -C "$L" commit -qm base; git -C "$L" checkout -qb featur
 lint_at() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$L" "$1" | sh "$HOOKS/pre-push-lint.sh"; }
 printf 'export const A = BAD;\n' > "$L/a.js"; git -C "$L" commit -qam "lint error committed"
 expect "lint gate blocks a lint error that is committed" 2 lint_at "git push origin feature"
+expect "lint gate blocks a committed lint error pushed with its errors joined to the output" 2 lint_at "git push origin feature 2>&1"
+records_escapes "lint gate passes with the escape and records it on a committed lint error" 1 lint_at "PRISMA_LINT_OK=1 git push origin feature"
 expect "lint gate blocks a lint error when the branch goes out with every tag" 2 lint_at "git push --tags origin feature"
 warns_unmeasured "lint gate says it measured nothing when a commit follows the push" lint_at "git push origin feature && git commit --allow-empty -m marker"
 warns_unmeasured "lint gate says it measured nothing when the command moves a branch with update-ref" lint_at "git update-ref refs/heads/feature HEAD && git push origin feature"
@@ -202,6 +218,7 @@ printf 'export const BASE = BAD;\n' > "$L/base.js"
 warns_unmeasured "lint gate says it measured nothing when the uncommitted change is in a file the push does not send" lint_at "git push origin feature"
 git -C "$L" checkout -q -- base.js
 expect "lint gate measures and passes a clean tree whose commits are clean" 0 lint_at "git push origin feature"
+records_escapes "lint gate records no escape on a clean push" 0 lint_at "PRISMA_LINT_OK=1 git push origin feature"
 rm -rf "$L"
 
 P=$(mktemp -d)

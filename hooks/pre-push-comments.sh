@@ -72,8 +72,6 @@ for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$real_dir" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
-if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
-
 cd "$dir" 2>/dev/null || { echo "WARN: the comments gate could not enter $dir, so nothing was measured." >&2; receipt_append comments-gate "$real_dir" not-measured; exit 0; }
 
 if [ -n "$segments" ]; then
@@ -116,6 +114,8 @@ if [ "${PRISMA_COMMENTS_BLOCK:-0}" != "1" ]; then
   receipt_append comments-gate "$real_dir" warned
   exit 0
 fi
+
+if escape_declared "$ESCAPE" "$bare_command"; then receipt_append comments-gate "$real_dir" escaped; exit 0; fi
 
 cat >&2 <<MSG
 COMMENTS GATE: this diff is over the ceiling, and the push is blocked.

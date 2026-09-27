@@ -66,8 +66,6 @@ for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$real_dir" in "$skip"|"$skip"/*) exit 0 ;; esac
 done
 
-if escape_declared "$ESCAPE" "$bare_command"; then receipt_append lint-gate "$real_dir" escaped; exit 0; fi
-
 cd "$dir" 2>/dev/null || { echo "WARN: the lint gate could not enter $dir, so nothing was measured." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "WARN: the lint gate did not measure, $dir is not a git repository." >&2; receipt_append lint-gate "$real_dir" not-measured; exit 0; }
 
@@ -135,6 +133,7 @@ PHP
     if [ "$status" != "0" ]; then
       how_many=$(printf '%s' "$output" | sed -n 's/^Found \([0-9]*\) of.*/\1/p')
       if [ -n "$how_many" ] && [ "$how_many" != "0" ]; then
+        if escape_declared "$ESCAPE" "$bare_command"; then receipt_append lint-gate "$real_dir" escaped; exit 0; fi
         echo "LINT GATE: php-cs-fixer has $how_many file(s) to fix, and this repo CI will go red for it. The push is blocked." >&2
         printf '%s\n' "$output" | grep -E "^ +[0-9]+\)" >&2
         echo "" >&2
@@ -165,6 +164,7 @@ FILES
     status=$?
     if [ "$status" != "0" ]; then
       if printf '%s' "$output" | grep -qE "[0-9]+ error"; then
+        if escape_declared "$ESCAPE" "$bare_command"; then receipt_append lint-gate "$real_dir" escaped; exit 0; fi
         echo "LINT GATE: eslint reports errors in files of this diff, and the push is blocked." >&2
         printf '%s\n' "$output" | grep -E "error" | head -12 >&2
         echo "If deliberate, prefix the command with $ESCAPE." >&2
