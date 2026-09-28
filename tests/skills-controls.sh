@@ -14,6 +14,12 @@ EXTERNAL_PLUGIN_SKILL=mattpocock-skills:tdd
 EXTERNAL_PLUGIN_COMMAND=/implement
 BUILD_BRANCH_RULE="Build on a work branch"
 BUILD_BRANCH_CLAUSES="$BUILD_BRANCH_RULE|default branch, create a branch|not committed yet|Commit to the work branch"
+STEP3_EXPIRY_RULE_EN="Every expiry is a threshold, and it is tested on the surface where it is consumed, before and after the cutoff time, on the clock of the service that decides"
+STEP3_EXPIRY_RULE_ES="Todo vencimiento es un umbral, y se prueba en la superficie donde se consume, antes y después de la hora de corte en el reloj del servicio que decide"
+STEP3_EXPIRY_CLOCK_ES="en el reloj del servicio que decide"
+STEP3_EXPIRY_CLOCK_EN="on the clock of the service that decides"
+STEP3_EXPIRY_MUTANT_CLOCK="on any clock"
+STEP3_ROW_PATTERN='^| \*\*3\*\* |'
 REVIEW_UNCOMMITTED_CLAUSES="When the work is not committed yet|git status --porcelain|git merge-base <fixed point> HEAD|git ls-files --others --exclude-standard|untracked files included"
 
 pass() { CASES=$((CASES+1)); printf 'PASS %s\n' "$1"; }
@@ -108,6 +114,11 @@ check_review_uncommitted() {
   carries_every_clause "$(cat "$1/prisma-fidelity-review/SKILL.md")" "$REVIEW_UNCOMMITTED_CLAUSES"
 }
 
+check_step3_expiry() {
+  grep "$STEP3_ROW_PATTERN" "$1/METHOD.md" | grep -q "$STEP3_EXPIRY_RULE_EN" || return 1
+  grep "$STEP3_ROW_PATTERN" "$1/docs/es/METHOD.md" | grep -q "$STEP3_EXPIRY_RULE_ES"
+}
+
 check_diagnose_escape() {
   f="$1/prisma-diagnose/SKILL.md"
   grep -q 'step 2b' "$f" || return 1
@@ -139,6 +150,7 @@ if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the 
 if check_build_work_branch "$ROOT/skills"; then pass "prisma-build works on a branch of its own when it stands on the default branch, and tells the reviewer the work is not committed yet"; else fail "prisma-build work branch"; fi
 if check_review_uncommitted "$ROOT/skills"; then pass "prisma-fidelity-review measures uncommitted work from the merge base and counts untracked files"; else fail "prisma-fidelity-review uncommitted work"; fi
 if check_diagnose_escape "$ROOT/skills"; then pass "prisma-diagnose names step 2b and closes by naming the step the defect escaped from"; else fail "prisma-diagnose closing"; fi
+if check_step3_expiry "$ROOT"; then pass "step 3 tests every expiry on both sides of its cutoff, in English and in the canonical block"; else fail "step 3 expiry line"; fi
 orphan=0
 for name in $STEP_SKILLS; do
   for page in skills/prisma/SKILL.md METHOD.md docs/es/METHOD.md; do
@@ -148,6 +160,12 @@ done
 if [ "$orphan" = "0" ]; then pass "every step skill is named by prisma, by METHOD.md and by the canonical block"; else fail "a step skill is an orphan in the method pages"; fi
 
 mutate() { rm -rf "$T/skills"; cp -R "$ROOT/skills" "$T/skills"; }
+rm -rf "$T/method"; mkdir -p "$T/method/docs/es"; cp "$ROOT/METHOD.md" "$T/method/METHOD.md"
+sed "s/$STEP3_EXPIRY_CLOCK_ES/$STEP3_EXPIRY_MUTANT_CLOCK/" "$ROOT/docs/es/METHOD.md" > "$T/method/docs/es/METHOD.md"
+if check_step3_expiry "$T/method"; then fail "control: changing the clock of the expiry line in the canonical block was not caught"; else pass "control: changing the clock of the expiry line in the canonical block turns the step 3 case red"; fi
+cp "$ROOT/docs/es/METHOD.md" "$T/method/docs/es/METHOD.md"
+sed "s/$STEP3_EXPIRY_CLOCK_EN/$STEP3_EXPIRY_MUTANT_CLOCK/" "$ROOT/METHOD.md" > "$T/method/METHOD.md"
+if check_step3_expiry "$T/method"; then fail "control: changing the clock of the expiry line in METHOD.md was not caught"; else pass "control: changing the clock of the expiry line in METHOD.md turns the step 3 case red"; fi
 mutate; printf '\nA line with an em-dash \342\200\224 inside.\n' >> "$T/skills/prisma-build/SKILL.md"
 if check_no_em_dash "$T/skills"; then fail "control: an injected em-dash was not caught"; else pass "control: an injected em-dash turns the em-dash case red"; fi
 mutate; grep -v '140k' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
