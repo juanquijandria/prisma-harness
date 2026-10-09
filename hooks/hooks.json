@@ -70,6 +70,11 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/notes-machinery.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/claim-ready-gate.sh\"",
+            "timeout": 120
           }
         ]
       }
