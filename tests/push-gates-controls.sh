@@ -86,7 +86,8 @@ seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
 size_from_subdirectory() ( PAYLOAD_DIR="$T/sub"; run pre-push-size.sh "$1" )
 mkdir -p "$T/sub"; git config diff.relative true
-expect "size gate counts the whole repository from a subdirectory when git diff is relative" 2 size_from_subdirectory "git push origin feature"
+out=$(size_from_subdirectory "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
+if [ "$rc" = "2" ]; then printf 'PASS size gate counts the whole repository from a subdirectory when git diff is relative (exit 2)\n'; else printf 'FAIL size gate counts the whole repository from a subdirectory when git diff is relative, expected 2 got %s: %s\n' "$rc" "$out"; ok=0; fi
 git config --unset diff.relative; rmdir "$T/sub"
 records_escapes "size gate passes with the escape and records it on a push over the ceiling" 1 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 expect "size gate lets a PR read through while the diff is over the ceiling" 0 run pre-push-size.sh "gh pr list"
