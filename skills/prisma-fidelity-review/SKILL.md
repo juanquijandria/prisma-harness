@@ -42,7 +42,24 @@ If none exists, the fidelity axis reports that there is no record and fidelity w
 
 ## Find the standards sources
 
-Anything the repository documents about how code is written, a coding standards file, a contributing guide, the project instructions file, the linter configuration. The standards axis reads those and the two smells that are fidelity in disguise, code added for a need the record does not have, and the same logic shape appearing twice in the change. Two rules bind it. A documented repository standard always wins over a smell. Anything the linter or the type checker already enforces is skipped, since the merge gate measures it.
+Anything the repository documents about how code is written, a coding standards file, a contributing guide, the project instructions file, the linter configuration. The standards axis reads those and the smells baseline below, which holds even when the repository documents nothing. Two rules bind it. A documented repository standard always wins over a smell, and where the repository endorses something a smell would flag, the smell is dropped. Anything the linter or the type checker already enforces is skipped, since the merge gate measures it.
+
+## The smells baseline
+
+Twelve code smells from chapter 3 of Fowler's *Refactoring*. Each one is a judgement call, written as "possible" and the smell, never a hard violation. Each line says what to look for in the diff and what usually fixes it.
+
+- **Mysterious name.** A name that does not say what the thing does or holds. Rename it, and if no honest name comes, the design is unclear.
+- **Duplicated code.** The same logic shape in two hunks or two files of the change. Extract the shape once and call it from both.
+- **Feature envy.** A function that works on another module's data more than on its own. Move it next to the data it uses.
+- **Data clumps.** The same few values travelling together through several signatures or files. Give them one type and pass that.
+- **Primitive obsession.** A bare number or string standing for a domain concept. Give the concept its own small type or named constant.
+- **Repeated switches.** The same branching on the same kind of value in more than one place. Keep one table or one dispatch that both places read.
+- **Shotgun surgery.** One logical change that forces scattered edits across many files. Gather what changes together.
+- **Divergent change.** One file edited for several unrelated reasons in the same change. Split it so each part changes for one reason.
+- **Speculative generality.** Parameters, hooks or layers added for a need the record does not have. Delete them until the need is real.
+- **Message chains.** A long walk through objects, a.b().c().d(), that the caller should not depend on. Hide the walk behind one call.
+- **Middle man.** A function or module that only passes calls on. Call the real target directly.
+- **Refused bequest.** An implementation that ignores or overrides most of what it inherits. Use composition instead of inheritance.
 
 ## Run both axes apart
 
@@ -50,7 +67,7 @@ When the caller can spawn subagents, each axis runs in its own fresh context wit
 
 **The fidelity brief.** Take the record's `Agreed` list and, for each line, mark it built, partial or absent, quoting the hunk that builds it or noting the absence. Take the `Out of scope` list and mark anything from it that the diff builds anyway. Then read the diff for behavior neither list mentions, which is scope creep. Then read what is marked built and say where the implementation looks wrong for what the line asked. Quote the record line for every finding. Stay under 400 words.
 
-**The standards brief.** For each documented standard the diff breaks, cite the file and the rule and quote the hunk. For each of the two smells, name it as a judgement call and quote the hunk. Distinguish a breach of a documented standard, which is hard, from a smell, which never is. Stay under 400 words.
+**The standards brief.** For each documented standard the diff breaks, cite the file and the rule and quote the hunk. For each smell of the baseline you find, name it as a judgement call and quote the hunk. Distinguish a breach of a documented standard, which is hard, from a smell, which never is. Stay under 400 words.
 
 ## Report
 
