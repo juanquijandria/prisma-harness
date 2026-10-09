@@ -44,8 +44,13 @@ run_payload_in_stderr() {
 }
 
 run_without_lsof() {
-  PRISMA_LSOF=$MISSING_LSOF; export PRISMA_LSOF
-  run_payload_in "$@"
+  payload_in "$1" "$2" | PRISMA_LSOF="$MISSING_TOOL" SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
+  echo "$?"
+}
+
+run_without_pgrep() {
+  payload_in "$1" "$2" | PRISMA_PGREP="$MISSING_TOOL" SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
+  echo "$?"
 }
 
 skip_case() {
@@ -57,11 +62,11 @@ expect_measured() {
 }
 
 expect_where_proc() {
-  if [ -e "/proc/$$/cwd" ]; then expect_measured "$@"; else skip_case "$1" "this system has no /proc"; fi
+  if [ -e "$PROC_PROBE" ]; then expect_measured "$@"; else skip_case "$1" "this system has no /proc"; fi
 }
 
 expect_without_proc() {
-  if [ -e "/proc/$$/cwd" ]; then skip_case "$1" "this system has /proc"; else expect_measured "$@"; fi
+  if [ -e "$PROC_PROBE" ]; then skip_case "$1" "this system has /proc"; else expect_measured "$@"; fi
 }
 
 run_payload() {
@@ -115,6 +120,7 @@ selftest_kills() {
   sleep "$PROBE_START_SECONDS"
   expect_measured "36 pkill whose pattern reaches a process in another folder blocks" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
   expect_measured "37 killall of a name that runs in another folder blocks" "$(run_payload_in "killall $KILL_PROBE_NAME" "$own_dir")" 2
+  expect_measured "72 a killall of another long name that shares the first 15 letters passes" "$(run_payload_in "killall $KILL_PROBE_NAME-other" "$own_dir")" 0
   expect_measured "38 the same pkill from the folder that owns the process passes" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$other_dir")" 0
   expect_measured "39 a pkill that matches nothing passes" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
   expect "40 a pkill only mentioned inside quotes passes" "$(run_payload_in "echo \"pkill -f $KILL_PROBE_NAME\"" "$own_dir")" 0
@@ -125,10 +131,14 @@ selftest_kills() {
   expect_measured "43 a foreign pkill after an own pkill on the same line still blocks" "$(run_payload_in "pkill -x $KILL_OWN_NAME; pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
   expect_measured "68 a pkill with a redirection still blocks a process in another folder" "$(run_payload_in "pkill -f $KILL_PROBE_NAME $REDIRECTION" "$own_dir") $(run_payload_in "pkill -f $KILL_PROBE_NAME > out.log" "$own_dir") $(run_payload_in "killall $KILL_OWN_NAME $REDIRECTION; pkill -f $KILL_PROBE_NAME 2>&1" "$own_dir")" "2 2 2"
   expect_measured "69 a redirection is not a pattern, so it never reaches a process whose command line holds it" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS $REDIRECTION" "$own_dir")" 0
+  expect_measured "74 a redirection glued to the pattern is not part of it" "$(run_payload_in "pkill -f $KILL_PROBE_NAME>/dev/null" "$own_dir")" 2
+  expect_measured "75 a quoted pattern that holds a > stays a pattern" "$(run_payload_in "pkill -f '$KILL_PROBE_SECONDS $REDIRECTION'" "$own_dir")" 2
   expect_where_proc "70 without lsof the folder is read from /proc, so a foreign pkill still blocks" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
   : > "$PRISMA_RECEIPT_FILE"
   expect_without_proc "71 a process whose folder neither lsof nor /proc can read is let through and recorded as not measured" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
   expect_measured "44 the flags of one pkill do not leak into the next" "$(run_payload_in "pkill -f $KILL_OWN_NAME; pkill -9 -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
+  : > "$PRISMA_RECEIPT_FILE"
+  expect "73 where pgrep is missing a pkill is let through and recorded as not measured" "$(run_without_pgrep "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
   receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
   printf '{"tool_name":"Bash","tool_input":{"command":"pkill -f %s"}}' "$KILL_PROBE_NAME" | SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
   expect "45 a pkill without a session folder is let through and recorded as not measured" "$? $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
@@ -202,7 +212,8 @@ selftest() {
   KILL_PYTHON=$(command -v python3 || command -v python)
   KILL_SLEEPER='import sys, time; time.sleep(int(sys.argv[1]))'
   REDIRECTION='2>/dev/null'
-  MISSING_LSOF=no-such-lsof-$$
+  MISSING_TOOL=no-such-tool-$$
+  PROC_PROBE=/proc/$$/cwd
   PROBE_START_SECONDS=1
   HEREDOC_PROBE=$(printf "python3 - <<'EOF'\nprint('grep -rn --include=*.md foo .')\nEOF")
   HEREDOC_THEN_SEARCH=$(printf "cat > notes.txt <<'EOF'\nuse --include=*.md\nEOF\ngrep -rn --include=*.txt foo .")

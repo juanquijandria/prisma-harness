@@ -16,18 +16,57 @@ PGREP_FOUND, PGREP_NOTHING = 0, 1
 KILLERS = {"pkill", "killall"}
 SEPARATORS = {";", "&&", "||", "|", "&", "\n", "(", ")"}
 SIGNAL_ARGUMENT = re.compile(r"^-([0-9]+|[A-Z][A-Z0-9]*)$")
+PUNCTUATION = ";&|()<>"
+SEPARATOR_CHARACTERS = set(";&|()")
+REDIRECTION_CHARACTERS = set("<>")
+WORD_BREAKS = set(" \t\n;&|()")
+QUOTES = "'\""
 KILLALL_FLAGS_WITH_VALUE = {"-u", "-t", "-c", "-s"}
 COMMAND_WIDTH = 80
 LSOF = os.environ.get("PRISMA_LSOF") or "lsof"
+PGREP = os.environ.get("PRISMA_PGREP") or "pgrep"
+PROC_ROOT = "/proc"
+LINUX_NAME_WIDTH = 15
+PROC_FOLDER = "/proc/%d/cwd"
+PROC_COMMAND_LINE = "/proc/%d/cmdline"
+
+
+def without_descriptor_numbers(command):
+    characters, quote, index = list(command), None, 0
+    while index < len(command):
+        character = command[index]
+        if character == "\\" and quote != "'":
+            index += 1
+        elif quote:
+            quote = None if character == quote else quote
+        elif character in QUOTES:
+            quote = character
+        elif character in REDIRECTION_CHARACTERS:
+            start = index
+            while start > 0 and command[start - 1].isdigit():
+                start -= 1
+            if start < index and (start == 0 or command[start - 1] in WORD_BREAKS):
+                characters[start:index] = " " * (index - start)
+        index += 1
+    return "".join(characters)
+
+
+def is_redirection(token):
+    return bool(set(token) & REDIRECTION_CHARACTERS) and set(token) <= set(PUNCTUATION)
 
 
 def invocations(command):
-    lexer = shlex.shlex(command.replace("\n", " ; "), posix=True, punctuation_chars=";&|()")
+    text = without_descriptor_numbers(command).replace("\n", " ; ")
+    lexer = shlex.shlex(text, posix=True, punctuation_chars=PUNCTUATION)
     lexer.whitespace_split = True
     lexer.commenters = "#"
-    current, found = None, []
+    current, found, target_pending = None, [], False
     for token in lexer:
-        if token in SEPARATORS or set(token) <= set(";&|()"):
+        if target_pending:
+            target_pending = False
+        elif current is not None and is_redirection(token):
+            target_pending = True
+        elif token in SEPARATORS or set(token) <= SEPARATOR_CHARACTERS:
             current = None
         elif current is not None:
             current.append(token)
@@ -49,29 +88,53 @@ def killall_names(arguments):
     return names
 
 
-def pgrep_calls(invocation):
-    program, arguments = invocation[0], invocation[1:]
-    if program == "killall":
-        return [["-x", name] for name in killall_names(arguments)]
-    if arguments and SIGNAL_ARGUMENT.match(arguments[0]):
-        arguments = arguments[1:]
-    return [arguments] if arguments else []
-
-
 def matching_pids(arguments):
-    found = subprocess.run(["pgrep"] + arguments, capture_output=True, text=True)
+    found = subprocess.run([PGREP] + arguments, capture_output=True, text=True)
     if found.returncode not in (PGREP_FOUND, PGREP_NOTHING):
         raise OSError("pgrep could not read the pattern")
     return [int(pid) for pid in found.stdout.split()]
 
 
-def working_folder(pid):
-    listed = subprocess.run([LSOF, "-a", "-p", str(pid), "-d", "cwd", "-Fn"], capture_output=True, text=True)
+def program_name(pid):
+    try:
+        with open(PROC_COMMAND_LINE % pid, "rb") as listed:
+            first = listed.read().split(b"\0")[0]
+    except OSError:
+        return None
+    return os.path.basename(first.decode(errors="replace")) or None
+
+
+def killall_pids(name):
+    pids = matching_pids(["-x", name])
+    if len(name) > LINUX_NAME_WIDTH and os.path.isdir(PROC_ROOT):
+        cut = matching_pids(["-x", name[:LINUX_NAME_WIDTH]])
+        pids += [pid for pid in cut if program_name(pid) in (name, None)]
+    return pids
+
+
+def invocation_pids(invocation):
+    program, arguments = invocation[0], invocation[1:]
+    if program == "killall":
+        return [pid for name in killall_names(arguments) for pid in killall_pids(name)]
+    if arguments and SIGNAL_ARGUMENT.match(arguments[0]):
+        arguments = arguments[1:]
+    return matching_pids(arguments) if arguments else []
+
+
+def lsof_folder(pid):
+    try:
+        listed = subprocess.run([LSOF, "-a", "-p", str(pid), "-d", "cwd", "-Fn"], capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
     for line in listed.stdout.splitlines():
         if line.startswith("n"):
             return os.path.realpath(line[1:])
-    proc = "/proc/%d/cwd" % pid
-    return os.path.realpath(proc) if os.path.exists(proc) else None
+    return None
+
+
+def working_folder(pid):
+    proc = PROC_FOLDER % pid
+    return lsof_folder(pid) or (os.path.realpath(proc) if os.path.exists(proc) else None)
 
 
 def command_line(pid):
@@ -87,16 +150,15 @@ def main():
     session = os.path.realpath(sys.argv[1])
     own, unknown, seen = {os.getpid(), os.getppid()}, False, set()
     for invocation in invocations(sys.stdin.read()):
-        for arguments in pgrep_calls(invocation):
-            for pid in matching_pids(arguments):
-                if pid in own or pid in seen:
-                    continue
-                seen.add(pid)
-                folder = working_folder(pid)
-                if folder is None:
-                    unknown = True
-                elif not inside(folder, session):
-                    print("%d\t%s\t%s" % (pid, folder, command_line(pid)))
+        for pid in invocation_pids(invocation):
+            if pid in own or pid in seen:
+                continue
+            seen.add(pid)
+            folder = working_folder(pid)
+            if folder is None:
+                unknown = True
+            elif not inside(folder, session):
+                print("%d\t%s\t%s" % (pid, folder, command_line(pid)))
     return PARTLY_MEASURED if unknown else 0
 
 

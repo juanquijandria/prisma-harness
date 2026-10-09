@@ -20,7 +20,7 @@ REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-$DEFAULT_WRAPPERS}"
 PARSER_FAILED=3
 UNSAFE_INCLUDE=4
 UNSAFE_EQUALS=6
-SELFTEST_CASES=71
+SELFTEST_CASES=75
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -113,8 +113,8 @@ check_kills() {
   [ "$rc" = "0" ] || [ "$rc" = "$PARTLY_MEASURED" ] || return 0
   [ -n "$targets" ] || return 0
   shown=$(printf '%s\n' "$targets" | head -n "$KILL_LINES_SHOWN")
-  block "this command would stop processes that another session started." \
-    "Its pattern matches $(printf '%s\n' "$targets" | wc -l | tr -d ' ') processes that run outside $working_dir, the folder of this session:
+  block "this command would stop processes that run in another folder." \
+    "Its pattern matches $(printf '%s\n' "$targets" | wc -l | tr -d ' ') processes whose working folder is outside $working_dir, the folder this session works in:
 $shown" \
     "stop only what you started, by the PID you saved with \$!, or narrow the pattern to a path inside your own folder."
 }
