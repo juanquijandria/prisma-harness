@@ -34,7 +34,8 @@ pages_touched_today() { find "$1" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/d
 if [ "$HOOK_MODE" = "1" ]; then
   [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
   CHANGED_PAGES=$(pages_touched_today "$DOCS_ROOT/$DOCS_DIR") || cannot_measure "--changed could not list today's pages, so NOTHING was reviewed."
-  [ -n "$CHANGED_PAGES" ] || { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
+  DELIVERIES_TODAY=$(for d in ${PRISMA_RATE_DIRS:-$RATE_DIRS}; do [ -d "$DOCS_ROOT/$d" ] && pages_touched_today "$DOCS_ROOT/$d"; done)
+  [ -n "$CHANGED_PAGES" ] || [ -n "$DELIVERIES_TODAY" ] || { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
 fi
 
 [ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."

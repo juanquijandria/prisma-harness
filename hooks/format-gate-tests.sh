@@ -108,6 +108,17 @@ EOT
   esac
 
   CASES=$((CASES+1))
+  SIBLING=$(mktemp -d)
+  mkdir -p "$SIBLING/wiki" "$SIBLING/inbox"
+  one_reading "$SIBLING/inbox/delivery.md"
+  RATE_ALONE=$(PRISMA_DOCS_ROOT="$SIBLING" PRISMA_DOCS_DIR=wiki PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" --changed 2>&1)
+  rm -rf "$SIBLING"
+  case "$RATE_ALONE" in
+    *"rate cells"*) printf '  PASS caught "%s"\n' "a delivery changed on a day when no page under the pages folder changed" ;;
+    *) printf '  BLIND on "%s"\n' "a delivery changed on a day when no page under the pages folder changed"; R=1 ;;
+  esac
+
+  CASES=$((CASES+1))
   RATE_AS_COMMAND=$(PRISMA_DOCS_ROOT="$T" PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" "$T/inbox/delivery.md" 2>&1)
   case "$RATE_AS_COMMAND" in
     *"rate cells"*) printf '  PASS caught "%s"\n' "the same delivery with the gate run as a command, which is how a person runs it" ;;
