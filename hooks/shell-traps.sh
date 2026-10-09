@@ -5,6 +5,7 @@ if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-
 HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
+QUOTE_INCLUDES="${PRISMA_QUOTE_INCLUDES:-$HOOKS_DIR/quote-include-globs.sh}"
 ESCAPE="PRISMA_SHELL_TRAPS_OK=1"
 GATE_NAME="shell-traps-gate"
 UNQUOTED_INCLUDE_GLOB='(^|[[:space:]])--include(=|[[:space:]]+)([^'"'"'"[:space:]\\]|\\.)*[*?[]'
@@ -12,7 +13,7 @@ SEARCH_PROGRAMS="grep egrep fgrep ugrep"
 DEFAULT_WRAPPERS="timeout"
 REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-$DEFAULT_WRAPPERS}"
 PARSER_FAILED=3
-SELFTEST_CASES=22
+SELFTEST_CASES=35
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -54,8 +55,22 @@ missing_wrappers_named() {
   done
 }
 
+allow_rewritten() {
+  receipt_append "$GATE_NAME" "$working_dir" rewritten
+  printf '%s' "$payload" | jq --arg command "$1" --arg reason "PRISMA shell traps quoted the --include pattern, because zsh aborts an unquoted one with 'no matches found'. The command that runs is: $1" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: $reason, updatedInput: (.tool_input + {command: $command})}}'
+  exit 0
+}
+
 check_include_glob() {
-  has_unquoted_include_glob "$bare_command" && invokes_a_search "$command_text" && block "a command on this line will not run." \
+  has_unquoted_include_glob "$bare_command" && invokes_a_search "$command_text" || return 0
+  if [ -z "$wrappers" ]; then
+    rewritten=$(printf '%s' "$command_text" | "$QUOTE_INCLUDES" 2>/dev/null) && {
+      [ -n "$rewritten" ] && allow_rewritten "$rewritten"
+      return 0
+    }
+  fi
+  block "a command on this line will not run." \
     "Under zsh an unquoted --include pattern is read as a file glob. It matches no file, zsh aborts that command with 'no matches found', and the rest of the line goes on as if the search had found nothing." \
     "quote the pattern, for example --include='*.md'."
 }
@@ -84,6 +99,28 @@ run_gate() {
   exit 0
 }
 
+payload_for() {
+  printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s,"description":"probe","timeout":%s}}' "$(printf '%s' "$1" | jq -Rs .)" "$PROBE_TIMEOUT"
+}
+
+run_hook() {
+  payload_for "$1" | SHELL="$2" PATH="${3:-$PATH}" PRISMA_REQUIRED_WRAPPERS="${4:-$DEFAULT_WRAPPERS}" sh "$SELF" 2>/dev/null
+}
+
+run_command() {
+  out=$(run_hook "$@"); rc=$?
+  printf '%s %s' "$rc" "$(printf '%s' "$out" | jq -r '.hookSpecificOutput.updatedInput.command // empty' 2>/dev/null)"
+}
+
+run_fields() {
+  run_hook "$@" | jq -e --arg t "$PROBE_TIMEOUT" '.hookSpecificOutput.updatedInput | .description == "probe" and (.timeout | tostring) == $t' >/dev/null 2>&1 \
+    && echo "keeps description and timeout" || echo "lost fields"
+}
+
+run_reason() {
+  run_hook "$@" | jq -r '.hookSpecificOutput.permissionDecisionReason // empty' 2>/dev/null | grep -qF "'*.md'" && echo "names the pattern" || echo "no pattern in the reason"
+}
+
 run_payload() {
   printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s}}' "$(printf '%s' "$1" | jq -Rs .)" \
     | SHELL="$2" PATH="${3:-$PATH}" PRISMA_REQUIRED_WRAPPERS="${4:-$DEFAULT_WRAPPERS}" sh "$SELF" >/dev/null 2>&1
@@ -96,21 +133,33 @@ expect() {
 }
 
 selftest_include_glob() {
-  expect "1 an unquoted include glob under zsh blocks" "$(run_payload 'grep -rn --include=*.md foo .' "$ZSH")" 2
-  expect "2 the same pattern in single quotes passes" "$(run_payload "grep -rn --include='*.md' foo ." "$ZSH")" 0
-  expect "3 the whole flag in double quotes passes" "$(run_payload 'grep -rn "--include=*.md" foo .' "$ZSH")" 0
-  expect "4 a search only mentioned inside quotes passes" "$(run_payload 'echo "grep -rn --include=*.md foo ."' "$ZSH")" 0
-  expect "5 a real search next to a quoted mention of the glob passes" "$(run_payload 'grep -rn foo . && echo "next time use --include=*.md"' "$ZSH")" 0
-  expect "6 an escaped quote inside double quotes does not hide the glob" "$(run_payload 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' "$ZSH")" 2
-  expect "7 under bash the unquoted glob reaches grep and passes" "$(run_payload 'grep -rn --include=*.md foo .' /bin/bash)" 0
-  expect "8 a brace glob after a cd and before a pipe blocks" "$(run_payload 'cd notes && grep -rln --include=*.{md,txt} foo . | wc -l' /usr/bin/zsh)" 2
-  expect "9 a brace list with no glob character expands and passes" "$(run_payload 'grep -rn --include={a.md,b.md} foo .' "$ZSH")" 0
-  expect "10 a search written only in a trailing comment passes" "$(run_payload 'ls -la # then grep -rn --include=*.md foo .' "$ZSH")" 0
-  expect "11 the escape lets the unquoted glob through" "$(run_payload "$ESCAPE grep -rn --include=*.md foo ." "$ZSH")" 0
-  expect "12 the pattern as a separate word blocks too" "$(run_payload 'grep -rn --include *.md foo .' "$ZSH")" 2
-  expect "13 a glob character escaped with a backslash passes" "$(run_payload 'grep -rn --include=\*.md foo .' "$ZSH")" 0
-  expect "14 egrep counts as a search" "$(run_payload 'egrep -rn --include=*.md foo .' "$ZSH")" 2
-  expect "15 a SHELL named without its path still counts as zsh" "$(run_payload 'grep -rn --include=*.md foo .' zsh)" 2
+  expect "1 an unquoted include glob under zsh is quoted and runs" "$(run_command 'grep -rn --include=*.md foo .' "$ZSH")" "0 grep -rn --include='*.md' foo ."
+  expect "2 the same pattern in single quotes passes untouched" "$(run_command "grep -rn --include='*.md' foo ." "$ZSH")" "0 "
+  expect "3 the whole flag in double quotes passes untouched" "$(run_command 'grep -rn "--include=*.md" foo .' "$ZSH")" "0 "
+  expect "4 a search only mentioned inside quotes passes untouched" "$(run_command 'echo "grep -rn --include=*.md foo ."' "$ZSH")" "0 "
+  expect "5 a real search next to a quoted mention of the glob passes untouched" "$(run_command 'grep -rn foo . && echo "next time use --include=*.md"' "$ZSH")" "0 "
+  expect "6 an escaped quote inside double quotes stays and the glob is quoted" "$(run_command 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' "$ZSH")" "0 grep -rn \"a\|href=\\\"#\" src/ --include='*.tsx' | grep -v \"test\""
+  expect "7 under bash the unquoted glob reaches grep and passes untouched" "$(run_command 'grep -rn --include=*.md foo .' /bin/bash)" "0 "
+  expect "8 a brace glob becomes one quoted flag per item" "$(run_command 'cd notes && grep -rln --include=*.{md,txt} foo . | wc -l' /usr/bin/zsh)" "0 cd notes && grep -rln --include='*.md' --include='*.txt' foo . | wc -l"
+  expect "9 a brace list with no glob character expands and passes untouched" "$(run_command 'grep -rn --include={a.md,b.md} foo .' "$ZSH")" "0 "
+  expect "10 a search written only in a trailing comment passes untouched" "$(run_command 'ls -la # then grep -rn --include=*.md foo .' "$ZSH")" "0 "
+  expect "11 the escape lets the unquoted glob through untouched" "$(run_command "$ESCAPE grep -rn --include=*.md foo ." "$ZSH")" "0 "
+  expect "12 the pattern as a separate word is quoted too" "$(run_command 'grep -rn --include *.md foo .' "$ZSH")" "0 grep -rn --include '*.md' foo ."
+  expect "13 a glob character escaped with a backslash passes untouched" "$(run_command 'grep -rn --include=\*.md foo .' "$ZSH")" "0 "
+  expect "14 egrep counts as a search" "$(run_command 'egrep -rn --include=*.md foo .' "$ZSH")" "0 egrep -rn --include='*.md' foo ."
+  expect "15 a SHELL named without its path still counts as zsh" "$(run_command 'grep -rn --include=*.md foo .' zsh)" "0 grep -rn --include='*.md' foo ."
+  expect "23 nested braces cannot be rewritten safely and block" "$(run_payload 'grep -rn --include=*.{md,{txt,csv}} foo .' "$ZSH")" 2
+  expect "24 every unquoted include on the line is quoted" "$(run_command 'grep -rn --include=*.md --include=*.txt foo .' "$ZSH")" "0 grep -rn --include='*.md' --include='*.txt' foo ."
+  expect "25 the rewrite keeps the other fields of the call" "$(run_fields 'grep -rn --include=*.md foo .' "$ZSH")" "keeps description and timeout"
+  expect "26 the reason names the quoted pattern" "$(run_reason 'grep -rn --include=*.md foo .' "$ZSH")" "names the pattern"
+  expect "28 an include glob inside a heredoc body is data and passes untouched" "$(run_command "$HEREDOC_PROBE" "$ZSH")" "0 "
+  expect "29 a real search after a heredoc is still quoted and the body is kept" "$(run_command "$HEREDOC_THEN_SEARCH" "$ZSH")" "0 $HEREDOC_THEN_SEARCH_FIXED"
+  expect "30 a glob next to a quote cannot be quoted safely and blocks" "$(run_payload 'grep -rn --include=*"x".md foo .' "$ZSH")" 2
+  expect "31 a glob next to a variable cannot be quoted safely and blocks" "$(run_payload 'grep -rn --include=*.$EXT foo .' "$ZSH")" 2
+  expect "32 one unsafe pattern blocks the whole line, no half rewrite" "$(run_payload 'grep -rn --include=*.md --include=*"x".txt foo .' "$ZSH")" 2
+  expect "33 a quoter that fails blocks as before, never opens" "$(PRISMA_QUOTE_INCLUDES=/usr/bin/false run_payload 'grep -rn --include=*.md foo .' "$ZSH")" 2
+  expect "34 a herestring is not a heredoc, the search below it is quoted" "$(run_command "$HERESTRING_THEN_SEARCH" "$ZSH")" "0 $HERESTRING_THEN_SEARCH_FIXED"
+  expect "35 an include next to a missing wrapper blocks" "$(run_payload "$MISSING_WRAPPER 5 grep -rn --include=*.md foo ." "$ZSH" "$PATH" "$MISSING_WRAPPER")" 2
 }
 
 selftest_wrappers_and_input() {
@@ -123,8 +172,10 @@ selftest_wrappers_and_input() {
 
 selftest_receipt() {
   receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
-  blocked_rc=$(run_payload 'grep -rn --include=*.md foo .' "$ZSH")
+  blocked_rc=$(run_payload 'grep -rn --include=*.{md,{txt,csv}} foo .' "$ZSH")
   expect "21 a block leaves its line in the receipt" "$blocked_rc $(grep -c "	$GATE_NAME	.*	blocked$" "$receipt")" "2 1"
+  rewritten_rc=$(run_payload 'grep -rn --include=*.md foo .' "$ZSH")
+  expect "27 a rewrite leaves its own line in the receipt" "$rewritten_rc $(grep -c "	$GATE_NAME	.*	rewritten$" "$receipt")" "0 1"
   fault_rc=$(PRISMA_PARSER_FAULT=1 run_payload 'grep -rn --include=*.md foo .' "$ZSH")
   expect "22 a parser that fails lets the command through and says so in the receipt" "$fault_rc $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
 }
@@ -132,6 +183,12 @@ selftest_receipt() {
 selftest() {
   SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
   ZSH=/bin/zsh
+  PROBE_TIMEOUT=60000
+  HEREDOC_PROBE=$(printf "python3 - <<'EOF'\nprint('grep -rn --include=*.md foo .')\nEOF")
+  HEREDOC_THEN_SEARCH=$(printf "cat > notes.txt <<'EOF'\nuse --include=*.md\nEOF\ngrep -rn --include=*.txt foo .")
+  HERESTRING_THEN_SEARCH=$(printf "cat <<<'x'\ngrep -rn --include=*.md foo .")
+  HERESTRING_THEN_SEARCH_FIXED=$(printf "cat <<<'x'\ngrep -rn --include='*.md' foo .")
+  HEREDOC_THEN_SEARCH_FIXED=$(printf "cat > notes.txt <<'EOF'\nuse --include=*.md\nEOF\ngrep -rn --include='*.txt' foo .")
   MISSING_WRAPPER=no-such-wrapper-alpha
   fake_bin=$(mktemp -d)
   printf '#!/bin/sh\nexit 0\n' > "$fake_bin/$DEFAULT_WRAPPERS"; chmod +x "$fake_bin/$DEFAULT_WRAPPERS"
