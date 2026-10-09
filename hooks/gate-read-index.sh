@@ -26,6 +26,11 @@ if [ "$1" = "--selftest" ]; then
   edit_tx=$(mktemp)
   echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_edit","name":"Edit","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$edit_tx"
   echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_edit","content":"The file has been updated"}]}}' >> "$edit_tx"
+  two_reads_tx=$(mktemp)
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"'"$root"'/index.md"}},{"type":"tool_use","id":"tu_other","name":"Read","input":{"file_path":"'"$root"'/other.md"}}]}}' > "$two_reads_tx"
+  two_failures_tx=$(mktemp)
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_other","name":"Read","input":{"file_path":"'"$root"'/other.md"}},{"type":"tool_use","id":"tu_read","name":"Read","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$two_failures_tx"
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_read","is_error":true,"content":"File does not exist."},{"type":"tool_result","tool_use_id":"tu_other","is_error":true,"content":"File does not exist."}]}}' >> "$two_failures_tx"
   alarm_tx=$(mktemp)
   echo '{"type":"user","message":{"content":"INDEX GATE: you are about to write a page under wiki/ without opening the index"}}' > "$alarm_tx"
   r1=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$empty_tx" "$root" | "$SELF"; echo "exit=$?")
@@ -35,7 +40,9 @@ if [ "$1" = "--selftest" ]; then
   r5=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$alarm_tx" "$root" | "$SELF"; echo "exit=$?")
   r6=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$write_tx" "$root" | "$SELF"; echo "exit=$?")
   r7=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$edit_tx" "$root" | "$SELF"; echo "exit=$?")
-  rm -rf "$read_tx" "$empty_tx" "$mention_tx" "$alarm_tx" "$write_tx" "$edit_tx" "$root"
+  r8=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$two_reads_tx" "$root" | "$SELF"; echo "exit=$?")
+  r9=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$two_failures_tx" "$root" | "$SELF"; echo "exit=$?")
+  rm -rf "$read_tx" "$empty_tx" "$mention_tx" "$alarm_tx" "$write_tx" "$edit_tx" "$two_reads_tx" "$two_failures_tx" "$root"
   ok=1
   case "$r1" in *"exit=2"*) echo "PASS case 1 (blocks when the index was not read)";; *) echo "FAIL case 1: $r1"; ok=0;; esac
   case "$r2" in *"exit=0"*) echo "PASS case 2 (passes when the index was actually read)";; *) echo "FAIL case 2: $r2"; ok=0;; esac
@@ -44,7 +51,9 @@ if [ "$1" = "--selftest" ]; then
   case "$r5" in *"exit=2"*) echo "PASS case 5 (its own alarm text does not disarm it)";; *) echo "FAIL case 5: $r5"; ok=0;; esac
   case "$r6" in *"exit=2"*) echo "PASS case 6 (writing the index without reading it does not open it)";; *) echo "FAIL case 6: $r6"; ok=0;; esac
   case "$r7" in *"exit=2"*) echo "PASS case 7 (editing the index without reading it does not open it)";; *) echo "FAIL case 7: $r7"; ok=0;; esac
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 7/7" && exit 0
+  case "$r8" in *"exit=0"*) echo "PASS case 8 (an index read that is not the last line jq writes still counts)";; *) echo "FAIL case 8: $r8"; ok=0;; esac
+  case "$r9" in *"exit=2"*) echo "PASS case 9 (a failed index read that is not the last line jq writes still fails)";; *) echo "FAIL case 9: $r9"; ok=0;; esac
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 9/9" && exit 0
   echo "SELFTEST FAILED"
   exit 1
 fi

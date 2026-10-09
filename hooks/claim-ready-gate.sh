@@ -9,7 +9,7 @@ GATE_NAME="claim-ready-gate"
 TRANSCRIPT_TAIL_LINES=400
 DENIAL_WINDOW_WORDS=3
 CLAIM_SEPARATOR='|'
-SELFTEST_CASES=28
+SELFTEST_CASES=31
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 . "$HOOKS_DIR/github-remote.sh"
@@ -24,11 +24,15 @@ LAST_MESSAGE_JQ='reduce (inputs | fromjson? // empty | select(.isSidechain != tr
     else . end)
 | .text | join("\n")'
 
-CLAIMS_JQ='def claim: "ready (to|for) merge|(is|are) green|list[oa]s? para merge(ar)?|en verde";
+CLAIMS_JQ='def ready_claim: "ready (to|for) merge|list[oa]s? para merge(ar)?";
+def green_claim: "(is|are) green|en verde";
+def readiness: "\\b(ready|list[oa]s?)\\b";
 def negators: ["no", "not", "never", "nunca", "tampoco", "ni", "isnt", "arent", "isn'"'"'t", "aren'"'"'t"];
 def own_clause: [splits("[,:;()]")] | last // "";
 def denied($before): [$before | own_clause | ascii_downcase | splits("[^\\p{L}'"'"']+") | select(length > 0)] | .[-$window:]
   | any(.[]; . as $word | negators | index($word));
+def undenied($sentence; $pattern): any($sentence | match($pattern; "gi"); denied($sentence[0:.offset]) | not);
+def denies_readiness($sentence): any($sentence | match(readiness; "gi"); denied($sentence[0:.offset]));
 def url_refs: [match("github[.]com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([0-9]+)"; "g") | "\(.captures[0].string)|\(.captures[1].string)"];
 def repo_refs: [match("(?:^|[^A-Za-z0-9_./-])([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#([0-9]+)(?![A-Za-z0-9_])"; "g") | "\(.captures[0].string)|\(.captures[1].string)"];
 def bare_refs: gsub("[A-Za-z0-9_.:/-]*(github[.]com/[^ ]*|[A-Za-z0-9_.-]/[A-Za-z0-9_.-]+#[0-9]+)"; " ")
@@ -37,7 +41,7 @@ gsub("```[^`]*```"; " ")
 | [splits("(?<=[.!?;])\\s+|\\n+")][]
 | select(test("^\\s*¿|[?]\\s*$") | not)
 | . as $sentence
-| select(any(match(claim; "gi"); denied($sentence[0:.offset]) | not))
+| select(undenied($sentence; ready_claim) or (undenied($sentence; green_claim) and (denies_readiness($sentence) | not)))
 | (url_refs + repo_refs + bare_refs)[]'
 
 not_measured() {

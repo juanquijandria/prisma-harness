@@ -1,100 +1,7 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside". Loaded by pr-ready.sh, not run alone.
 
-FAKE_REPO=acme/api
-FAKE_NUMBER=7
-FAKE_AUTHOR=octo
-FAKE_BRANCH=feat/seven
-FAKE_HEAD=aaaaaaa1111111111111111111111111111111111
-PUSHED=2026-01-10T10:00:00Z
-CLAUDE_STARTED=2026-01-10T10:01:00Z
-CLAUDE_FINISHED=2026-01-10T10:02:00Z
-CLAUDE_DONE_BODY='**Claude finished @octo'"'"'s task in 40s**'
-CLAUDE_WORKING_BODY='**Claude Code is working**'
-
-install_fake_gh() {
-  FAKE_GH_DIR="$1"
-  cat > "$FAKE_GH_DIR/gh" <<'FAKE'
-#!/bin/sh
-for arg in "$@"; do case "$arg" in repos/*) endpoint=$arg ;; esac; done
-while IFS='|' read -r pattern file; do
-  [ -n "$pattern" ] || continue
-  case "$endpoint" in $pattern) cat "$FAKE_GH_DIR/$file"; exit 0 ;; esac
-done < "$FAKE_GH_DIR/routes"
-echo "fake gh has no fixture for $endpoint" >&2
-exit 1
-FAKE
-  chmod +x "$FAKE_GH_DIR/gh"
-  export FAKE_GH_DIR
-}
-
-route() {
-  route_count=$((route_count+1))
-  printf '%s' "$2" > "$FAKE_GH_DIR/fixture-$route_count.json"
-  printf '%s|fixture-%s.json\n' "$1" "$route_count" >> "$FAKE_GH_DIR/routes"
-}
-
-pr_json() {
-  printf '{"number":%s,"state":"%s","user":{"login":"%s"},"head":{"ref":"%s","sha":"%s","repo":{"full_name":"%s"}},"mergeable_state":"%s","created_at":"%s","closed_at":%s,"merged_at":%s}' \
-    "$1" "${2:-open}" "${3:-$FAKE_AUTHOR}" "$4" "$5" "$FAKE_REPO" "${6:-clean}" "${7:-2026-01-10T09:00:00Z}" "${8:-null}" "${9:-null}"
-}
-
-push_json() { printf '{"activity_type":"push","timestamp":"%s","after":"%s"}' "$1" "$2"; }
-comment_json() { printf '{"user":{"login":"%s"},"created_at":"%s","updated_at":"%s","body":"%s"}' "$1" "$2" "$3" "$4"; }
-review_json() { printf '{"user":{"login":"%s"},"submitted_at":"%s","state":"COMMENTED"}' "$1" "$2"; }
-check_json() { printf '{"name":"%s","app":{"slug":"ci"},"status":"%s","conclusion":%s,"started_at":"%s","completed_at":%s}' "$1" "$2" "$3" "$4" "$5"; }
-status_json() { printf '{"id":%s,"context":"%s","state":"%s","created_at":"%s"}' "$1" "$2" "$3" "$4"; }
-
-green_scenario() {
-  PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD")"
-  ACTIVITY="[$(push_json "$PUSHED" "$FAKE_HEAD")]"
-  COMMENTS="[$(comment_json 'claude[bot]' "$CLAUDE_STARTED" "$CLAUDE_FINISHED" "$CLAUDE_DONE_BODY")]"
-  REVIEWS='[]'
-  CHECKS='{"check_runs":[]}'
-  STATUSES='[]'
-  OPEN_PRS="[$PR]"
-  CLOSED_PRS='[]'
-  FILES='[{"filename":"src/app.ts"}]'
-  unset TEST_REVIEWERS OTHER_NUMBER JUDGE_DIR GH_FOR_TEST
-}
-
-serve() {
-  : > "$FAKE_GH_DIR/routes"; route_count=0
-  if [ -n "${OTHER_NUMBER:-}" ]; then
-    route "repos/$FAKE_REPO/pulls/$OTHER_NUMBER/files*" "$OTHER_FILES"
-    route "repos/$FAKE_REPO/activity?ref=refs%2Fheads%2F$OTHER_BRANCH&*" "$OTHER_ACTIVITY"
-  fi
-  route "repos/$FAKE_REPO/pulls/$FAKE_NUMBER" "$PR"
-  route "repos/$FAKE_REPO/pulls/$FAKE_NUMBER/files*" "$FILES"
-  route "repos/$FAKE_REPO/activity*" "$ACTIVITY"
-  route "repos/$FAKE_REPO/issues/$FAKE_NUMBER/comments*" "$COMMENTS"
-  route "repos/$FAKE_REPO/pulls/$FAKE_NUMBER/reviews*" "$REVIEWS"
-  route "repos/$FAKE_REPO/commits/*/check-runs*" "$CHECKS"
-  route "repos/$FAKE_REPO/commits/*/statuses*" "$STATUSES"
-  route "repos/$FAKE_REPO/pulls?state=open*" "$OPEN_PRS"
-  route "repos/$FAKE_REPO/pulls?state=closed*" "$CLOSED_PRS"
-}
-
-run_hook() {
-  serve
-  if [ "${TEST_REVIEWERS+set}" = set ]; then
-    (cd "${JUDGE_DIR:-$FAKE_GH_DIR}" && PRISMA_PR_REVIEWERS="$TEST_REVIEWERS" PRISMA_GH="${GH_FOR_TEST:-$FAKE_GH_DIR/gh}" sh "$SELF" "$FAKE_REPO" "$FAKE_NUMBER" "$@" 2>&1)
-  else
-    (cd "${JUDGE_DIR:-$FAKE_GH_DIR}" && PRISMA_GH="${GH_FOR_TEST:-$FAKE_GH_DIR/gh}" sh "$SELF" "$FAKE_REPO" "$FAKE_NUMBER" "$@" 2>&1)
-  fi
-}
-
-judge() {
-  out=$(run_hook "$@"); rc=$?
-  printf '%s %s' "$rc" "$(printf '%s\n' "$out" | head -1 | sed 's/:.*//')"
-}
-
-judge_says() { run_hook "$@" | grep -F -- "$SAYS" >/dev/null && echo says || echo silent; }
-
-expect() {
-  cases=$((cases+1))
-  if [ "$2" = "$3" ]; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s, expected [%s] and got [%s]\n' "$1" "$3" "$2"; ok=0; fi
-}
+. "$HOOKS_DIR/pr-ready-fixtures.sh"
 
 selftest_ci() {
   green_scenario; STATUSES="[$(status_json 1 deploy pending 2026-01-10T10:00:05Z)]"
@@ -108,6 +15,8 @@ selftest_ci() {
   expect "4 success, neutral and skipped runs and a status that turned green are ready" "$(judge)" "0 READY"
   green_scenario; CHECKS="{\"check_runs\":[$(check_json build in_progress null "$PUSHED" null)]}"
   expect "5 a check run still in progress is not ready" "$(judge)" "1 NOT READY"
+  green_scenario; CHECKS="{\"check_runs\":[$(check_json lint completed '"failure"' "$PUSHED" '"2026-01-10T10:03:00Z"'),$(check_json test completed '"success"' "$PUSHED" '"2026-01-10T10:03:00Z"')]}"; SAYS="ci: lint finished as failure on aaaaaaa"
+  expect "49 a run that is not the last line jq writes still reads whole" "$(judge)$(judge_says)" "1 NOT READYsays"
 }
 
 selftest_reviewers() {
@@ -123,6 +32,21 @@ selftest_reviewers() {
   expect "10 a reviewer that never wrote is not ready and is named" "$(judge)$(judge_says)" "1 NOT READYsays"
   green_scenario; TEST_REVIEWERS="claude[bot],octo-reviewer"
   expect "11 every reviewer in a comma list is required" "$(judge)" "1 NOT READY"
+  formal_review CHANGES_REQUESTED; SAYS="requested changes at 2026-01-10T10:05:00Z"
+  expect "42 a review that requests changes is not ready, and says so" "$(judge)$(judge_says)" "1 NOT READYsays"
+  formal_review COMMENTED "$OLDER_HEAD"; SAYS="made on commit $OLDER_HEAD"
+  expect "43 a review made on another commit than the head does not count, and says so" "$(judge)$(judge_says)" "1 NOT READYsays"
+  formal_review DISMISSED
+  expect "44 a dismissed review does not count" "$(judge)" "1 NOT READY"
+  formal_review CHANGES_REQUESTED; REVIEWS="[$(review_json octo-reviewer 2026-01-10T10:04:00Z CHANGES_REQUESTED),$(review_json octo-reviewer 2026-01-10T10:06:00Z APPROVED)]"
+  expect "45 an approval after a request for changes is ready" "$(judge)" "0 READY"
+  formal_review CHANGES_REQUESTED; REVIEWS="[$(review_json octo-reviewer 2026-01-10T10:04:00Z CHANGES_REQUESTED),$(review_json octo-reviewer 2026-01-10T10:06:00Z COMMENTED)]"
+  expect "46 a comment after a request for changes does not lift it" "$(judge)" "1 NOT READY"
+}
+
+formal_review() {
+  green_scenario; TEST_REVIEWERS="octo-reviewer"; COMMENTS='[]'
+  REVIEWS="[$(review_json octo-reviewer 2026-01-10T10:05:00Z "$1" "${2:-$FAKE_HEAD}")]"
 }
 
 selftest_at() {
@@ -175,7 +99,7 @@ selftest_conflicts() {
   green_scenario; PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD" dirty)"; SAYS="not judged as of"
   expect "19 --at does not carry the mergeable state of today into the past, and says so" "$(judge --at 2026-01-10T10:05:00Z)$(judge_says --at 2026-01-10T10:05:00Z)" "0 READYsays"
   if ! git merge-tree --write-tree HEAD HEAD >/dev/null 2>&1; then
-    for name in "20 another open PR of the author that conflicts is not ready" "21 another PR that shares a file and merges clean is ready" "22 another PR that touches no shared file is not compared" "23 a PR closed before --at is not compared"; do cases=$((cases+1)); printf 'SKIP %s, this git has no merge-tree --write-tree\n' "$name"; done
+    for name in "20 another open PR of the author that conflicts is not ready" "21 another PR that shares a file and merges clean is ready" "22 another PR that touches no shared file is not compared" "23 a PR closed before --at is not compared" "50 with --at, an open PR that is not the last line jq writes is still compared"; do cases=$((cases+1)); printf 'SKIP %s, this git has no merge-tree --write-tree\n' "$name"; done
   else
     build_clone
     other_pr "$CLASHING_HEAD"; SAYS="finds a conflict in app.ts."
@@ -186,6 +110,8 @@ selftest_conflicts() {
     expect "22 another PR that touches no shared file is not compared, and that is said" "$(judge)$(judge_says)" "0 READYsays"
     other_pr "$CLASHING_HEAD"; OPEN_PRS="[$PR]"; CLOSED_PRS="[$(pr_json 8 closed "$FAKE_AUTHOR" "$OTHER_BRANCH" "$CLASHING_HEAD" clean 2026-01-10T09:00:00Z '"2026-01-10T10:30:00Z"')]"
     expect "23 a PR closed before --at is not compared, and one closed after it is" "$(judge --at 2026-01-10T10:40:00Z)|$(judge --at 2026-01-10T10:05:00Z)" "0 READY|1 NOT READY"
+    other_pr "$CLASHING_HEAD"; SECOND_OTHER_NUMBER=9; OPEN_PRS="[$PR,$(pr_json 8 open "$FAKE_AUTHOR" "$OTHER_BRANCH" "$CLASHING_HEAD"),$(pr_json 9 open "$FAKE_AUTHOR" nine "$APART_HEAD")]"
+    expect "50 with --at, an open PR that is not the last line jq writes is still compared" "$(judge --at 2026-01-10T10:05:00Z)" "1 NOT READY"
   fi
   green_scenario; SAYS="not a clone of $FAKE_REPO"
   expect "24 outside a clone of the repo the check between PRs says it did not run" "$(judge_says)" "says"
@@ -208,6 +134,10 @@ selftest_unmeasured() {
   expect "37 --at with no time after it is a usage error, never a verdict about now" "$(judge --at)" "2 --at needs a time"
   green_scenario
   expect "38 an option the gate does not know is a usage error" "$(judge --since 2026-01-10T08:00:00Z)" "2 unknown option --since"
+  green_scenario; CHECKS='{"message":"Not Found"}'; SAYS="JSON of another shape"
+  expect "47 check runs that come back as JSON of another shape are not measured, never a failed CI" "$(judge)$(judge_says)" "3 NOT MEASUREDsays"
+  green_scenario; COMMENTS='{"message":"Not Found"}'
+  expect "48 comments that come back as an object are not measured, never a missing review" "$(judge)" "3 NOT MEASURED"
 }
 
 claude_review() { comment_json 'claude[bot]' "$1" "$2" "$CLAUDE_DONE_BODY"; }
@@ -262,6 +192,15 @@ selftest_history() {
   fi
 }
 
+selftest_merge_state() {
+  green_scenario; PR=$(printf '%s' "$PR" | "$JQ" -c '.draft = true'); SAYS="the PR is a draft"
+  expect "39 a PR in draft is not ready, and says it is a draft" "$(judge)$(judge_says)" "1 NOT READYsays"
+  green_scenario; PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD" draft)"; SAYS="the PR is a draft"
+  expect "40 a mergeable state of draft is a draft too" "$(judge)$(judge_says)" "1 NOT READYsays"
+  green_scenario; PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD" blocked)"; SAYS="a required check or review is still missing"
+  expect "41 a PR whose mergeable state is blocked is not ready, and says what blocks it" "$(judge)$(judge_says)" "1 NOT READYsays"
+}
+
 selftest() {
   SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
   T=$(mktemp -d)
@@ -273,6 +212,7 @@ selftest() {
   selftest_conflicts
   selftest_unmeasured
   selftest_history
+  selftest_merge_state
   rm -rf "$T"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
   [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && return 0
