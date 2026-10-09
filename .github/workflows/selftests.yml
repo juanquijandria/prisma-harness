@@ -26,6 +26,9 @@ jobs:
           uname -a
           sh --version 2>/dev/null || echo "sh has no --version"
           for t in sh bash dash jq python3 python git awk cmp mktemp find env cp; do printf '%-8s %s\n' "$t" "$(command -v $t || echo MISSING)"; done
+          printf 'jq ends two lines as:'; jq -n '1,2' | od -An -c | tr -s ' '
+          printf 'sh keeps of them:'; sh -c 'lines=$(jq -n "1,2"); printf "%s" "$lines"' | od -An -c | tr -s ' '
+          printf 'read keeps as the last field:'; sh -c 'printf "a|7\r\n" | { IFS="|" read -r first last; printf "%s" "$last"; }' | od -An -c | tr -s ' '
       - name: Run every selftest
         shell: bash
         run: sh tests/run-selftests.sh
