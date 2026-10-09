@@ -20,6 +20,12 @@ if [ "$1" = "--selftest" ]; then
   echo '{}' > "$empty_tx"
   mention_tx=$(mktemp)
   echo '{"type":"user","message":{"content":"take a look at '"$root"'/index.md later"}}' > "$mention_tx"
+  write_tx=$(mktemp)
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_write","name":"Write","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$write_tx"
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_write","content":"File created successfully"}]}}' >> "$write_tx"
+  edit_tx=$(mktemp)
+  echo '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"tu_edit","name":"Edit","input":{"file_path":"'"$root"'/index.md"}}]}}' > "$edit_tx"
+  echo '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"tu_edit","content":"The file has been updated"}]}}' >> "$edit_tx"
   alarm_tx=$(mktemp)
   echo '{"type":"user","message":{"content":"INDEX GATE: you are about to write a page under wiki/ without opening the index"}}' > "$alarm_tx"
   r1=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$empty_tx" "$root" | "$SELF"; echo "exit=$?")
@@ -27,14 +33,18 @@ if [ "$1" = "--selftest" ]; then
   r3=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/notes.md"}}' "$empty_tx" "$root" | "$SELF"; echo "exit=$?")
   r4=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$mention_tx" "$root" | "$SELF"; echo "exit=$?")
   r5=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$alarm_tx" "$root" | "$SELF"; echo "exit=$?")
-  rm -rf "$read_tx" "$empty_tx" "$mention_tx" "$alarm_tx" "$root"
+  r6=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$write_tx" "$root" | "$SELF"; echo "exit=$?")
+  r7=$(printf '{"tool_name":"Write","transcript_path":"%s","tool_input":{"file_path":"%s/wiki/a/b.md"}}' "$edit_tx" "$root" | "$SELF"; echo "exit=$?")
+  rm -rf "$read_tx" "$empty_tx" "$mention_tx" "$alarm_tx" "$write_tx" "$edit_tx" "$root"
   ok=1
   case "$r1" in *"exit=2"*) echo "PASS case 1 (blocks when the index was not read)";; *) echo "FAIL case 1: $r1"; ok=0;; esac
   case "$r2" in *"exit=0"*) echo "PASS case 2 (passes when the index was actually read)";; *) echo "FAIL case 2: $r2"; ok=0;; esac
   case "$r3" in *"exit=0"*) echo "PASS case 3 (outside the docs dir it does not apply)";; *) echo "FAIL case 3: $r3"; ok=0;; esac
   case "$r4" in *"exit=2"*) echo "PASS case 4 (mentioning the path is not reading it)";; *) echo "FAIL case 4: $r4"; ok=0;; esac
   case "$r5" in *"exit=2"*) echo "PASS case 5 (its own alarm text does not disarm it)";; *) echo "FAIL case 5: $r5"; ok=0;; esac
-  [ "$ok" = "1" ] && echo "SELFTEST OK: 5/5" && exit 0
+  case "$r6" in *"exit=2"*) echo "PASS case 6 (writing the index without reading it does not open it)";; *) echo "FAIL case 6: $r6"; ok=0;; esac
+  case "$r7" in *"exit=2"*) echo "PASS case 7 (editing the index without reading it does not open it)";; *) echo "FAIL case 7: $r7"; ok=0;; esac
+  [ "$ok" = "1" ] && echo "SELFTEST OK: 7/7" && exit 0
   echo "SELFTEST FAILED"
   exit 1
 fi
@@ -61,12 +71,12 @@ outside_docs "$file_path" && exit 0
 
 [ -n "$transcript" ] && [ -f "$transcript" ] || not_measured "the index gate could not read the transcript, nothing was verified."
 
-touched=$("$JQ" -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read" or .name=="Edit" or .name=="Write") | select((.id // "") != "") | select((.input.file_path // "") != "") | "\(.id)\t\(.input.file_path)"' "$transcript" 2>/dev/null)
-touched_status=$?
+read_calls=$("$JQ" -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use") | select(.name=="Read") | select((.id // "") != "") | select((.input.file_path // "") != "") | "\(.id)\t\(.input.file_path)"' "$transcript" 2>/dev/null)
+read_calls_status=$?
 errored=$("$JQ" -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
 errored_status=$?
-{ [ "$touched_status" = "0" ] && [ "$errored_status" = "0" ]; } || not_measured "the index gate could not read the transcript, so nothing was verified."
-opened=$(printf '%s\n' "$touched" | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
+{ [ "$read_calls_status" = "0" ] && [ "$errored_status" = "0" ]; } || not_measured "the index gate could not read the transcript, so nothing was verified."
+opened=$(printf '%s\n' "$read_calls" | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
 
 while IFS= read -r call; do
   [ -n "$call" ] || continue

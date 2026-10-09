@@ -97,7 +97,7 @@ run pre-push-size.sh "git push origin feature" >/dev/null 2>&1
 run pre-push-size.sh "git push origin feature" >/dev/null 2>&1
 CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" = "$((before+3))" ]; then printf 'PASS three runs that could not measure leave three lines, one each\n'; else printf 'FAIL three runs left %s lines\n' "$(($(receipt_lines)-before))"; ok=0; fi
 summary=$(sh "$HOOKS/receipt.sh" --summary)
-unmeasured=$(printf '%s\n' "$summary" | awk '$1=="size-gate"{print $4}')
+unmeasured=$(printf '%s\n' "$summary" | awk '$1=="size-gate"{print $5}')
 CHECKS=$((CHECKS+1)); if [ "$unmeasured" = "3" ] 2>/dev/null; then printf 'PASS the summary counts what a gate could not measure apart from what it blocked\n'; else printf 'FAIL the summary column for unmeasured events reads [%s]\n' "$unmeasured"; ok=0; fi
 git checkout -q feature
 

@@ -1,5 +1,51 @@
 # Prisma Harness. Documented in README.md, section "What is inside". Loaded by format-gate.sh, not run alone.
 
+STOP_BLOCKED=2
+STOP_LET_THROUGH=0
+
+new_site() {
+  site=$(mktemp -d)
+  mkdir -p "$site/wiki" "$site/inbox" "$site/deliveries"
+  printf '%s' "$site"
+}
+
+changed_gate() {
+  site="$1"; shift
+  PRISMA_DOCS_ROOT="$site" PRISMA_DOCS_DIR=wiki PRISMA_FORMAT_CONFIG="$site/.prisma-format.conf" PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" --changed "$@" 2>&1
+}
+
+stop_exit() {
+  site="$1"; active="$2"; shift 2
+  printf '{"hook_event_name":"Stop","stop_hook_active":%s}' "$active" | changed_gate "$site" "$@" >/dev/null
+  printf '%s' "$?"
+}
+
+hook_mode_catches() {
+  CASES=$((CASES+1))
+  case "$2" in
+    *"rate cells"*) printf '  PASS caught "%s"\n' "$1" ;;
+    *) printf '  BLIND on "%s"\n' "$1"; R=1 ;;
+  esac
+}
+
+hook_mode_exits() {
+  CASES=$((CASES+1))
+  if [ "$2" = "$3" ]; then printf '  PASS exits as expected on "%s"\n' "$1"
+  else printf '  WRONG EXIT on "%s", expected %s and got %s\n' "$1" "$3" "$2"; R=1; fi
+}
+
+selftest_hook_mode() {
+  site=$(new_site); printf '# A page\n\nPlain text with no figures.\n' > "$site/wiki/plain.md"; one_reading "$site/inbox/delivery.md"
+  hook_mode_catches "a delivery in a folder beside the pages folder, which is where deliveries actually live" "$(changed_gate "$site")"; rm -rf "$site"
+  site=$(new_site); one_reading "$site/inbox/delivery.md"
+  hook_mode_catches "a delivery changed on a day when no page under the pages folder changed" "$(changed_gate "$site")"; rm -rf "$site"
+  site=$(new_site); one_reading "$site/deliveries/delivery.md"; printf 'RATE_DIRS=deliveries\n' > "$site/.prisma-format.conf"
+  hook_mode_catches "a delivery in a folder named only in the config file" "$(changed_gate "$site")"; rm -rf "$site"
+  site=$(new_site); printf 'A page with no heading.\n' > "$site/wiki/Broken Name.md"
+  hook_mode_exits "a stop that Claude Code marks as already continued by a stop hook is let through" "$(stop_exit "$site" false --stop-event) $(stop_exit "$site" true --stop-event)" "$STOP_BLOCKED $STOP_LET_THROUGH"
+  hook_mode_exits "without --stop-event a stop event on stdin is never read" "$(stop_exit "$site" true)" "$STOP_BLOCKED"; rm -rf "$site"
+}
+
 selftest() {
   STRICT=1
   RULE_KEBAB_CASE=1; RULE_H1_FIRST_LINE=1; RULE_EM_DASH=1; RULE_COLON_IN_PROSE=1; RULE_HEADING_COUNTS=1
@@ -95,28 +141,7 @@ EOT
   printf '\n| Criterion | What it asks | Verdict |\n|---|---|---|\n| First | the two routes agree within 5 %% of each other | not met |\n| Second | under 5 %% of sessions disagree | met |\n| Third | the share stays over 90 %% of the week | met |\n| Fourth | growth over 10 %% counts | met |\n| Fifth | error under 1 %% counts | met |\n| Sixth | coverage over 80 %% counts | met |\n' >> "$T/inbox/prose-about-rates.md"
   stay_quiet "a table whose cells talk about percentages instead of being one" "$T/inbox/prose-about-rates.md"
   one_reading "$T/wiki/record-with-rates.md";                                    stay_quiet "a page of rates outside the deliveries folder, which is a record and may carry its own control" "$T/wiki/record-with-rates.md"
-  CASES=$((CASES+1))
-  SIBLING=$(mktemp -d)
-  mkdir -p "$SIBLING/wiki" "$SIBLING/inbox"
-  printf '# A page\n\nPlain text with no figures.\n' > "$SIBLING/wiki/plain.md"
-  one_reading "$SIBLING/inbox/delivery.md"
-  RATE_SIBLING=$(PRISMA_DOCS_ROOT="$SIBLING" PRISMA_DOCS_DIR=wiki PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" --changed 2>&1)
-  rm -rf "$SIBLING"
-  case "$RATE_SIBLING" in
-    *"rate cells"*) printf '  PASS caught "%s"\n' "a delivery in a folder beside the pages folder, which is where deliveries actually live" ;;
-    *) printf '  BLIND on "%s"\n' "a delivery in a folder beside the pages folder, which is where deliveries actually live"; R=1 ;;
-  esac
-
-  CASES=$((CASES+1))
-  SIBLING=$(mktemp -d)
-  mkdir -p "$SIBLING/wiki" "$SIBLING/inbox"
-  one_reading "$SIBLING/inbox/delivery.md"
-  RATE_ALONE=$(PRISMA_DOCS_ROOT="$SIBLING" PRISMA_DOCS_DIR=wiki PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" --changed 2>&1)
-  rm -rf "$SIBLING"
-  case "$RATE_ALONE" in
-    *"rate cells"*) printf '  PASS caught "%s"\n' "a delivery changed on a day when no page under the pages folder changed" ;;
-    *) printf '  BLIND on "%s"\n' "a delivery changed on a day when no page under the pages folder changed"; R=1 ;;
-  esac
+  selftest_hook_mode
 
   CASES=$((CASES+1))
   RATE_AS_COMMAND=$(PRISMA_DOCS_ROOT="$T" PRISMA_RULE_RATE_SECOND_READING=1 PRISMA_RATE_CELLS_FLOOR=6 sh "$HOOKS_DIR/format-gate.sh" "$T/inbox/delivery.md" 2>&1)

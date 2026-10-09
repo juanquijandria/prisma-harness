@@ -26,33 +26,41 @@ EXEMPT_DIRS="raw archive inbox Clippings"
 RATE_DIRS="inbox"
 
 HOOK_MODE=0
-for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; done
+STOP_EVENT=0
+for flag in "$@"; do [ "$flag" = "--changed" ] && HOOK_MODE=1; [ "$flag" = "--stop-event" ] && STOP_EVENT=1; done
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 cannot_measure() { echo "WARN: $1" >&2; [ "$HOOK_MODE" = "1" ] || exit 1; receipt_append format-gate "$DOCS_ROOT" not-measured; exit 0; }
 pages_touched_today() { find "$1" -name '*.md' -newermt "$(date +%Y-%m-%d)" 2>/dev/null; }
+stop_already_continued() { [ "$STOP_EVENT" = "1" ] || return 1; cat | grep -qE '"stop_hook_active"[[:space:]]*:[[:space:]]*true'; }
+CONFIG_READER="$HOOKS_DIR/read-format-config.sh"
+apply_format_config() {
+  . "$CONFIG_READER"
+  read_format_config "$CONFIG_FILE"
+  for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_DIRS; do
+    eval "override=\${PRISMA_$v:-}"
+    [ -n "$override" ] || continue
+    kind=$(format_config_kind "$v")
+    if format_config_accepts "$kind" "$override"; then
+      eval "$v=\"\$override\""
+    else
+      printf 'WARN: PRISMA_%s ignored, it takes %s.\n' "$v" "$(format_config_wants "$kind")" >&2
+    fi
+  done
+}
+[ -r "$CONFIG_READER" ] && apply_format_config
+
 if [ "$HOOK_MODE" = "1" ]; then
+  stop_already_continued && exit 0
   [ -d "$DOCS_ROOT/$DOCS_DIR" ] || { echo "WARN: the format gate found no directory at $DOCS_ROOT/$DOCS_DIR, so no page was reviewed. Set PRISMA_DOCS_DIR to where your pages live." >&2; exit 0; }
   CHANGED_PAGES=$(pages_touched_today "$DOCS_ROOT/$DOCS_DIR") || cannot_measure "--changed could not list today's pages, so NOTHING was reviewed."
-  DELIVERIES_TODAY=$(for d in ${PRISMA_RATE_DIRS:-$RATE_DIRS}; do [ -d "$DOCS_ROOT/$d" ] && pages_touched_today "$DOCS_ROOT/$d"; done)
+  DELIVERIES_TODAY=$(for d in $RATE_DIRS; do [ -d "$DOCS_ROOT/$d" ] && pages_touched_today "$DOCS_ROOT/$d"; done)
   [ -n "$CHANGED_PAGES" ] || [ -n "$DELIVERIES_TODAY" ] || { echo "no pages under $DOCS_DIR/ touched today"; exit 0; }
 fi
 
-[ -r "$HOOKS_DIR/read-format-config.sh" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
-. "$HOOKS_DIR/read-format-config.sh"
+[ -r "$CONFIG_READER" ] || cannot_measure "the format gate did not run, read-format-config.sh is missing."
 [ -r "$HOOKS_DIR/rate-rule.sh" ] || cannot_measure "the format gate did not run, rate-rule.sh is missing."
 . "$HOOKS_DIR/rate-rule.sh"
-read_format_config "$CONFIG_FILE"
-for v in RULE_KEBAB_CASE RULE_H1_FIRST_LINE RULE_EM_DASH RULE_COLON_IN_PROSE RULE_HEADING_COUNTS RULE_VOSEO RULE_LINE_CEILING RULE_SOURCES_FOOTER RULE_WIKILINKS RULE_VERIFY_TAG RULE_RATE_SECOND_READING RATE_CELLS_FLOOR EXEMPT_NAMES EXEMPT_DIRS RATE_DIRS; do
-  eval "override=\${PRISMA_$v:-}"
-  [ -n "$override" ] || continue
-  kind=$(format_config_kind "$v")
-  if format_config_accepts "$kind" "$override"; then
-    eval "$v=\"\$override\""
-  else
-    printf 'WARN: PRISMA_%s ignored, it takes %s.\n' "$v" "$(format_config_wants "$kind")" >&2
-  fi
-done
 
 exempt() {
   name=$(basename "$1")
@@ -248,8 +256,8 @@ case "$1" in
     printf '%s\n' "$RATE_ONLY" | while IFS= read -r f; do [ -n "$f" ] && rate_rule "$f"; done
     printf '%s\n' "$REVIEWABLE" | while IFS= read -r f; do [ -n "$f" ] && review "$f"; done
     ;;
-  -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
-  "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
+  -*) printf 'format-gate.sh: unknown option %s\n' "$1" >&2; printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed [--stop-event] | --debt | --debt-freeze | --match <file> | --selftest\n' >&2; exit 1 ;;
+  "") printf 'usage: format-gate.sh [--strict] <file.md ...> | --changed [--stop-event] | --debt | --debt-freeze | --match <file> | --selftest\n'; exit 1 ;;
   *)  for f in "$@"; do page_checks "$f"; done ;;
 esac
 

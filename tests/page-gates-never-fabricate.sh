@@ -49,19 +49,19 @@ tool_result() { printf '{"type":"user","message":{"content":[{"type":"tool_resul
 tx="$T/write-ok.jsonl"
 { tool_use tu_w Write; tool_result tu_w false; } > "$tx"
 out=$(index_gate "$tx"); rc=$?
-if [ "$rc" = "0" ]; then
-  pass "F4a a Write of the index that succeeded counts as knowing it"
+if [ "$rc" = "2" ]; then
+  pass "F4a a Write of the index that succeeded does not count as reading it"
 else
-  fail "F4a a successful Write of the index was refused as evidence (rc=$rc)"
+  fail "F4a a successful Write of the index was accepted as a read (rc=$rc)"
 fi
 
-tx="$T/write-err.jsonl"
-{ tool_use tu_w Write; tool_result tu_w true; } > "$tx"
+tx="$T/read-err-then-write.jsonl"
+{ tool_use tu_r Read; tool_result tu_r true; tool_use tu_w Write; tool_result tu_w false; } > "$tx"
 out=$(index_gate "$tx"); rc=$?
 if [ "$rc" = "2" ]; then
-  pass "F4c a Write of the index that errored does not count"
+  pass "F4c a Read of the index that errored, then a Write that succeeded, does not count"
 else
-  fail "F4c a failed Write was accepted as evidence (rc=$rc)"
+  fail "F4c a failed Read followed by a good Write was accepted as evidence (rc=$rc)"
 fi
 
 tx="$T/read-noid.jsonl"
