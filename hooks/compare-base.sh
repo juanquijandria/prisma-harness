@@ -3,7 +3,7 @@
 
 git rev-parse --git-dir >/dev/null 2>&1 || exit 1
 
-EMPTY_TREE=$(git hash-object -t tree /dev/null 2>/dev/null)
+EMPTY_TREE=$(git hash-object -t tree --stdin < /dev/null 2>/dev/null)
 [ -n "$EMPTY_TREE" ] || exit 1
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)

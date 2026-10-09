@@ -15,6 +15,8 @@ GLOB_CHARACTERS = set("*?[")
 QUOTING_CHARACTERS = set("'\"\\$")
 EQUALS_UNSAFE_CHARACTERS = QUOTING_CHARACTERS | GLOB_CHARACTERS | set("{")
 WORD_ENDS = set(" \t\n;&|<>()")
+BACKTICK = "\x60"
+READ_WORD_ENDS = WORD_ENDS | {BACKTICK}
 COMMAND_SEPARATORS = set(";&|\n(")
 COMMAND_POSITION_WORDS = {"if", "then", "else", "elif", "do", "while", "until", "!", "{", "time"}
 BLANKS = " \t"
@@ -57,7 +59,7 @@ def expand_braces(value):
 
 def read_word(text, start):
     end = start
-    while end < len(text) and text[end] not in WORD_ENDS:
+    while end < len(text) and text[end] not in READ_WORD_ENDS:
         end += 1
     return text[start:end], end
 

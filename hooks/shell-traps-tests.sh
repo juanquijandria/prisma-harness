@@ -169,6 +169,7 @@ selftest_unexpanded_regions() {
   expect_command "63 case and in written as plain arguments do not stop the rewrite" "$(run_command 'grep -rn -e case -e in --include=*.md . && echo ====' "$ZSH")" "0 grep -rn -e case -e in --include='*.md' . && echo '===='"
   expect "56 an include pattern of a case keeps its meaning" "$(run_command 'case $f in --include=*.md) grep -rn foo . ;; esac' "$ZSH")" "0 "
   expect_command "57 a == pattern of a case stays and its body is still quoted" "$(run_command 'case $x in ==*) echo ==== ;; esac' "$ZSH")" "0 case \$x in ==*) echo '====' ;; esac"
+  expect_command "76 a == word inside backticks is quoted inside them" "$(run_command 'echo `echo ====` && echo after' "$ZSH")" "0 echo \`echo '===='\` && echo after"
 }
 
 selftest_heredoc_delimiters() {
