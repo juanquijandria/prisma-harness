@@ -199,6 +199,10 @@ selftest_merge_state() {
   expect "40 a mergeable state of draft is a draft too" "$(judge)$(judge_says)" "1 NOT READYsays"
   green_scenario; PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD" blocked)"; SAYS="a required check or review is still missing"
   expect "41 a PR whose mergeable state is blocked is not ready, and says what blocks it" "$(judge)$(judge_says)" "1 NOT READYsays"
+  green_scenario; PR=$(printf '%s' "$PR" | "$JQ" -c '.draft = true')
+  expect "51 with --at a draft is not judged, since GitHub only knows it as of now" "$(judge --at 2026-01-10T10:05:00Z)" "0 READY"
+  green_scenario; REVIEWS="[$(review_json octo-outsider 2026-01-10T10:05:00Z CHANGES_REQUESTED)]"; SAYS="octo-outsider requested changes at 2026-01-10T10:05:00Z"
+  expect "52 a request for changes from someone outside the reviewer list is not ready, and names them" "$(judge)$(judge_says)" "1 NOT READYsays"
 }
 
 selftest() {

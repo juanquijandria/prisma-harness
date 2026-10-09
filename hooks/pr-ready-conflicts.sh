@@ -60,7 +60,7 @@ judge_other_prs() {
   fetch open "repos/$REPO/pulls?state=open&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
   if [ -n "$AT" ]; then fetch closed "repos/$REPO/pulls?state=closed&sort=updated&direction=desc&per_page=$PAGE_SIZE" "$LIST_SHAPE"
   else printf '[]' > "$WORK/closed.json"; fi
-  others=$("$JQ" -rs --argjson cutoff "$CUTOFF" --arg author "$author" --argjson number "$NUMBER" "$TIME_JQ $OTHER_PRS_JQ" "$WORK/open.json" "$WORK/closed.json")
+  others=$("$JQ" -rs --argjson cutoff "$CUTOFF" --arg author "$author" --argjson number "$NUMBER" "$TIME_JQ $OTHER_PRS_JQ" "$WORK/open.json" "$WORK/closed.json" | tr -d '\r')
   [ -n "$others" ] || { finding ok "conflicts with other PRs: $author had no other open PR"; return; }
   fetch files "repos/$REPO/pulls/$NUMBER/files?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
   compared=0

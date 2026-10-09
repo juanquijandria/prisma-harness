@@ -15,13 +15,14 @@ DEFAULT_REVIEWERS='claude[bot]'
 REVIEWERS="${PRISMA_PR_REVIEWERS-$DEFAULT_REVIEWERS}"
 FINISHING_BOT='claude[bot]'
 FINISHED_MARKER='^[*_ ]*Claude finished @'
-DECIDING_REVIEWS='"APPROVED","CHANGES_REQUESTED","DISMISSED"'
+CHANGE_REQUEST_STATE='"CHANGES_REQUESTED"'
+DECIDING_REVIEWS='"APPROVED",'"$CHANGE_REQUEST_STATE"',"DISMISSED"'
 COUNTING_REVIEWS='"APPROVED","COMMENTED"'
 LIST_SHAPE='type == "array"'
 PULL_SHAPE='type == "object" and (.head | type) == "object"'
 CHECK_RUNS_SHAPE='type == "object" and (.check_runs | type) == "array"'
 TAB=$(printf '\t')
-SELFTEST_CASES=50
+SELFTEST_CASES=52
 USAGE='usage: pr-ready.sh <owner/repo> <number> [--at <ISO8601>] | --selftest'
 
 TIME_JQ='def seconds: if . == null then null else
@@ -52,9 +53,15 @@ REVIEW_JQ='($pushed | seconds) as $after_push
   + [$formal[] | select(.commit_id == $head and (.state | IN('"$COUNTING_REVIEWS"'))) | {started: .submitted_at, done: .submitted_at}]
 | (map(select((.started | seconds) > $after_push and .done != null)) | min_by(.done | seconds)) as $fresh
 | (max_by(.started | seconds)) as $latest
-| if $deciding.state == "CHANGES_REQUESTED" then "changes\t\($deciding.submitted_at)"
+| if $deciding.state == '"$CHANGE_REQUEST_STATE"' then "changes\t\($deciding.submitted_at)"
   elif $fresh then "fresh\t\($fresh.done)" elif $elsewhere then "elsewhere\t\($elsewhere.commit_id)" elif $latest == null then "none\t"
   elif ($latest.started | seconds) <= $after_push then "stale\t\($latest.started)" else "unfinished\t\($latest.started)" end'
+
+OTHERS_CHANGES_JQ='($required | split(" ")) as $named
+| [($reviews | add)[] | select(.submitted_at != null and (.state | IN('"$DECIDING_REVIEWS"'))) | by_cutoff(.submitted_at)]
+| group_by(.user.login)[] | max_by(.submitted_at | seconds)
+| select(.state == '"$CHANGE_REQUEST_STATE"' and (.user.login | IN($named[]) | not))
+| [.user.login, .submitted_at] | @tsv'
 
 unmeasurable() {
   finding unmeasured "$1"
@@ -99,7 +106,7 @@ read_head() {
 judge_ci() {
   fetch runs "repos/$REPO/commits/$head_sha/check-runs?filter=all&per_page=$PAGE_SIZE" "$CHECK_RUNS_SHAPE" all
   fetch statuses "repos/$REPO/commits/$head_sha/statuses?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
-  runs=$("$JQ" -rn --argjson cutoff "$CUTOFF" --slurpfile runs "$WORK/runs.json" --slurpfile statuses "$WORK/statuses.json" "$TIME_JQ $CI_JQ")
+  runs=$("$JQ" -rn --argjson cutoff "$CUTOFF" --slurpfile runs "$WORK/runs.json" --slurpfile statuses "$WORK/statuses.json" "$TIME_JQ $CI_JQ" | tr -d '\r')
   short=$(printf "%.${SHORT_SHA_WIDTH}s" "$head_sha")
   [ "$runs" = "none" ] && { finding ok "ci: no CI runs on this PR, nothing to wait for on $short"; return; }
   printf '%s\n' "$runs" | while IFS="$TAB" read -r verdict name state; do
@@ -128,11 +135,21 @@ judge_reviewer() {
 judge_reviewers() {
   set -f
   logins=$(printf '%s' "$REVIEWERS" | tr ',' ' ')
-  [ -n "$(printf '%s' "$logins" | tr -d ' ')" ] || { set +f; finding note "reviewers: none required, PRISMA_PR_REVIEWERS is empty"; return; }
-  fetch comments "repos/$REPO/issues/$NUMBER/comments?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
   fetch reviews "repos/$REPO/pulls/$NUMBER/reviews?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
-  for login in $logins; do judge_reviewer "$login"; done
+  if [ -n "$(printf '%s' "$logins" | tr -d ' ')" ]; then
+    fetch comments "repos/$REPO/issues/$NUMBER/comments?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
+    for login in $logins; do judge_reviewer "$login"; done
+  else finding note "reviewers: none required, PRISMA_PR_REVIEWERS is empty"; fi
   set +f
+  judge_others_changes
+}
+
+judge_others_changes() {
+  requests=$("$JQ" -rn --argjson cutoff "$CUTOFF" --arg required "$logins" --slurpfile reviews "$WORK/reviews.json" "$TIME_JQ $OTHERS_CHANGES_JQ" | tr -d '\r')
+  [ -n "$requests" ] || return 0
+  while IFS="$TAB" read -r login when; do finding fail "changes: $login requested changes at $when and has not approved since"; done <<REQUESTS
+$requests
+REQUESTS
 }
 
 verdict() {

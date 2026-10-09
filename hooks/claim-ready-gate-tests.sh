@@ -89,12 +89,17 @@ PR #7 listo para mergear
   expect "26 a denial with an accented word is a denial" "$(decision)" "0 pass"
   not_ready; said "El #7 no está todavía listo para mergear."
   expect "27 a denial three words before the claim is a denial" "$(decision)" "0 pass"
+}
+
+selftest_denied_readiness() {
   not_ready; said "El #7 está en verde, pero no está listo."
   expect "29 green in a sentence that denies the PR is ready is not a claim" "$(decision)" "0 pass"
   not_ready; said "The CI of #7 is green, but it is not ready to merge."
   expect "30 the same in English is not a claim" "$(decision)" "0 pass"
   not_ready; said "#8 no está listo, pero #7 está listo para mergear."
   expect "31 a ready to merge that is not denied stays a claim beside a denied one" "$(decision)" "0 block"
+  not_ready; said "#8 is not ready, but #7 is ready to merge."
+  expect "32 the same in English stays a claim" "$(decision)" "0 block"
 }
 
 selftest_receipt() {
@@ -121,6 +126,7 @@ selftest() {
   ok=1; cases=0
   selftest_claims
   selftest_not_claims
+  selftest_denied_readiness
   selftest_receipt
   rm -rf "$T"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }

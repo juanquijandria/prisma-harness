@@ -9,7 +9,7 @@ GATE_NAME="claim-ready-gate"
 TRANSCRIPT_TAIL_LINES=400
 DENIAL_WINDOW_WORDS=3
 CLAIM_SEPARATOR='|'
-SELFTEST_CASES=31
+SELFTEST_CASES=32
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 . "$HOOKS_DIR/github-remote.sh"
@@ -31,8 +31,7 @@ def negators: ["no", "not", "never", "nunca", "tampoco", "ni", "isnt", "arent", 
 def own_clause: [splits("[,:;()]")] | last // "";
 def denied($before): [$before | own_clause | ascii_downcase | splits("[^\\p{L}'"'"']+") | select(length > 0)] | .[-$window:]
   | any(.[]; . as $word | negators | index($word));
-def undenied($sentence; $pattern): any($sentence | match($pattern; "gi"); denied($sentence[0:.offset]) | not);
-def denies_readiness($sentence): any($sentence | match(readiness; "gi"); denied($sentence[0:.offset]));
+def said_with_denial($sentence; $pattern; $denial): any($sentence | match($pattern; "gi"); denied($sentence[0:.offset]) == $denial);
 def url_refs: [match("github[.]com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/pull/([0-9]+)"; "g") | "\(.captures[0].string)|\(.captures[1].string)"];
 def repo_refs: [match("(?:^|[^A-Za-z0-9_./-])([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)#([0-9]+)(?![A-Za-z0-9_])"; "g") | "\(.captures[0].string)|\(.captures[1].string)"];
 def bare_refs: gsub("[A-Za-z0-9_.:/-]*(github[.]com/[^ ]*|[A-Za-z0-9_.-]/[A-Za-z0-9_.-]+#[0-9]+)"; " ")
@@ -41,7 +40,8 @@ gsub("```[^`]*```"; " ")
 | [splits("(?<=[.!?;])\\s+|\\n+")][]
 | select(test("^\\s*¿|[?]\\s*$") | not)
 | . as $sentence
-| select(undenied($sentence; ready_claim) or (undenied($sentence; green_claim) and (denies_readiness($sentence) | not)))
+| select(said_with_denial($sentence; ready_claim; false)
+    or (said_with_denial($sentence; green_claim; false) and (said_with_denial($sentence; readiness; true) | not)))
 | (url_refs + repo_refs + bare_refs)[]'
 
 not_measured() {
@@ -50,7 +50,7 @@ not_measured() {
 }
 
 claims_in() {
-  "$JQ" -Rrs --argjson window "$DENIAL_WINDOW_WORDS" "$CLAIMS_JQ" 2>/dev/null | sort -u
+  "$JQ" -Rrs --argjson window "$DENIAL_WINDOW_WORDS" "$CLAIMS_JQ" 2>/dev/null | tr -d '\r' | sort -u
 }
 
 claimed_prs() {

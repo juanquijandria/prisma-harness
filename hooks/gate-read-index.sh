@@ -85,11 +85,11 @@ read_calls_status=$?
 errored=$("$JQ" -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result") | select(.is_error == true) | .tool_use_id // empty' "$transcript" 2>/dev/null)
 errored_status=$?
 { [ "$read_calls_status" = "0" ] && [ "$errored_status" = "0" ]; } || not_measured "the index gate could not read the transcript, so nothing was verified."
-opened=$(printf '%s\n' "$read_calls" | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
+opened=$(printf '%s\n' "$read_calls" | tr -d '\r' | while IFS="$(printf '\t')" read -r call path; do [ "$path" = "$INDEX_PATH" ] && printf '%s\n' "$call"; done)
 
 while IFS= read -r call; do
   [ -n "$call" ] || continue
-  printf '%s\n' "$errored" | grep -Fqx -- "$call" || exit 0
+  printf '%s\n' "$errored" | tr -d '\r' | grep -Fqx -- "$call" || exit 0
 done <<CALLS
 $opened
 CALLS
