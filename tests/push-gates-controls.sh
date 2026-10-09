@@ -5,11 +5,12 @@ HOOKS="$(cd "$(dirname "$0")/../hooks" && pwd)"
 . "$HOOKS/selftest-env.sh"
 export PRISMA_COMMENTS_BLOCK=1
 T=$(mktemp -d); ok=1
+ESLINT_ADDED_EXTENSIONS="jsx cjs mts cts"
 git -C "$T" init -q && cd "$T" || exit 1
 git symbolic-ref HEAD refs/heads/main
 git config user.email t@t; git config user.name t
 printf 'export const A = 1;\n' > a.js; git add a.js; git commit -qm init; git checkout -qb feature
-payload() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "$T" "$1"; }
+payload() { printf '{"tool_name":"Bash","cwd":"%s","tool_input":{"command":"%s"}}' "${PAYLOAD_DIR:-$T}" "$1"; }
 CHECKS=0
 expect() { name="$1"; want="$2"; shift 2; CHECKS=$((CHECKS+1)); "$@" >/dev/null 2>&1; got=$?; if [ "$got" = "$want" ]; then printf 'PASS %s (exit %s)\n' "$name" "$got"; else printf 'FAIL %s, expected %s got %s\n' "$name" "$want" "$got"; ok=0; fi; }
 run() { gate="$1"; cmd="$2"; payload "$cmd" | sh "$HOOKS/$gate"; }
@@ -83,6 +84,10 @@ git reset -q --hard HEAD~1
 records_escapes "size gate records no escape on a push under the ceiling" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
+size_from_subdirectory() ( PAYLOAD_DIR="$T/sub"; run pre-push-size.sh "$1" )
+mkdir -p "$T/sub"; git config diff.relative true
+expect "size gate counts the whole repository from a subdirectory when git diff is relative" 2 size_from_subdirectory "git push origin feature"
+git config --unset diff.relative; rmdir "$T/sub"
 records_escapes "size gate passes with the escape and records it on a push over the ceiling" 1 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 expect "size gate lets a PR read through while the diff is over the ceiling" 0 run pre-push-size.sh "gh pr list"
 expect "size gate blocks a PR creation over the ceiling" 2 run pre-push-size.sh "gh pr create --fill"
@@ -219,6 +224,11 @@ warns_unmeasured "lint gate says it measured nothing when the uncommitted change
 git -C "$L" checkout -q -- base.js
 expect "lint gate measures and passes a clean tree whose commits are clean" 0 lint_at "git push origin feature"
 records_escapes "lint gate records no escape on a clean push" 0 lint_at "PRISMA_LINT_OK=1 git push origin feature"
+for extension in $ESLINT_ADDED_EXTENSIONS; do
+  printf 'export const B = BAD;\n' > "$L/b.$extension"; git -C "$L" add "b.$extension"; git -C "$L" commit -qm "$extension lint error"
+  expect "lint gate blocks a lint error committed in a .$extension file" 2 lint_at "git push origin feature"
+  git -C "$L" reset -q --hard HEAD~1
+done
 rm -rf "$L"
 
 P=$(mktemp -d)

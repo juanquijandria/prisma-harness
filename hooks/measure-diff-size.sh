@@ -7,7 +7,7 @@ HEAD="${3:?head ref required}"
 
 EXCLUDE='(^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|composer\.lock|Gemfile\.lock|poetry\.lock|Cargo\.lock|go\.sum)$|\.(lock|svg|png|jpe?g|gif|webp|woff2?|ttf|eot|map|snap|min\.(js|css))$'
 
-NUMSTAT=$(git -C "$REPO" diff --numstat "$BASE" "$HEAD" 2>/dev/null) || exit 2
+NUMSTAT=$(git -C "$REPO" diff --no-relative --numstat "$BASE" "$HEAD" 2>/dev/null) || exit 2
 
 printf '%s\n' "$NUMSTAT" \
   | grep -vE "$EXCLUDE" \

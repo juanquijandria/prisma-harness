@@ -54,7 +54,7 @@ Write the regression test before the fix, at a seam where it exercises the real 
 
 Before declaring done, confirm the original loop no longer reproduces, the regression test passes or the missing seam is recorded, every tagged log is gone, every throwaway harness is deleted or marked, and the hypothesis that turned out right is stated in the commit message so the next person learns.
 
-Then answer one question the method insists on. Which of the five steps let this defect through? Write the answer in the commit message and in the plan record, in this form.
+Then answer one question the method insists on. Which of the five steps let this defect through? Write the answer in the commit message, and in the plan record when the work has one, in this form.
 
 ```
 Escaped from: step 2, the seam had no test that could go red on this

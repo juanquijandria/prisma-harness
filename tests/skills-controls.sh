@@ -127,6 +127,22 @@ check_step3_expiry() {
   grep "$STEP3_ROW_PATTERN" "$1/docs/es/METHOD.md" | grep -q "$STEP3_EXPIRY_RULE_ES"
 }
 
+HELPER_BASE='<base directory>'
+HELPER_COMMAND_PATTERN='`[^`]*hooks/[a-z-]*[.]sh[^`]*`'
+MISSING_HELPER=no-such-helper.sh
+DIAGNOSE_RECORD_RULE="in the plan record when the work has one"
+check_helper_paths() {
+  commands=$(grep -o "$HELPER_COMMAND_PATTERN" "$1/prisma/SKILL.md")
+  [ -n "$commands" ] || return 1
+  printf '%s\n' "$commands" | while IFS= read -r command; do
+    case "$command" in *"$HELPER_BASE/../../hooks/"*) ;; *) exit 1 ;; esac
+    path=$(printf '%s' "$command" | grep -o "$HELPER_BASE/[^ ]*[.]sh")
+    [ -f "$1/prisma/${path#"$HELPER_BASE"/}" ] || exit 1
+  done
+}
+
+check_diagnose_without_record() { grep -qF "$DIAGNOSE_RECORD_RULE" "$1/prisma-diagnose/SKILL.md"; }
+
 check_diagnose_escape() {
   f="$1/prisma-diagnose/SKILL.md"
   grep -q 'step 2b' "$f" || return 1
@@ -158,6 +174,8 @@ if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the 
 if check_build_work_branch "$ROOT/skills"; then pass "prisma-build works on a branch of its own when it stands on the default branch, and tells the reviewer the work is not committed yet"; else fail "prisma-build work branch"; fi
 if check_review_uncommitted "$ROOT/skills"; then pass "prisma-fidelity-review measures uncommitted work from the merge base and counts untracked files"; else fail "prisma-fidelity-review uncommitted work"; fi
 if check_diagnose_escape "$ROOT/skills"; then pass "prisma-diagnose names step 2b and closes by naming the step the defect escaped from"; else fail "prisma-diagnose closing"; fi
+if check_helper_paths "$ROOT/skills"; then pass "every helper the prisma skill tells the agent to run starts at the base directory of the skill and exists there"; else fail "a helper path in the prisma skill only works from the plugin itself"; fi
+if check_diagnose_without_record "$ROOT/skills"; then pass "prisma-diagnose asks for the plan record only when the work has one"; else fail "prisma-diagnose demands a plan record that may not exist"; fi
 if check_review_smells "$ROOT/skills"; then pass "prisma-fidelity-review carries the twelve smells of its baseline"; else fail "prisma-fidelity-review smells baseline"; fi
 if check_step3_expiry "$ROOT"; then pass "step 3 tests every expiry on both sides of its cutoff, in English and in the canonical block"; else fail "step 3 expiry line"; fi
 orphan=0
@@ -197,6 +215,13 @@ mutate; grep -vF "$BUILD_BRANCH_RULE" "$T/skills/prisma-build/SKILL.md" > "$T/b.
 if check_build_work_branch "$T/skills"; then fail "control: removing the work branch rule was not caught"; else pass "control: removing the work branch rule turns the work branch case red"; fi
 mutate; grep -vF "git merge-base" "$T/skills/prisma-fidelity-review/SKILL.md" > "$T/r.md"; mv "$T/r.md" "$T/skills/prisma-fidelity-review/SKILL.md"
 if check_review_uncommitted "$T/skills"; then fail "control: removing the merge base measure was not caught"; else pass "control: removing the merge base measure turns the uncommitted case red"; fi
+mutate; sed "s|$HELPER_BASE/../../hooks/|hooks/|g" "$T/skills/prisma/SKILL.md" > "$T/s.md"; mv "$T/s.md" "$T/skills/prisma/SKILL.md"
+if check_helper_paths "$T/skills"; then fail "control: a helper path relative to the project was not caught"; else pass "control: a helper path relative to the project turns the helper case red"; fi
+mutate; cp -R "$ROOT/hooks" "$T/hooks"; sed "s|hooks/format-gate[.]sh|hooks/$MISSING_HELPER|" "$T/skills/prisma/SKILL.md" > "$T/s.md"; mv "$T/s.md" "$T/skills/prisma/SKILL.md"
+if check_helper_paths "$T/skills"; then fail "control: a helper that does not exist was not caught"; else pass "control: a helper that does not exist turns the helper case red"; fi
+rm -rf "$T/hooks"
+mutate; grep -vF "$DIAGNOSE_RECORD_RULE" "$T/skills/prisma-diagnose/SKILL.md" > "$T/d.md"; mv "$T/d.md" "$T/skills/prisma-diagnose/SKILL.md"
+if check_diagnose_without_record "$T/skills"; then fail "control: removing the condition on the plan record was not caught"; else pass "control: removing the condition on the plan record turns the diagnose record case red"; fi
 published_copy() {
   rm -rf "$T/published"
   mkdir -p "$T/published/skills"

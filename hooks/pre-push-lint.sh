@@ -7,6 +7,7 @@ INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 COMPARE_BASE="$HOOKS_DIR/compare-base.sh"
 ESCAPE="PRISMA_LINT_OK=1"
+ESLINT_PATHSPECS='*.js *.jsx *.mjs *.cjs *.ts *.tsx *.mts *.cts *.vue'
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -149,11 +150,13 @@ PHP
 fi
 
 if [ -f package.json ] && [ -x node_modules/.bin/eslint ]; then
-  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" "$HEAD_REF" -- '*.js' '*.mjs' '*.ts' '*.tsx' '*.vue') || {
+  set -f
+  files=$(git diff --name-only --diff-filter=ACMR "$merge_base" "$HEAD_REF" -- $ESLINT_PATHSPECS) || {
     echo "WARN: the lint gate could not list the changed javascript files, so nothing was measured." >&2
     receipt_append lint-gate "$real_dir" not-measured
     files=""
   }
+  set +f
   files=$(files_measurable_on_disk "$files")
   if [ -n "$files" ]; then
     set --

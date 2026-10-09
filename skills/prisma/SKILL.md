@@ -7,6 +7,8 @@ description: Run PRISMA on a piece of work. Routes the request to one of five la
 
 Read `METHOD.md` at the plugin root once per session before applying this skill. It is the source; this file is the operating order.
 
+The plugin root is two levels above the base directory Claude Code prints when this skill loads, written `<base directory>/../..` below, and the helpers live in its `hooks/` folder. Run them by that path, since the project you work in is not the plugin.
+
 ## 1. Route first
 
 Ask two questions. First, what kind of work is it, and four lanes answer it, query, mechanical change, code with logic and text, the more expensive one winning when two fit. Second, does anything leave to a third party, and the fifth lane stacks on the first answer, adding controls and never replacing them.
@@ -26,16 +28,16 @@ Two guards. When in doubt, take the MORE expensive lane, because the agent has a
 1. **Plan.** Invoke `prisma-plan`. It interviews in rounds with a recommended answer per question, leaves a record with the agreed behavior, the exclusions, the seams, the surface and the exit condition, and closes by declaring the lane and whether the work fits in one session, about 140k tokens of useful context. If it does not fit, it splits the work into session-sized tickets before anything is built. When the plan adopts a rule that applies to the whole system, it lists every fact that rule touches and reviews the list whole.
 2. **Build.** Invoke `prisma-build`. Tests first at the agreed seams, every control seen red before the code that turns it green exists, then `prisma-fidelity-review` in a fresh subagent that receives the record and the fixed point and nothing of the builder's account, then commit. If something is broken along the way, invoke `prisma-diagnose` before patching; it ends by naming the step the defect escaped from.
 3. **End to end.** Run it on real data and LOOK at the result. Name the surface where a person will see it BEFORE looking, then look at THAT surface, not the artifact that produces it. Two failures of the same functional hypothesis send you back to step 1.
-4. **Mutation testing and format gate.** Reintroduce the EXACT defect and confirm the test fails for the expected reason. Add a semantic counterexample chosen separately. When the work takes a request from someone else, feed one invalid value per field of that request, because the input contract is an oracle too. Run `hooks/format-gate.sh --strict` on every text you deliver.
+4. **Mutation testing and format gate.** Reintroduce the EXACT defect and confirm the test fails for the expected reason. Add a semantic counterexample chosen separately. When the work takes a request from someone else, feed one invalid value per field of that request, because the input contract is an oracle too. Run `sh <base directory>/../../hooks/format-gate.sh --strict` on every text you deliver.
 5. **Verify.** Check the exit condition on the real source or surface. A figure gets measured again by a second route, in the normal state and in the edge state. A behavior change gets observed at the destination. Never cite an earlier run as a substitute.
 
 ## 3. The five gates, by name
 
 - **Fidelity reviewer**, `prisma-fidelity-review` in a fresh subagent. Did we build what the record agreed, no more and no less?
-- **Format gate**, `hooks/format-gate.sh`. Is the deliverable written to the rules? It reads no code and finds no bugs.
+- **Format gate**, `format-gate.sh` among the helpers. Is the deliverable written to the rules? It reads no code and finds no bugs.
 - **Refuter**, an adversarial agent whose job is to knock the finding down against code and data.
 - **Merge gate**, the CI or bot check on the PR. It says whether the PR can merge. Its findings are reproduced before being repeated as facts.
-- **Blind replica**, `hooks/blind-replica.sh`. Receives the claim and the sources and NOTHING of the calculation. Mandatory for derived figures, platform semantics, ambiguous sources, data to third parties, and hard-to-revert consequences. In single-model mode it runs in a fresh-context subagent and declares that it gives independence of derivation, not of engine. Write the claim and its sources to a file and run `sh hooks/blind-replica.sh <file>`. Without `PRISMA_AUDITOR_CMD` it prints the brief for a fresh subagent and exits 6; with it, the exit code is the verdict, 0 confirmed, 5 refuted, 4 none.
+- **Blind replica**, `blind-replica.sh` among the helpers. Receives the claim and the sources and NOTHING of the calculation. Mandatory for derived figures, platform semantics, ambiguous sources, data to third parties, and hard-to-revert consequences. In single-model mode it runs in a fresh-context subagent and declares that it gives independence of derivation, not of engine. Write the claim and its sources to a file and run `sh <base directory>/../../hooks/blind-replica.sh <file>`. Without `PRISMA_AUDITOR_CMD` it prints the brief for a fresh subagent and exits 6; with it, the exit code is the verdict, 0 confirmed, 5 refuted, 4 none.
 
 ## 4. Every claim is a hypothesis until measured
 
