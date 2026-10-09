@@ -18,6 +18,7 @@ SEPARATORS = {";", "&&", "||", "|", "&", "\n", "(", ")"}
 SIGNAL_ARGUMENT = re.compile(r"^-([0-9]+|[A-Z][A-Z0-9]*)$")
 KILLALL_FLAGS_WITH_VALUE = {"-u", "-t", "-c", "-s"}
 COMMAND_WIDTH = 80
+LSOF = os.environ.get("PRISMA_LSOF") or "lsof"
 
 
 def invocations(command):
@@ -65,7 +66,7 @@ def matching_pids(arguments):
 
 
 def working_folder(pid):
-    listed = subprocess.run(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"], capture_output=True, text=True)
+    listed = subprocess.run([LSOF, "-a", "-p", str(pid), "-d", "cwd", "-Fn"], capture_output=True, text=True)
     for line in listed.stdout.splitlines():
         if line.startswith("n"):
             return os.path.realpath(line[1:])

@@ -43,6 +43,27 @@ run_payload_in_stderr() {
   payload_in "$1" "$2" | SHELL="$ZSH" sh "$SELF" 2>&1 >/dev/null
 }
 
+run_without_lsof() {
+  PRISMA_LSOF=$MISSING_LSOF; export PRISMA_LSOF
+  run_payload_in "$@"
+}
+
+skip_case() {
+  cases=$((cases+1)); printf 'SKIP %s, %s\n' "$1" "$2"
+}
+
+expect_measured() {
+  if command -v pgrep >/dev/null 2>&1; then expect "$@"; else skip_case "$1" "this system has no pgrep"; fi
+}
+
+expect_where_proc() {
+  if [ -e "/proc/$$/cwd" ]; then expect_measured "$@"; else skip_case "$1" "this system has no /proc"; fi
+}
+
+expect_without_proc() {
+  if [ -e "/proc/$$/cwd" ]; then skip_case "$1" "this system has /proc"; else expect_measured "$@"; fi
+}
+
 run_payload() {
   printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s}}' "$(printf '%s' "$1" | jq -Rs .)" \
     | SHELL="$2" PATH="${3:-$PATH}" PRISMA_REQUIRED_WRAPPERS="${4:-$DEFAULT_WRAPPERS}" sh "$SELF" >/dev/null 2>&1
@@ -89,21 +110,30 @@ selftest_kills() {
   ln -s "$(command -v sleep)" "$other_dir/$KILL_PROBE_NAME"
   (cd "$other_dir" && exec "./$KILL_PROBE_NAME" "$KILL_PROBE_SECONDS") &
   foreign_pid=$!
+  (cd "$other_dir" && exec "$KILL_PYTHON" -c "$KILL_SLEEPER" "$KILL_PROBE_SECONDS" "$REDIRECTION") &
+  redirection_pid=$!
   sleep "$PROBE_START_SECONDS"
-  expect "36 pkill whose pattern reaches a process in another folder blocks" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
-  expect "37 killall of a name that runs in another folder blocks" "$(run_payload_in "killall $KILL_PROBE_NAME" "$own_dir")" 2
-  expect "38 the same pkill from the folder that owns the process passes" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$other_dir")" 0
-  expect "39 a pkill that matches nothing passes" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
+  expect_measured "36 pkill whose pattern reaches a process in another folder blocks" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
+  expect_measured "37 killall of a name that runs in another folder blocks" "$(run_payload_in "killall $KILL_PROBE_NAME" "$own_dir")" 2
+  expect_measured "38 the same pkill from the folder that owns the process passes" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$other_dir")" 0
+  expect_measured "39 a pkill that matches nothing passes" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
   expect "40 a pkill only mentioned inside quotes passes" "$(run_payload_in "echo \"pkill -f $KILL_PROBE_NAME\"" "$own_dir")" 0
-  expect "41 the escape lets a foreign pkill through" "$(run_payload_in "$ESCAPE pkill -f $KILL_PROBE_NAME" "$own_dir")" 0
-  expect "42 the block names the foreign folder" "$(run_payload_in_stderr "pkill -f $KILL_PROBE_NAME" "$own_dir" | grep -c "$other_dir")" 1
-  expect "43 a foreign pkill after an own pkill on the same line still blocks" "$(run_payload_in "pkill -x $KILL_OWN_NAME; pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
-  expect "44 the flags of one pkill do not leak into the next" "$(run_payload_in "pkill -f $KILL_OWN_NAME; pkill -9 -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
+  expect_measured "41 the escape lets a foreign pkill through" "$(run_payload_in "$ESCAPE pkill -f $KILL_PROBE_NAME" "$own_dir")" 0
+  foreign_block=$(run_payload_in_stderr "pkill -f $KILL_PROBE_NAME" "$own_dir")
+  expect_measured "42 the block names the foreign folder" "$(printf '%s' "$foreign_block" | grep -c "$other_dir")" 1
+  expect_measured "67 the block says the processes run in another folder, never that another session started them" "$(printf '%s' "$foreign_block" | grep -c 'another session') $(printf '%s' "$foreign_block" | grep -c 'another folder')" "0 1"
+  expect_measured "43 a foreign pkill after an own pkill on the same line still blocks" "$(run_payload_in "pkill -x $KILL_OWN_NAME; pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
+  expect_measured "68 a pkill with a redirection still blocks a process in another folder" "$(run_payload_in "pkill -f $KILL_PROBE_NAME $REDIRECTION" "$own_dir") $(run_payload_in "pkill -f $KILL_PROBE_NAME > out.log" "$own_dir") $(run_payload_in "killall $KILL_OWN_NAME $REDIRECTION; pkill -f $KILL_PROBE_NAME 2>&1" "$own_dir")" "2 2 2"
+  expect_measured "69 a redirection is not a pattern, so it never reaches a process whose command line holds it" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS $REDIRECTION" "$own_dir")" 0
+  expect_where_proc "70 without lsof the folder is read from /proc, so a foreign pkill still blocks" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
+  : > "$PRISMA_RECEIPT_FILE"
+  expect_without_proc "71 a process whose folder neither lsof nor /proc can read is let through and recorded as not measured" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
+  expect_measured "44 the flags of one pkill do not leak into the next" "$(run_payload_in "pkill -f $KILL_OWN_NAME; pkill -9 -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
   receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
   printf '{"tool_name":"Bash","tool_input":{"command":"pkill -f %s"}}' "$KILL_PROBE_NAME" | SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
   expect "45 a pkill without a session folder is let through and recorded as not measured" "$? $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
-  kill "$foreign_pid" 2>/dev/null
-  wait "$foreign_pid" 2>/dev/null
+  kill "$foreign_pid" "$redirection_pid" 2>/dev/null
+  wait "$foreign_pid" "$redirection_pid" 2>/dev/null
   rm -rf "$other_dir" "$own_dir"
 }
 
@@ -169,6 +199,10 @@ selftest() {
   KILL_PROBE_NAME=prisma-kill-probe-$$
   KILL_PROBE_SECONDS=300
   KILL_OWN_NAME=prisma-own-probe-$$
+  KILL_PYTHON=$(command -v python3 || command -v python)
+  KILL_SLEEPER='import sys, time; time.sleep(int(sys.argv[1]))'
+  REDIRECTION='2>/dev/null'
+  MISSING_LSOF=no-such-lsof-$$
   PROBE_START_SECONDS=1
   HEREDOC_PROBE=$(printf "python3 - <<'EOF'\nprint('grep -rn --include=*.md foo .')\nEOF")
   HEREDOC_THEN_SEARCH=$(printf "cat > notes.txt <<'EOF'\nuse --include=*.md\nEOF\ngrep -rn --include=*.txt foo .")
