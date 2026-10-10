@@ -24,3 +24,9 @@ shipped_pages() {
   done
   return 0
 }
+
+readme_carries() {
+  for page in "$1/README.md" "$1/README.es.md"; do
+    awk '{ gsub(/\. /, "\n"); print }' "$page" | grep -F -- "$3" | grep -qE "(^|[^0-9.])$2([^0-9.]|[.]([^0-9]|$)|$)" || return 1
+  done
+}

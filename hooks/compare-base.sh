@@ -7,10 +7,10 @@ EMPTY_TREE=$(git hash-object -t tree --stdin < /dev/null 2>/dev/null)
 [ -n "$EMPTY_TREE" ] || exit 1
 
 branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-cabeza_remota=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
+remote_head=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)
 
 remote=""
-for candidate in "@{upstream}" "origin/$branch" $cabeza_remota origin/main origin/master origin/develop origin/staging; do
+for candidate in "@{upstream}" "origin/$branch" $remote_head origin/main origin/master origin/develop origin/staging; do
   [ -n "$candidate" ] || continue
   git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1 && { remote="$candidate"; break; }
 done

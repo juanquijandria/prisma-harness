@@ -22,6 +22,10 @@ Run `sh tests/run-selftests.sh`. It runs every selftest, the controls, the forma
 
 Then run `sh tests/runner-controls.sh`, which runs the suite again inside copies of the repository under a poisoned environment, with a hostile home and a format configuration in the tree, with foreign files added, from a path that contains a space, and with one hook silenced to prove that a selftest cannot disappear without being reported. It lives outside the runner because a runner cannot run itself. The three systems in `.github/workflows/selftests.yml` run both on every push.
 
+## Publishing a version
+
+A version is published only when the CI of the commit being tagged is green on Linux, macOS and Windows, read on that same commit. The tag and the release wait for it. The 0.9.0 was released before its CI finished, and the CI then ended red on two of the three systems.
+
 ## A gate that opened when it should not have
 
 That is a security report and not a bug report. See `SECURITY.md`.

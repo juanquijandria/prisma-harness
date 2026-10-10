@@ -7,6 +7,9 @@ BASE=$(mktemp -d)
 EM_DASH=$(printf '\342\200\224')
 FOREIGN_PLUGIN=mattpocock-skills
 RECEIPT_IN_HOME=.prisma-harness/receipts.log
+STALE_OWN_COUNT=0
+OWN_COUNT_CHECK=1
+. "$ROOT/tests/shipped.sh"
 ok=1
 CASES=0
 
@@ -189,6 +192,17 @@ if [ -n "$published" ]; then
 else
   fail "the count of the never-fabricate suites could not be read from README.md, so this control measured nothing"
 fi
+
+own_published=$(sed -n "s/.*tests\/$SELF_NAME\` adds \([0-9][0-9]*\) over.*/\1/p" "$ROOT/README.md")
+for stale_page in README.md README.es.md; do
+  stale_own="$BASE/stale-own-count-$stale_page"; copy_repo "$stale_own"
+  sed "s/\(tests\/$SELF_NAME\` [a-z]*\) $own_published /\1 $STALE_OWN_COUNT /" "$ROOT/$stale_page" > "$stale_own/$stale_page"
+  if [ -z "$own_published" ] || cmp -s "$ROOT/$stale_page" "$stale_own/$stale_page"; then fail "control: the count of these controls in $stale_page could not be made stale, so this control measured nothing"
+  elif readme_carries "$stale_own" "$own_published" "tests/$SELF_NAME"; then fail "control: a stale count of these controls in $stale_page was not caught"
+  else pass "control: a stale count of these controls in $stale_page turns their own count case red"; fi
+done
+own_count=$((CASES + OWN_COUNT_CHECK))
+if readme_carries "$ROOT" "$own_count" "tests/$SELF_NAME"; then pass "both pages carry $own_count for these controls, in the sentence that names tests/$SELF_NAME"; else fail "the sentence that names tests/$SELF_NAME does not carry $own_count in both pages"; fi
 
 rm -rf "$BASE"
 [ "$ok" = "1" ] && printf 'SELFTEST OK: %d/%d\n' "$CASES" "$CASES" && exit 0

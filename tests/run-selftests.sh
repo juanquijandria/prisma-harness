@@ -71,14 +71,9 @@ if [ -n "$sk_declared" ] && [ "$sk_declared" != "$sk_ran" ]; then
 fi
 rm -f "$SK"
 printf '\n##### the counts these pages publish\n'
-readme_carries() {
-  for page in "$ROOT/README.md" "$ROOT/README.es.md"; do
-    awk '{ gsub(/\. /, "\n"); print }' "$page" | grep -F -- "$2" | grep -qE "(^|[^0-9.])$1([^0-9.]|[.]([^0-9]|$)|$)" || return 1
-  done
-}
 while IFS='|' read -r label number anchor; do
   [ -n "$label" ] || continue
-  if readme_carries "$number" "$anchor"; then
+  if readme_carries "$ROOT" "$number" "$anchor"; then
     printf '  both pages carry %s for %s, in the sentence that names %s\n' "$number" "$label" "$anchor"
   else
     printf 'FAIL the sentence that names %s does not carry %s for %s in both pages, a count in prose that the suite can disprove\n' "$anchor" "$number" "$label"
