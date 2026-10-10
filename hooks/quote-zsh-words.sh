@@ -22,6 +22,7 @@ COMMAND_POSITION_WORDS = {"if", "then", "else", "elif", "do", "while", "until", 
 BLANKS = " \t"
 LINE_BLANKS = " \t\n"
 QUOTES = "'\""
+SKIPPED_SPANS = QUOTES + BACKTICK
 TEST_OPEN = "[["
 TEST_CLOSE = "]]"
 ARITHMETIC_OPEN = "(("
@@ -97,7 +98,7 @@ def quoted_equals(value):
 def skip_quoted(text, index):
     quote, index = text[index], index + 1
     while index < len(text) and text[index] != quote:
-        index += 2 if text[index] == "\\" and quote == '"' else 1
+        index += 2 if text[index] == "\\" and quote != "'" else 1
     return min(index + 1, len(text))
 
 
@@ -152,7 +153,7 @@ def read_delimiter(text, index):
         if character in QUOTES:
             end = text.find(character, index + 1)
             if end < 0:
-                return "", index
+                return None, index
             word.append(text[index + 1:end])
             index = end + 1
         elif character == "\\":
@@ -171,7 +172,7 @@ def heredoc_at(text, index):
     if not operator:
         return None
     delimiter, end = read_delimiter(text, operator.end())
-    return (delimiter, operator.group(1) == "-", end) if delimiter else None
+    return None if delimiter is None or end == operator.end() else (delimiter, operator.group(1) == "-", end)
 
 
 def closes_heredoc(line, delimiter, strips_tabs):
@@ -217,7 +218,7 @@ class Quoter:
         text, index = self.text, self.index
         character = text[index]
         heredoc = heredoc_at(text, index) if character == "<" else None
-        if character in QUOTES:
+        if character in SKIPPED_SPANS:
             self.index, self.at_command = skip_quoted(text, index), False
         elif character == "\\":
             self.index, self.at_command = index + 2, False

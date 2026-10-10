@@ -19,6 +19,8 @@ SIGNAL_ARGUMENT = re.compile(r"^-([0-9]+|[A-Z][A-Z0-9]*)$")
 PUNCTUATION = ";&|()<>"
 SEPARATOR_CHARACTERS = set(";&|()")
 REDIRECTION_CHARACTERS = set("<>")
+HIDDEN_REDIRECTIONS = {"<": "\ue000", ">": "\ue001"}
+SHOWN_REDIRECTIONS = str.maketrans({hidden: shown for shown, hidden in HIDDEN_REDIRECTIONS.items()})
 WORD_BREAKS = set(" \t\n;&|()")
 QUOTES = "'\""
 KILLALL_FLAGS_WITH_VALUE = {"-u", "-t", "-c", "-s"}
@@ -31,14 +33,21 @@ PROC_FOLDER = "/proc/%d/cwd"
 PROC_COMMAND_LINE = "/proc/%d/cmdline"
 
 
-def without_descriptor_numbers(command):
+def hide_redirection(characters, index):
+    if index < len(characters) and characters[index] in HIDDEN_REDIRECTIONS:
+        characters[index] = HIDDEN_REDIRECTIONS[characters[index]]
+
+
+def lexer_ready(command):
     characters, quote, index = list(command), None, 0
     while index < len(command):
         character = command[index]
         if character == "\\" and quote != "'":
             index += 1
+            hide_redirection(characters, index)
         elif quote:
             quote = None if character == quote else quote
+            hide_redirection(characters, index)
         elif character in QUOTES:
             quote = character
         elif character in REDIRECTION_CHARACTERS:
@@ -56,7 +65,7 @@ def is_redirection(token):
 
 
 def invocations(command):
-    text = without_descriptor_numbers(command).replace("\n", " ; ")
+    text = lexer_ready(command).replace("\n", " ; ")
     lexer = shlex.shlex(text, posix=True, punctuation_chars=PUNCTUATION)
     lexer.whitespace_split = True
     lexer.commenters = "#"
@@ -69,7 +78,7 @@ def invocations(command):
         elif token in SEPARATORS or set(token) <= SEPARATOR_CHARACTERS:
             current = None
         elif current is not None:
-            current.append(token)
+            current.append(token.translate(SHOWN_REDIRECTIONS))
         elif os.path.basename(token) in KILLERS:
             current = [os.path.basename(token)]
             found.append(current)

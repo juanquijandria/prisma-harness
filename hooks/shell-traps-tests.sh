@@ -57,6 +57,8 @@ skip_case() {
   cases=$((cases+1)); printf 'SKIP %s, %s\n' "$1" "$2"
 }
 
+not_measured_lines() { cat "$PRISMA_RECEIPT_FILE" 2>/dev/null | grep -c "	$GATE_NAME	.*	not-measured$"; }
+
 expect_measured() {
   if command -v pgrep >/dev/null 2>&1; then expect "$@"; else skip_case "$1" "this system has no pgrep"; fi
 }
@@ -133,6 +135,10 @@ selftest_kills() {
   expect_measured "69 a redirection is not a pattern, so it never reaches a process whose command line holds it" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS $REDIRECTION" "$own_dir")" 0
   expect_measured "74 a redirection glued to the pattern is not part of it" "$(run_payload_in "pkill -f $KILL_PROBE_NAME>/dev/null" "$own_dir")" 2
   expect_measured "75 a quoted pattern that holds a > stays a pattern" "$(run_payload_in "pkill -f '$KILL_PROBE_SECONDS $REDIRECTION'" "$own_dir")" 2
+  expect_measured "80 a pattern that is only a quoted > is a pattern, so it still reaches a process whose command line holds it" "$(run_payload_in "pkill -f '>'" "$own_dir")" 2
+  expect_measured "81 an escaped > is a pattern too" "$(run_payload_in "pkill -f \\>" "$own_dir")" 2
+  unmeasured_before=$(not_measured_lines)
+  expect_measured "83 a quoted < is a pattern too, so the pkill is measured" "$(run_payload_in "pkill -f '<'" "$own_dir" >/dev/null; echo $(( $(not_measured_lines) - unmeasured_before )))" 0
   expect_where_proc "70 without lsof the folder is read from /proc, so a foreign pkill still blocks" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
   : > "$PRISMA_RECEIPT_FILE"
   expect_without_proc "71 a process whose folder neither lsof nor /proc can read is let through and recorded as not measured" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
@@ -169,7 +175,11 @@ selftest_unexpanded_regions() {
   expect_command "63 case and in written as plain arguments do not stop the rewrite" "$(run_command 'grep -rn -e case -e in --include=*.md . && echo ====' "$ZSH")" "0 grep -rn -e case -e in --include='*.md' . && echo '===='"
   expect "56 an include pattern of a case keeps its meaning" "$(run_command 'case $f in --include=*.md) grep -rn foo . ;; esac' "$ZSH")" "0 "
   expect_command "57 a == pattern of a case stays and its body is still quoted" "$(run_command 'case $x in ==*) echo ==== ;; esac' "$ZSH")" "0 case \$x in ==*) echo '====' ;; esac"
-  expect_command "76 a == word inside backticks is quoted inside them" "$(run_command 'echo `echo ====` && echo after' "$ZSH")" "0 echo \`echo '===='\` && echo after"
+  expect "76 a command substitution in backticks is left as written" "$(run_command 'echo `echo ====` && echo after' "$ZSH")" "0 "
+  expect "77 a test inside backticks keeps its == operator" "$(run_command 'echo `[[ a == a ]] && echo yes`' "$ZSH")" "0 "
+  escaped_backticks='echo `echo \`date\`` && echo ===='
+  expect_command "82 an escaped backtick inside backticks does not close them" "$(run_command "$escaped_backticks" "$ZSH")" "0 echo \`echo \\\`date\\\`\` && echo '===='"
+  expect_command "78 a word after the closing backtick is still quoted" "$(run_command 'echo `date` && echo ====' "$ZSH")" "0 echo \`date\` && echo '===='"
 }
 
 selftest_heredoc_delimiters() {
@@ -182,6 +192,8 @@ selftest_heredoc_delimiters() {
   mixed=$(printf 'cat <<E"O"F\necho ====\nEOF\necho ====')
   expect_command "64 a delimiter written with mixed quotes keeps its body" "$(run_command "$mixed" "$ZSH")" "0 $(printf 'cat <<E"O"F\necho ====\nEOF\necho '"'===='"'')"
   tabbed=$(printf 'cat <<-EOF\n\techo ====\n\tEOF\necho ====')
+  empty_delimiter=$(printf "cat <<''\necho ====\n\necho ====")
+  expect_command "79 an empty quoted delimiter keeps its body until the empty line" "$(run_command "$empty_delimiter" "$ZSH")" "0 $(printf "cat <<''\necho ====\n\necho '===='")"
   expect_command "61 under <<- a delimiter after tabs closes the body" "$(run_command "$tabbed" "$ZSH")" "0 $(printf 'cat <<-EOF\n\techo ====\n\tEOF\necho '"'===='"'')"
 }
 
