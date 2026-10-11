@@ -82,7 +82,7 @@ selftest_kill_probes() {
   fake_lsof="$probe_bin/lsof"
   printf '#!/bin/sh\nprintf "p%%s\\nfcwd\\nn%%s\\n" "%s" "%s"\n' "$UNREADABLE_PID" "$UNREADABLE_LSOF_FOLDER" > "$fake_lsof"; chmod +x "$fake_lsof"
   printf '#!/bin/sh\nprintf "%%s" "$*" > "$FAKE_PGREP_ARGS"\n[ -n "$FAKE_PGREP_PIDS" ] || exit 1\nprintf "%%s\\n" $FAKE_PGREP_PIDS\n' > "$fake_pgrep"; chmod +x "$fake_pgrep"
-  session_dir=$(mktemp -d); foreign_dir=$(mktemp -d)
+  session_dir=$(mktemp -d); foreign_dir=$(mktemp -d); shifted=""
   (cd "$session_dir" && exec sleep "$KILL_PROBE_SECONDS") &
   own_sleeper=$!
   (cd "$foreign_dir" && exec sleep "$KILL_PROBE_SECONDS") &
@@ -97,6 +97,20 @@ selftest_kill_probes() {
   expect_unprivileged "91 an lsof line that is not a folder is a gap in the measure, never a foreign folder" "$(run_with_pgrep "pkill -f $KILL_PROBE_NAME" "$probe_bin" "$UNREADABLE_PID" "$fake_lsof")" "0 not-measured"
   expect_measured "92 a block from another trap on the line of an unmeasured pkill leaves one line, blocked" "$(run_with_pgrep "pkill -f $KILL_PROBE_NAME; $MISSING_WRAPPER 5 ls" "$session_dir" "$UNREADABLE_PID" "$MISSING_TOOL" "$MISSING_WRAPPER")" "2 blocked"
   expect_measured "93 a rewrite on the line of an unmeasured pkill lets it through and says both" "$(run_with_pgrep "pkill -f $KILL_PROBE_NAME; grep -rn --include=*.md foo ." "$session_dir" "$UNREADABLE_PID" "$MISSING_TOOL")" "0 rewritten not-measured"
+  body_only=$(printf "cat <<'EOF'\npkill -f %s\nEOF" "$KILL_PROBE_NAME")
+  expect_measured "94 a pkill written inside a heredoc body is data and passes" "$(run_with_pgrep "$body_only" "$session_dir" "$foreign_sleeper")" "0 none"
+  after_body=$(printf '%s\npkill -f %s' "$body_only" "$KILL_PROBE_NAME")
+  after_herestring=$(printf "cat <<<'x'\npkill -f %s" "$KILL_PROBE_NAME")
+  after_quoted=$(printf "echo '<<EOF'\npkill -f %s" "$KILL_PROBE_NAME")
+  expect_measured "95 a pkill after the body, after a herestring or after a quoted << still blocks" "$(run_with_pgrep "$after_body" "$session_dir" "$foreign_sleeper"), $(run_with_pgrep "$after_herestring" "$session_dir" "$foreign_sleeper"), $(run_with_pgrep "$after_quoted" "$session_dir" "$foreign_sleeper")" "2 blocked, 2 blocked, 2 blocked"
+  after_comment=$(printf 'pkill -f %s # a note\npkill -f %s' "$KILL_OWN_NAME" "$KILL_PROBE_NAME")
+  run_with_pgrep "$after_comment" "$session_dir" "" >/dev/null
+  expect_measured "96 the pattern of a pkill on the line after a comment still reaches pgrep" "$(pgrep_received)" "-f $KILL_PROBE_NAME"
+  for hidden in 'echo $((1<<2))' '(( n = 1<<3 ))' 'x=`cat <<E`'; do
+    run_with_pgrep "$(printf '%s\npkill -f %s' "$hidden" "$KILL_PROBE_NAME")" "$session_dir" "" >/dev/null
+    shifted="$shifted$(pgrep_received),"
+  done
+  expect_measured "97 a << inside arithmetic or backticks opens no heredoc, so the pkill below it is read" "$shifted" "-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,"
   expect_measured "88 a command that leaves no private use character free is let through and recorded as not measured" "$(run_with_pgrep "$("$KILL_PYTHON" -c "$CROWDED_PRIVATE_USE")" "$session_dir" "")" "0 not-measured"
   kill "$own_sleeper" "$foreign_sleeper" 2>/dev/null
   wait "$own_sleeper" "$foreign_sleeper" 2>/dev/null

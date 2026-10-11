@@ -22,7 +22,6 @@ REDIRECTION_CHARACTERS = set("<>")
 HIDDEN_REDIRECTION_ORDER = "<>"
 PRIVATE_USE_FIRST, PRIVATE_USE_LAST = 0xE000, 0xF8FF
 WORD_BREAKS = set(" \t\n;&|()")
-QUOTES = "'\""
 KILLALL_FLAGS_WITH_VALUE = {"-u", "-t", "-c", "-s"}
 COMMAND_WIDTH = 80
 LSOF = os.environ.get("PRISMA_LSOF") or "lsof"
@@ -75,6 +74,7 @@ def is_redirection(token):
 
 
 def invocations(command):
+    command = without_bodies_and_comments(command)
     markers = free_markers(command)
     shown = str.maketrans({hidden: redirection for redirection, hidden in markers.items()})
     text = lexer_ready(command, markers).replace("\n", " ; ")
@@ -202,4 +202,7 @@ except (OSError, IndexError, ValueError):
     sys.exit(CANNOT_MEASURE)
 PY
 )
-"$PYTHON" -c "$CODE" "$@"
+HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "$HOOKS_DIR/kill-targets-text.sh"
+"$PYTHON" -c "$SHELL_TEXT_CODE
+$CODE" "$@"
