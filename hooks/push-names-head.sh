@@ -15,6 +15,7 @@ PUSH_DEFAULTS_THAT_DO_NOT_SEND_HEAD="matching nothing"
 CONFIGURED_PUSH_TARGETS="^remote\..*\.(push|mirror)$"
 PUSH_SETTING_KEYS="push. remote."
 GIT_CONFIG_ENVIRONMENT="GIT_CONFIG"
+PUSH_LOOKING_COMMAND='git.*push|gh.*pr[[:space:]]+(create|ready)'
 
 is_one_of() {
   needle="$1"
@@ -156,4 +157,20 @@ SEGMENTS
 unmeasured_because_git_may_change() {
   echo "WARN: this command runs a git command that is not known to leave the commits alone, so $1 cannot know what the push sends and measured nothing. Push in a command of its own to have it measured." >&2
   receipt_append "$2" "$3" not-measured
+}
+
+payload_string() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -r "$3 // empty" 2>/dev/null
+    return 0
+  fi
+  printf '%s' "$1" | sed -nE 's/.*"'"$2"'"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p'
+}
+
+push_gate_not_measured() {
+  echo "WARN: $3" >&2
+  if payload_string "$2" command .tool_input.command | grep -qE "$PUSH_LOOKING_COMMAND"; then
+    receipt_append "$1" "${4:-$(payload_string "$2" cwd .cwd)}" not-measured
+  fi
+  exit 0
 }

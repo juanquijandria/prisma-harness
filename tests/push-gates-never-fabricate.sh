@@ -214,4 +214,56 @@ else
   fail "X5 the gate stated a cause it did not measure (rc=$rc)"
 fi
 
+leaves_lines() {
+  name="$1"; want="$2"; shift 2; n=$(receipt_lines); out=$("$@" 2>&1); rc=$?; added=$(( $(receipt_lines) - n ))
+  if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN && [ "$added" = "$want" ] && { [ "$want" = "0" ] || tail -1 "$PRISMA_RECEIPT_FILE" | grep -q 'not-measured$'; }; then pass "$name"
+  else fail "$name, expected exit 0, a WARN and $want line(s), got exit $rc and $added line(s) out=[$out]"; fi
+}
+gate_run() { payload "${GATE_CWD:-$repo}" "$4" | $1 "$2/pre-push-$3.sh"; }
+parser_fault() { ( PRISMA_PARSER_FAULT=1; export PRISMA_PARSER_FAULT; gate_run /bin/sh "$HOOKS" "$1" "$2" ); }
+from_nowhere() { ( GATE_CWD="$T/no-such-dir"; gate_run /bin/sh "$HOOKS" "$1" "git push origin feature" ); }
+hooks_without() { copy="$T/hooks-without-$1"; mkdir -p "$copy" && cp "$HOOKS"/*.sh "$copy"/ && rm -f "$copy/$1"; printf '%s' "$copy"; }
+without_jq() { ( PATH="$T/bin-without-jq"; gate_run /bin/sh "$HOOKS" "$1" "$2" ); }
+mkdir -p "$T/bin-without-jq"
+for tool in cat dirname basename sed tr mkdir date grep; do ln -s "$(command -v "$tool")" "$T/bin-without-jq/$tool" 2>/dev/null; done
+for gate in lint comments size; do
+  leaves_lines "M1 the $gate gate without jq leaves a not-measured line for a push" 1 without_jq "$gate" "git push origin feature"
+done
+leaves_lines "M2 counterexample, without jq a command that is not a push leaves nothing" 0 without_jq comments "ls -la"
+leaves_lines "M3 the comments gate without measure-comments.sh leaves a not-measured line" 1 gate_run /bin/sh "$(hooks_without measure-comments.sh)" comments "git push origin feature"
+for helper in measure-diff-size.sh compare-base.sh command-invokes.sh; do
+  leaves_lines "M4 the size gate without $helper leaves a not-measured line" 1 gate_run /bin/sh "$(hooks_without "$helper")" size "git push origin feature"
+done
+leaves_lines "M5 counterexample, without a helper a command that is not a push leaves nothing" 0 gate_run /bin/sh "$(hooks_without command-invokes.sh)" size "ls -la"
+gh_fails="$T/hooks-whose-parser-fails-on-gh"
+mkdir -p "$gh_fails" && cp "$HOOKS"/*.sh "$gh_fails"/
+printf '#!/bin/sh\n[ "$1 $2" = "gh pr" ] && exit 3\nexec "%s" "$@"\n' "$HOOKS/command-invokes.sh" > "$gh_fails/command-invokes.sh"
+for gate in lint comments size; do
+  leaves_lines "M6 the $gate gate whose parser fails on a push leaves a not-measured line" 1 parser_fault "$gate" "git push origin feature"
+  leaves_lines "M7 the $gate gate whose parser fails on a PR creation leaves a not-measured line" 1 gate_run /bin/sh "$gh_fails" "$gate" "gh pr create --fill"
+  leaves_lines "M8 the $gate gate that cannot locate the repo leaves a not-measured line" 1 from_nowhere "$gate"
+done
+leaves_lines "M9 counterexample, a parser that fails on every command leaves nothing for one that is not a push" 0 parser_fault size "ls -la"
+leaves_lines "M7b the comments gate whose parser fails on a PR marked ready leaves a not-measured line" 1 gate_run /bin/sh "$gh_fails" comments "gh pr ready 12"
+windows_cwd='C:\\Users\\x'
+n=$(receipt_lines); ( GATE_CWD="$windows_cwd"; parser_fault size "git push origin feature" ) >/dev/null 2>&1
+if [ "$(receipt_lines)" = "$((n+1))" ] && [ "$(tail -1 "$PRISMA_RECEIPT_FILE" | cut -f3)" = 'C:\Users\x' ]; then pass "M12 the repository in the line is the cwd jq reads, with its escapes undone"
+else fail "M12 the repository in the line is [$(tail -1 "$PRISMA_RECEIPT_FILE" | cut -f3)]"; fi
+loader_shell=$(command -v dash || true)
+for helper in receipt.sh push-names-head.sh escape-declared.sh; do
+  copy=$(hooks_without "$helper")
+  if [ "$helper" = "escape-declared.sh" ]; then want=1; else want=0; fi
+  for gate in lint comments size; do
+    for cmd in "ls -la" "git push origin feature"; do
+      [ "$want" = "1" ] && [ "$cmd" = "ls -la" ] && continue
+      if [ -n "$loader_shell" ]; then
+        leaves_lines "M10 dash runs the $gate gate without $helper on $cmd, exits 0 and leaves $want line(s)" "$want" gate_run "$loader_shell" "$copy" "$gate" "$cmd"
+      else
+        skip "M10 dash is not installed, so the $gate gate without $helper cannot be run under it"
+      fi
+    done
+  done
+done
+leaves_lines "M11 counterexample, without escape-declared.sh a command that is not a push leaves nothing" 0 gate_run /bin/sh "$(hooks_without escape-declared.sh)" comments "ls -la"
+
 finish

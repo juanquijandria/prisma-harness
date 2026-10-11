@@ -250,10 +250,11 @@ git -C "$P" commit -qam "php fixed"; printf '<?php $base = BAD;\n' > "$P/base.ph
 warns_unmeasured "lint gate says it measured nothing when the uncommitted php change is in a file the push does not send" php_at "git push origin feature"
 rm -rf "$P"
 
-out=$(cd / && payload "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
-CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate warns when the directory is not a git repository\n'; else printf 'FAIL size gate silent outside a repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
-out=$(payload "cd /nonexistent-dir-xyz && git push origin feature" | sh "$HOOKS/pre-push-lint.sh" 2>&1); rc=$?
-CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS lint gate warns when it cannot locate the repo\n'; else printf 'FAIL lint gate silent on a missing repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+NOT_A_REPO=$(mktemp -d)
+size_outside_a_repo() { PAYLOAD_DIR="$NOT_A_REPO" run pre-push-size.sh "git push origin feature"; }
+warns_unmeasured "size gate warns and leaves its line when the directory is not a git repository" size_outside_a_repo
+rmdir "$NOT_A_REPO"
+warns_unmeasured "lint gate warns and leaves its line when it cannot locate the repo" run pre-push-lint.sh "cd /nonexistent-dir-xyz && git push origin feature"
 
 CHECKS=$((CHECKS+1))
 if sh "$HOOKS/receipt.sh" --summary | grep -qE 'gate +[0-9]'; then printf 'PASS a separate process reads back the receipt these gates wrote\n'; else printf 'FAIL the receipt summary shows no gate row\n'; ok=0; fi
