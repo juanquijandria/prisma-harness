@@ -6,8 +6,8 @@
 selftest_ci() {
   green_scenario; STATUSES="[$(status_json 1 deploy pending 2026-01-10T10:00:05Z)]"
   expect "1 a pending status on the head is not ready" "$(judge)" "1 NOT READY"
-  green_scenario; SAYS="no CI runs on this PR"
-  expect "2 a head with no CI runs is ready and says there were none" "$(judge)$(judge_says)" "0 READYsays"
+  green_scenario; CHECKS='{"check_runs":[]}'; SAYS="no run on aaaaaaa yet"
+  expect "2 a head with no CI runs in a repository with an active workflow is not measured, and says the CI has not run" "$(judge)$(judge_says)" "3 NOT MEASUREDsays"
   green_scenario; CHECKS="{\"check_runs\":[$(check_json test completed '"failure"' "$PUSHED" '"2026-01-10T10:03:00Z"')]}"
   expect "3 a failed check run is not ready" "$(judge)" "1 NOT READY"
   green_scenario; CHECKS="{\"check_runs\":[$(check_json a completed '"success"' "$PUSHED" '"2026-01-10T10:03:00Z"'),$(check_json b completed '"neutral"' "$PUSHED" '"2026-01-10T10:03:00Z"'),$(check_json c completed '"skipped"' "$PUSHED" '"2026-01-10T10:03:00Z"')]}"
@@ -17,6 +17,22 @@ selftest_ci() {
   expect "5 a check run still in progress is not ready" "$(judge)" "1 NOT READY"
   green_scenario; CHECKS="{\"check_runs\":[$(check_json lint completed '"failure"' "$PUSHED" '"2026-01-10T10:03:00Z"'),$(check_json test completed '"success"' "$PUSHED" '"2026-01-10T10:03:00Z"')]}"; SAYS="ci: lint finished as failure on aaaaaaa"
   expect "49 a run that is not the last line jq writes still reads whole" "$(judge)$(judge_says)" "1 NOT READYsays"
+  selftest_ci_without_runs
+}
+
+selftest_ci_without_runs() {
+  green_scenario; CHECKS='{"check_runs":[]}'; WORKFLOWS='{"total_count":0,"workflows":[]}'; SAYS="no CI runs on this PR"
+  expect "53 a head with no CI runs in a repository with no workflow is ready, and says there were none" "$(judge)$(judge_says)" "0 READYsays"
+  green_scenario; CHECKS='{"check_runs":[]}'; WORKFLOWS='{"total_count":2,"workflows":[{"path":"dynamic/dependabot/dependabot-updates","state":"active"},{"path":".github/workflows/old.yml","state":"disabled_manually"}]}'
+  expect "54 a dynamic or disabled workflow does not count as CI to wait for" "$(judge)" "0 READY"
+  green_scenario; CHECKS="{\"check_runs\":[$(check_json a completed '"skipped"' "$PUSHED" "\"$CI_FINISHED\""),$(check_json b completed '"neutral"' "$PUSHED" "\"$CI_FINISHED\"")]}"; SAYS="skipped or neutral"
+  expect "55 runs that all finished skipped or neutral are not measured, and say so" "$(judge)$(judge_says)" "3 NOT MEASUREDsays"
+  green_scenario; CHECKS="{\"check_runs\":[$(check_json a completed '"success"' "$PUSHED" "\"$CI_FINISHED\""),$(check_json b completed '"skipped"' "$PUSHED" "\"$CI_FINISHED\"")]}"
+  expect "56 one real success beside a skipped run is ready" "$(judge)" "0 READY"
+  green_scenario; CHECKS='{"check_runs":[]}'; WORKFLOWS='{"message":"Not Found"}'
+  expect "57 a list of workflows that cannot be read is not measured, never ready" "$(judge)" "3 NOT MEASURED"
+  green_scenario; CHECKS='{"check_runs":[]}'; SAYS="workflows as they are today"
+  expect "58 with --at the workflows are read as of today, and that is said" "$(judge_says --at 2026-01-10T10:05:00Z)" "says"
 }
 
 selftest_reviewers() {
@@ -205,6 +221,34 @@ selftest_merge_state() {
   expect "52 a request for changes from someone outside the reviewer list is not ready, and names them" "$(judge)$(judge_says)" "1 NOT READYsays"
 }
 
+stacked_on_merged() {
+  green_scenario; BASE_REF=feat/six; base_head=ddddddd4444444444444444444444444444444444
+  PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$FAKE_HEAD" clean 2026-01-10T09:00:00Z null null "$BASE_REF")"
+  BASE_PRS="[$(pr_json 6 closed "$FAKE_AUTHOR" "$BASE_REF" "$base_head" unknown 2026-01-10T08:00:00Z '"2026-01-10T10:20:00Z"' '"2026-01-10T10:20:00Z"')]"
+  BASE_ACTIVITY="[$(push_json 2026-01-10T08:30:00Z "$base_head")]"
+}
+
+selftest_base() {
+  stacked_on_merged; SAYS="the same commit #6 already carried into main"
+  expect "59 a PR whose base is a branch #6 already merged, and that has not moved since, is not ready, and says so" "$(judge)$(judge_says)" "1 NOT READYsays"
+  stacked_on_merged; BASE_PRS="[$(pr_json 6 open "$FAKE_AUTHOR" "$BASE_REF" "$base_head")]"
+  expect "60 a PR stacked on a branch whose PR is still open is ready" "$(judge)" "0 READY"
+  stacked_on_merged; BASE_ACTIVITY="[$(push_json 2026-01-10T10:25:00Z eeeeeee5555555555555555555555555555555555 pr_merge),$(push_json 2026-01-10T08:30:00Z "$base_head")]"
+  expect "61 a base that moved after its PR merged is a living branch, and is ready" "$(judge)" "0 READY"
+  stacked_on_merged; BASE_BRANCH='{"protected":true}'
+  expect "62 a protected base is a long-lived branch, and is ready" "$(judge)" "0 READY"
+  green_scenario; BASE_PRS='this is not json'; BASE_BRANCH='this is not json'
+  expect "63 a PR whose base is the default branch reads nothing about its base" "$(judge)" "0 READY"
+  stacked_on_merged; BASE_PRS='{"message":"Not Found"}'
+  expect "64 a list of the PRs of the base that cannot be read is not measured" "$(judge)" "3 NOT MEASURED"
+  stacked_on_merged; BASE_ACTIVITY="[$(push_json 2026-01-10T11:00:00Z eeeeeee5555555555555555555555555555555555 pr_merge),$(push_json 2026-01-10T08:30:00Z "$base_head")]"
+  expect "65 with --at, a base is judged on both sides of the merge of its PR, with the tip it had then" "$(judge --at 2026-01-10T10:10:00Z)|$(judge --at 2026-01-10T10:30:00Z)" "0 READY|1 NOT READY"
+  stacked_on_merged; BASE_ACTIVITY='{"message":"Not Found"}'; SAYS="moved after"
+  expect "66 an activity log of the base that cannot be read is not measured, never a base that moved" "$(judge)$(judge_says)" "3 NOT MEASUREDsilent"
+  stacked_on_merged; BASE_BRANCH='{"message":"Not Found"}'
+  expect "67 a base branch whose protection cannot be read is not measured" "$(judge)" "3 NOT MEASURED"
+}
+
 selftest() {
   SELF=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
   T=$(mktemp -d)
@@ -217,6 +261,7 @@ selftest() {
   selftest_unmeasured
   selftest_history
   selftest_merge_state
+  selftest_base
   rm -rf "$T"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
   [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && return 0
