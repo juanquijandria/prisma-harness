@@ -19,8 +19,8 @@ SIGNAL_ARGUMENT = re.compile(r"^-([0-9]+|[A-Z][A-Z0-9]*)$")
 PUNCTUATION = ";&|()<>"
 SEPARATOR_CHARACTERS = set(";&|()")
 REDIRECTION_CHARACTERS = set("<>")
-HIDDEN_REDIRECTIONS = {"<": "\ue000", ">": "\ue001"}
-SHOWN_REDIRECTIONS = str.maketrans({hidden: shown for shown, hidden in HIDDEN_REDIRECTIONS.items()})
+HIDDEN_REDIRECTION_ORDER = "<>"
+PRIVATE_USE_FIRST, PRIVATE_USE_LAST = 0xE000, 0xF8FF
 WORD_BREAKS = set(" \t\n;&|()")
 QUOTES = "'\""
 KILLALL_FLAGS_WITH_VALUE = {"-u", "-t", "-c", "-s"}
@@ -31,23 +31,33 @@ PROC_ROOT = "/proc"
 LINUX_NAME_WIDTH = 15
 PROC_FOLDER = "/proc/%d/cwd"
 PROC_COMMAND_LINE = "/proc/%d/cmdline"
+POSIX = "posix"
+EXISTENCE_PROBE = 0
 
 
-def hide_redirection(characters, index):
-    if index < len(characters) and characters[index] in HIDDEN_REDIRECTIONS:
-        characters[index] = HIDDEN_REDIRECTIONS[characters[index]]
+def free_markers(command):
+    used = set(command)
+    free = [chr(code) for code in range(PRIVATE_USE_FIRST, PRIVATE_USE_LAST + 1) if chr(code) not in used]
+    if len(free) < len(HIDDEN_REDIRECTION_ORDER):
+        raise ValueError("no free private use character is left to hide a quoted redirection")
+    return dict(zip(HIDDEN_REDIRECTION_ORDER, free))
 
 
-def lexer_ready(command):
+def hide_redirection(characters, index, markers):
+    if index < len(characters) and characters[index] in markers:
+        characters[index] = markers[characters[index]]
+
+
+def lexer_ready(command, markers):
     characters, quote, index = list(command), None, 0
     while index < len(command):
         character = command[index]
         if character == "\\" and quote != "'":
             index += 1
-            hide_redirection(characters, index)
+            hide_redirection(characters, index, markers)
         elif quote:
             quote = None if character == quote else quote
-            hide_redirection(characters, index)
+            hide_redirection(characters, index, markers)
         elif character in QUOTES:
             quote = character
         elif character in REDIRECTION_CHARACTERS:
@@ -65,7 +75,9 @@ def is_redirection(token):
 
 
 def invocations(command):
-    text = lexer_ready(command).replace("\n", " ; ")
+    markers = free_markers(command)
+    shown = str.maketrans({hidden: redirection for redirection, hidden in markers.items()})
+    text = lexer_ready(command, markers).replace("\n", " ; ")
     lexer = shlex.shlex(text, posix=True, punctuation_chars=PUNCTUATION)
     lexer.whitespace_split = True
     lexer.commenters = "#"
@@ -78,7 +90,7 @@ def invocations(command):
         elif token in SEPARATORS or set(token) <= SEPARATOR_CHARACTERS:
             current = None
         elif current is not None:
-            current.append(token.translate(SHOWN_REDIRECTIONS))
+            current.append(token.translate(shown))
         elif os.path.basename(token) in KILLERS:
             current = [os.path.basename(token)]
             found.append(current)
@@ -137,13 +149,26 @@ def lsof_folder(pid):
         return None
     for line in listed.stdout.splitlines():
         if line.startswith("n"):
-            return os.path.realpath(line[1:])
+            folder = os.path.realpath(line[1:])
+            return folder if os.path.isdir(folder) else None
     return None
 
 
 def working_folder(pid):
     proc = PROC_FOLDER % pid
     return lsof_folder(pid) or (os.path.realpath(proc) if os.path.exists(proc) else None)
+
+
+def is_known_gone(pid):
+    if os.name != POSIX:
+        return False
+    try:
+        os.kill(pid, EXISTENCE_PROBE)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    return False
 
 
 def command_line(pid):
@@ -165,7 +190,7 @@ def main():
             seen.add(pid)
             folder = working_folder(pid)
             if folder is None:
-                unknown = True
+                unknown = unknown or not is_known_gone(pid)
             elif not inside(folder, session):
                 print("%d\t%s\t%s" % (pid, folder, command_line(pid)))
     return PARTLY_MEASURED if unknown else 0

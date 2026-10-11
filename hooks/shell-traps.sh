@@ -12,6 +12,8 @@ PARTLY_MEASURED=5
 KILL_LINES_SHOWN=10
 ESCAPE="PRISMA_SHELL_TRAPS_OK=1"
 GATE_NAME="shell-traps-gate"
+BASH_TOOL_FIELD='"tool_name"[[:space:]]*:[[:space:]]*"Bash"'
+JSON_STRING_VALUE='[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*'
 UNQUOTED_INCLUDE_GLOB='(^|[[:space:]])--include(=|[[:space:]]+)([^'"'"'"[:space:]\\]|\\.)*[*?[]'
 UNQUOTED_EQUALS_WORD='(^|[[:space:];&|(])=='
 SEARCH_PROGRAMS="grep egrep fgrep ugrep"
@@ -20,7 +22,7 @@ REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-$DEFAULT_WRAPPERS}"
 PARSER_FAILED=3
 UNSAFE_INCLUDE=4
 UNSAFE_EQUALS=6
-SELFTEST_CASES=83
+SELFTEST_CASES=93
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -66,8 +68,13 @@ missing_wrappers_named() {
   done
 }
 
+record_kill_gap() {
+  [ -z "$kill_gap" ] || receipt_append "$GATE_NAME" "$kill_gap" not-measured
+}
+
 allow_rewritten() {
   receipt_append "$GATE_NAME" "$working_dir" rewritten
+  record_kill_gap
   printf '%s' "$payload" | jq --arg command "$1" --arg reason "PRISMA shell traps quoted what zsh would have expanded, an --include pattern that aborts with 'no matches found' or a word starting with = that zsh reads as the path of a command. The command that runs is: $1" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: $reason, updatedInput: (.tool_input + {command: $command})}}'
   exit 0
@@ -107,11 +114,10 @@ invokes_a_killer() {
 
 check_kills() {
   invokes_a_killer || return 0
-  [ -n "$working_dir" ] || { receipt_append "$GATE_NAME" unknown not-measured; return 0; }
+  [ -n "$working_dir" ] || { kill_gap=unknown; return 0; }
   targets=$(printf '%s' "$command_text" | "$KILL_TARGETS" "$working_dir" 2>/dev/null); rc=$?
-  [ "$rc" = "0" ] || receipt_append "$GATE_NAME" "$working_dir" not-measured
-  [ "$rc" = "0" ] || [ "$rc" = "$PARTLY_MEASURED" ] || return 0
-  [ -n "$targets" ] || return 0
+  [ "$rc" = "0" ] || [ "$rc" = "$PARTLY_MEASURED" ] || { kill_gap="$working_dir"; return 0; }
+  [ -n "$targets" ] || { [ "$rc" = "0" ] || kill_gap="$working_dir"; return 0; }
   shown=$(printf '%s\n' "$targets" | head -n "$KILL_LINES_SHOWN")
   block "this command would stop processes that run in another folder." \
     "Its pattern matches $(printf '%s\n' "$targets" | wc -l | tr -d ' ') processes whose working folder is outside $working_dir, the folder this session works in:
@@ -127,21 +133,39 @@ check_wrappers() {
   done
 }
 
+touches_a_trap() {
+  has_unquoted_include_glob "$1" || has_unquoted_equals_word "$1" || [ -n "$(missing_wrappers_named "$1")" ] || kill_words_in "$1"
+}
+
+json_field_guess() {
+  printf '%s' "$payload" | sed -nE "s/.*\"$1\"$JSON_STRING_VALUE/\\1/p"
+}
+
+guess_without_jq() {
+  printf '%s' "$payload" | grep -qE "$BASH_TOOL_FIELD" || exit 0
+  guessed=$(json_field_guess command)
+  touches_a_trap "${guessed:-$payload}" || exit 0
+  working_dir=$(json_field_guess cwd)
+  working_dir="${working_dir:-unknown}"
+  not_measured "jq is missing"
+}
+
 run_gate() {
-  command -v jq >/dev/null 2>&1 || { echo "WARN: the shell traps gate did not run, jq is missing." >&2; exit 0; }
   payload=$(cat)
+  command -v jq >/dev/null 2>&1 || guess_without_jq
   [ "$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)" = "Bash" ] || exit 0
   command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
   working_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
   wrappers=$(missing_wrappers_named "$command_text")
   kill_words=""; kill_words_in "$command_text" && kill_words=1
-  has_unquoted_include_glob "$command_text" || has_unquoted_equals_word "$command_text" || [ -n "$wrappers" ] || [ -n "$kill_words" ] || exit 0
+  touches_a_trap "$command_text" || exit 0
   [ -x "$INVOKES" ] || not_measured "command-invokes.sh is missing"
   bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES" 2>/dev/null) || not_measured "strip-quotes.sh could not read the command"
   if escape_declared "$ESCAPE" "$bare_command"; then receipt_append "$GATE_NAME" "$working_dir" escaped; exit 0; fi
-  [ -n "$kill_words" ] && check_kills
+  kill_gap=""; [ -n "$kill_words" ] && check_kills
   check_quoting
   check_wrappers "$wrappers"
+  record_kill_gap
   exit 0
 }
 
