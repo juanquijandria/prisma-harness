@@ -3,7 +3,6 @@
 
 MERGES_CLEAN=0
 MERGE_CONFLICTS=1
-BASE_MOVES='"push","force_push","branch_creation","pr_merge","merge_queue_merge"'
 BRANCH_SHAPE='type == "object" and (.protected | type) == "boolean"'
 
 OTHER_PRS_JQ='[add[]] | unique_by(.number)[]
@@ -38,7 +37,7 @@ fetch_activity() {
 }
 
 tip_at_cutoff() {
-  "$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$2"')) | by_cutoff(.timestamp)]
+  "$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$HEAD_MOVES"')) | by_cutoff(.timestamp)]
     | max_by(.timestamp | seconds) // empty | .after' "$WORK/$1.json"
 }
 
@@ -46,7 +45,7 @@ read_other_head() {
   other_head="$3"
   [ -z "$AT" ] && return 0
   fetch_activity "activity-$1" "${4:-$REPO}" "$2"
-  other_head=$(tip_at_cutoff "activity-$1" "$PUSH_EVENTS")
+  other_head=$(tip_at_cutoff "activity-$1")
 }
 
 compare_with_other() {
@@ -100,7 +99,7 @@ CARRIER
   fetch base-branch "repos/$REPO/branches/$branch_param" "$BRANCH_SHAPE"
   [ "$(ask '.protected' base-branch)" != "true" ] || { finding ok "base: $base is protected, so it is a long-lived branch"; return; }
   fetch_activity base-activity "$REPO" "$base"
-  tip=$(tip_at_cutoff base-activity "$BASE_MOVES")
+  tip=$(tip_at_cutoff base-activity)
   [ -n "$tip" ] || { finding unmeasured "base: the activity log of $base shows no push before that time"; return; }
   [ "$tip" = "$carried" ] || { finding ok "base: $base moved after #$carrier merged at $carried_at"; return; }
   finding fail "base: $base points at $(printf "%.${SHORT_SHA_WIDTH}s" "$tip"), the same commit #$carrier already carried into $into at $carried_at. If $base is a work branch, merging here never reaches $default_branch, so change the base to $default_branch first. If it is a long-lived branch, say so when you claim this PR ready"

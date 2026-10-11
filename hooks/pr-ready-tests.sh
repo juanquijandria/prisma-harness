@@ -65,6 +65,12 @@ formal_review() {
   REVIEWS="[$(review_json octo-reviewer 2026-01-10T10:05:00Z "$1" "${2:-$FAKE_HEAD}")]"
 }
 
+merged_into_head() {
+  green_scenario; MERGED_INTO_HEAD=2026-01-10T10:10:00Z; merged_head=ccccccc6666666666666666666666666666666666
+  PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$merged_head")"
+  ACTIVITY="[$(push_json "$MERGED_INTO_HEAD" "$merged_head" pr_merge),$(push_json "$PUSHED" "$FAKE_HEAD")]"
+}
+
 selftest_at() {
   later_head=bbbbbbb2222222222222222222222222222222222
   green_scenario; PR="$(pr_json "$FAKE_NUMBER" open "$FAKE_AUTHOR" "$FAKE_BRANCH" "$later_head")"
@@ -76,6 +82,10 @@ selftest_at() {
   expect "14 a status is read as it was, on both sides of the moment it turned green" "$(judge --at 2026-01-10T10:03:00Z)|$(judge --at 2026-01-10T10:05:00Z)" "1 NOT READY|0 READY"
   expect "15 an --at with a UTC offset is the same instant" "$(judge --at 2026-01-10T05:03:00-05:00)|$(judge --at 2026-01-10T05:05:00-05:00)" "1 NOT READY|0 READY"
   expect "16 an --at that is not ISO 8601 is a usage error" "$(judge --at yesterday)" "2 the time after --at is not ISO 8601"
+  merged_into_head; SAYS="before the last push at $MERGED_INTO_HEAD"
+  expect "68 a PR merged into the head branch is the new head, and a review older than that merge judged an older head" "$(judge)$(judge_says)" "1 NOT READYsays"
+  merged_into_head
+  expect "69 with --at, a merge into the head branch moves the head on both sides of it" "$(judge --at 2026-01-10T10:05:00Z)|$(judge --at 2026-01-10T10:15:00Z)" "0 READY|1 NOT READY"
 }
 
 commit_on_branch() {

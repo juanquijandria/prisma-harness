@@ -9,7 +9,7 @@ JQ=$(command -v jq)
 SHORT_SHA_WIDTH=7
 NO_CUTOFF=999999999999
 PAGE_SIZE=100
-PUSH_EVENTS='"push","force_push","branch_creation"'
+HEAD_MOVES='"push","force_push","branch_creation","pr_merge","merge_queue_merge"'
 PASSING_CONCLUSIONS='"success","neutral","skipped"'
 DEFAULT_REVIEWERS='claude[bot]'
 REVIEWERS="${PRISMA_PR_REVIEWERS-$DEFAULT_REVIEWERS}"
@@ -25,7 +25,7 @@ WORKFLOWS_SHAPE='type == "object" and (.workflows | type) == "array"'
 ACTIVE_WORKFLOWS_JQ='[.[].workflows[] | select(.state == "active" and (.path // "" | startswith(".github/workflows/")))] | length'
 REAL_SUCCESS=success
 TAB=$(printf '\t')
-SELFTEST_CASES=67
+SELFTEST_CASES=69
 USAGE='usage: pr-ready.sh <owner/repo> <number> [--at <ISO8601>] | --selftest'
 
 TIME_JQ='def seconds: if . == null then null else
@@ -99,7 +99,7 @@ read_head() {
   [ -n "$head_repo" ] && [ -n "$head_ref" ] || unmeasurable "the PR names no head branch that can still be read"
   ref_param=$("$JQ" -rn --arg ref "refs/heads/$head_ref" '$ref | @uri')
   fetch activity "repos/$head_repo/activity?ref=$ref_param&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
-  last_push=$("$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$PUSH_EVENTS"')) | by_cutoff(.timestamp)]
+  last_push=$("$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$HEAD_MOVES"')) | by_cutoff(.timestamp)]
     | max_by(.timestamp | seconds) // empty | [.timestamp, .after] | @tsv' "$WORK/activity.json")
   [ -n "$last_push" ] || unmeasurable "the activity log of $head_ref shows no push before that time"
   pushed_at=${last_push%"$TAB"*}; head_sha=${last_push#*"$TAB"}
