@@ -22,7 +22,7 @@ Este es el bloque en español que define PRISMA, tomado de la fuente de verdad d
 | # | Paso | Qué pasa | Skill o comprobación | Quién lo dispara |
 |---|---|---|---|---|
 | **1** | **Plan** | entrevista que afila la idea hasta el entendimiento compartido y deja registro. Y si adopta una regla que vale para todo el sistema, deja la lista entera de los hechos que esa regla toca, revisada completa y no solo los que ya fallaron | **invoca AHORA** `prisma-plan`, que cierra declarando el carril y si el trabajo cabe en una sesión | el terminal la arranca solo; la persona responde decisiones |
-| 1b | la bifurcación | decidir si cabe en UNA sesión (~140k de contexto útil) | ningún comando, es criterio | el agente lo estima al cerrar la entrevista y LO DICE |
+| 1b | la bifurcación | decidir si cabe en UNA sesión, que es entrar antes del 80% de su ventana, unos 800 mil tokens con 1 millón. Dentro del mismo ticket, al acercarse se compacta y no se pide relevo, y una sesión nueva es solo para otro ticket | ningún comando, es criterio | el agente lo estima al cerrar la entrevista y LO DICE |
 | 1c | solo si NO cabe | escribir el destino y el camino en tickets del tamaño de una sesión | los escribe `prisma-plan` al cerrar, cada ticket con su propia condición de salida | el agente |
 | **2** | **Build** | ejecutar la cadena de construcción | **invoca AHORA** `prisma-build`, que escribe cada prueba y la ve en rojo antes de que exista el código, la pone en verde, lanza `prisma-fidelity-review` en un subagente limpio y hace commit | el agente |
 | 2b | solo si está roto | diagnosticar antes de parchar | `prisma-diagnose`, que termina nombrando de qué paso se escapó el defecto | el agente |

@@ -7,6 +7,13 @@ T=$(mktemp -d)
 ok=1
 CASES=0
 PLAN_DECISION_FILTER="Not every open choice is the person's"
+SESSION_WINDOW_RULE="before 80% of its context window"
+SESSION_HANDOFF_RULE="compacts instead of asking for a handoff"
+SESSION_FIT_CLAUSES="$SESSION_WINDOW_RULE|$SESSION_HANDOFF_RULE|A new session is only for another ticket"
+FIXED_SESSION_SIZE='140 ?k|140[ ,.]?000|140 mil|dozen files|docena de archivos'
+FIXED_SESSION_SIZE_MUTANT="about 140k tokens of useful context"
+FIXED_SESSION_SIZE_MUTANT_ES="~140k de contexto útil"
+STEP1_SUMMARY_CLAUSES="$SESSION_WINDOW_RULE|$SESSION_HANDOFF_RULE"
 PLAN_DECISION_CLAUSES="change what gets built|spend someone's money|be hard to undo|reach an audience|Open the first round with the answer"
 STEP_SKILLS="prisma-plan prisma-build prisma-fidelity-review prisma-diagnose"
 EXTERNAL_PLUGIN_PATTERN='pocock|/to-spec|/to-tickets|/implement\b|grill-with-docs'
@@ -80,10 +87,18 @@ check_no_em_dash() {
 check_plan_closes() {
   f="$1/prisma-plan/SKILL.md"
   grep -q 'step 1' "$f" || return 1
-  a=$(line_of "$f" '^## Closing the interview'); b=$(line_of "$f" '^## The record'); c=$(line_of "$f" '140k')
+  a=$(line_of "$f" '^## Closing the interview'); b=$(line_of "$f" '^## The record'); c=$(line_of "$f" "$SESSION_WINDOW_RULE")
   [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] || return 1
   [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ] || return 1
+  carries_every_clause "$(sed -n "${a},${b}p" "$f")" "$SESSION_FIT_CLAUSES" || return 1
   sed -n "${a},${b}p" "$f" | grep -qi 'lane'
+}
+
+check_no_fixed_session_size() {
+  set -- "$1/METHOD.md" "$1/docs/es/METHOD.md" "$1"/skills/*/SKILL.md
+  for page in "$@"; do [ -f "$page" ] || return 1; done
+  grep -qiE "$FIXED_SESSION_SIZE" "$@"
+  [ "$?" -eq 1 ]
 }
 
 check_plan_filters_decisions() {
@@ -167,7 +182,9 @@ if [ "$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" = "$ROOT" ]; then
 else
   skip "this tree is not the repository itself, the published page list was not compared against its index"
 fi
-if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and closes with the lane and the session ceiling"; else fail "prisma-plan closing section"; fi
+if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and closes with the lane and a session fit measured against the context window"; else fail "prisma-plan closing section"; fi
+if check_no_fixed_session_size "$ROOT"; then pass "no method page and no skill brings back the fixed session size of 140k tokens or a dozen files"; else fail "a fixed session size in the method pages or the skills"; fi
+if carries_every_clause "$(cat "$ROOT/skills/prisma/SKILL.md")" "$STEP1_SUMMARY_CLAUSES"; then pass "the prisma skill sums up step 1 with the session fit against the window and the compaction inside a ticket"; else fail "the step 1 summary of the prisma skill"; fi
 if check_plan_filters_decisions "$ROOT/skills"; then pass "prisma-plan keeps for the person only the choices that change the work, cost money, cannot be undone or reach an audience"; else fail "prisma-plan decision filter"; fi
 if check_build_order "$ROOT/skills"; then pass "prisma-build sees red before the review and the review before the commit"; else fail "prisma-build order"; fi
 if check_review_axes "$ROOT/skills"; then pass "prisma-fidelity-review pins the fixed point and keeps the two axes apart"; else fail "prisma-fidelity-review anchors"; fi
@@ -197,8 +214,20 @@ sed "s/$STEP3_EXPIRY_CLOCK_EN/$STEP3_EXPIRY_MUTANT_CLOCK/" "$ROOT/METHOD.md" > "
 if check_step3_expiry "$T/method"; then fail "control: changing the clock of the expiry line in METHOD.md was not caught"; else pass "control: changing the clock of the expiry line in METHOD.md turns the step 3 case red"; fi
 mutate; printf '\nA line with an em-dash \342\200\224 inside.\n' >> "$T/skills/prisma-build/SKILL.md"
 if check_no_em_dash "$T/skills"; then fail "control: an injected em-dash was not caught"; else pass "control: an injected em-dash turns the em-dash case red"; fi
-mutate; grep -v '140k' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
-if check_plan_closes "$T/skills"; then fail "control: removing the session ceiling was not caught"; else pass "control: removing the session ceiling turns the plan case red"; fi
+mutate; grep -vF "$SESSION_WINDOW_RULE" "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
+if check_plan_closes "$T/skills"; then fail "control: removing the session fit against the window was not caught"; else pass "control: removing the session fit against the window turns the plan case red"; fi
+mutate; sed "s/$SESSION_HANDOFF_RULE/asks for a new session/" "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
+if check_plan_closes "$T/skills"; then fail "control: a session that asks for a handoff instead of compacting was not caught"; else pass "control: a session that asks for a handoff instead of compacting turns the plan case red"; fi
+rm -rf "$T/sized"; mkdir -p "$T/sized/docs/es"; cp "$ROOT/METHOD.md" "$T/sized/METHOD.md"; cp -R "$ROOT/skills" "$T/sized/skills"
+printf '\nDecide whether it fits in one session, %s.\n' "$FIXED_SESSION_SIZE_MUTANT" >> "$T/sized/skills/prisma/SKILL.md"; cp "$ROOT/docs/es/METHOD.md" "$T/sized/docs/es/METHOD.md"
+if check_no_fixed_session_size "$T/sized"; then fail "control: a fixed session size put back in a skill was not caught"; else pass "control: a fixed session size put back in a skill turns the session size case red"; fi
+cp "$ROOT/skills/prisma/SKILL.md" "$T/sized/skills/prisma/SKILL.md"; printf '\nDecidir si cabe en una sesión, %s.\n' "$FIXED_SESSION_SIZE_MUTANT_ES" >> "$T/sized/docs/es/METHOD.md"
+if check_no_fixed_session_size "$T/sized"; then fail "control: a fixed session size put back in the Spanish method page was not caught"; else pass "control: a fixed session size put back in the Spanish method page turns the session size case red"; fi
+rm -rf "$T/sized"; mkdir -p "$T/sized"
+if check_no_fixed_session_size "$T/sized"; then fail "control: a tree without the method pages and the skills was not caught"; else pass "control: a tree without the method pages and the skills turns the session size case red"; fi
+rm -rf "$T/sized"
+mutate; sed "s/$SESSION_HANDOFF_RULE/asks for a new session/" "$T/skills/prisma/SKILL.md" > "$T/s.md"; mv "$T/s.md" "$T/skills/prisma/SKILL.md"
+if carries_every_clause "$(cat "$T/skills/prisma/SKILL.md")" "$STEP1_SUMMARY_CLAUSES"; then fail "control: a step 1 summary that asks for a new session was not caught"; else pass "control: a step 1 summary that asks for a new session turns the summary case red"; fi
 mutate; grep -v "$PLAN_DECISION_FILTER" "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"
 if check_plan_filters_decisions "$T/skills"; then fail "control: removing the decision filter was not caught"; else pass "control: removing the decision filter turns the plan filter case red"; fi
 mutate; sed 's/, or reach an audience//' "$T/skills/prisma-plan/SKILL.md" > "$T/p.md"; mv "$T/p.md" "$T/skills/prisma-plan/SKILL.md"

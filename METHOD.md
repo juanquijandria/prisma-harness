@@ -29,7 +29,7 @@ Ask two questions. First, what kind of work is it, and four lanes answer that, q
 | # | Step | What happens | Skill or check | Who triggers it |
 |---|---|---|---|---|
 | **1** | **Plan** | an interview that sharpens the idea into shared understanding and leaves a record. When it adopts a rule that applies to the whole system, it leaves the full list of the facts that rule touches, reviewed whole and not only the ones that already failed | **invoke NOW** `prisma-plan`, which closes by declaring the lane and whether the work fits in one session | the agent starts it; the person answers decisions |
-| 1b | the fork | decide whether it fits in ONE session (about 140k tokens of useful context) | no command, it is judgment | the agent estimates it when closing the interview and SAYS SO |
+| 1b | the fork | decide whether it fits in ONE session, which means fitting before 80% of its context window, about 800k tokens with a 1M window. Within the same ticket a session nearing that ceiling compacts and does not ask for a handoff, and a new session is only for another ticket | no command, it is judgment | the agent estimates it when closing the interview and SAYS SO |
 | 1c | only if it does NOT fit | write the destination and the path as session-sized tickets | `prisma-plan` writes them when it closes, each ticket with its own exit condition | the agent |
 | **2** | **Build** | run the build chain | **invoke NOW** `prisma-build`, which writes each test and sees it red before the code exists, turns it green, launches `prisma-fidelity-review` in a fresh subagent, then commits | the agent |
 | 2b | only if it is broken | diagnose before patching | `prisma-diagnose`, which ends by naming the step the defect escaped from | the agent |
