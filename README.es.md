@@ -22,7 +22,7 @@
 
 <p align="center"><img src="assets/prisma-method-map.svg" width="100%" alt="El mapa de PRISMA. Un pedido se rutea a uno de cinco carriles, el código con lógica corre plan, build, end to end, mutation testing y verify, y cinco puertas deciden el merge. Un ticket de ejemplo vuelve tres veces y se aprueba en la cuarta vuelta."></p>
 
-PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio lo empaqueta como plugin de Claude Code. Rutea cada pedido a uno de cinco carriles, corre cinco pasos para el código con lógica, y deja que cinco puertas decidan si el trabajo sale de la máquina. Corre con un solo modelo, sin segundo motor, sin servicio externo y sin cuenta. El dibujo está en inglés.
+PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio lo empaqueta como plugin de Claude Code. Rutea cada pedido según el tipo de trabajo, corre cinco pasos para el código con lógica, revisa el trabajo con cinco puertas con nombre, y frena con hooks lo que el método dice que no debe pasar. Corre con un solo modelo, sin segundo motor, sin servicio externo y sin cuenta. El dibujo está en inglés.
 
 ## Por qué existe
 
@@ -42,15 +42,15 @@ Tú solo dices "PRISMA". La skill `prisma` rutea el pedido y llama a cada una de
 
 | Paso | Skill | Qué hace |
 |---|---|---|
-| Ruteo | `prisma` | manda el pedido a uno de cinco carriles, consulta, cambio mecánico, código con lógica, datos a un tercero o texto, y solo el código con lógica corre los cinco pasos |
-| 1 Plan | `prisma-plan` | una entrevista en rondas que deja un registro escrito, dice si el trabajo cabe en una sesión y lo parte en tickets, y cada otra sesión que pide va con su tarjeta |
+| Ruteo | `prisma` | rutea el pedido a uno de cuatro carriles, consulta, cambio mecánico, código con lógica o texto, y además a datos a un tercero cuando algo sale hacia otra persona. Solo el código con lógica corre los cinco pasos |
+| 1 Plan | `prisma-plan` | una entrevista en rondas que deja un registro escrito, dice si el trabajo cabe en una sesión, lo parte en tickets cuando no cabe, y pide cada otra sesión con su tarjeta |
 | 2 Build | `prisma-build` | cada test visto en rojo antes del código que lo pone en verde, después la revisión de `prisma-fidelity-review` en un subagente limpio, después el commit |
 | 2b Diagnose | `prisma-diagnose` | cuando algo está roto, reproducirlo antes de parchar, y nombrar el paso del que se escapó el defecto |
 | 3 End to end | ninguna | correr sobre datos reales y mirar la superficie que ve una persona, no el artefacto que la produce |
-| 4 Mutation testing | ninguna | reintroducir el defecto exacto, sumar un contraejemplo, y comprobar que el test falla por la razón esperada |
+| 4 Mutation testing | ninguna | reintroducir el defecto exacto, sumar un contraejemplo, comprobar que el test falla por la razón esperada, y correr el gate de formato sobre el texto |
 | 5 Verify | ninguna | comprobar la condición de salida en la fuente real, y medir una cifra otra vez por otra vía |
 
-Tres reglas valen sobre todos los carriles. Toda afirmación es hipótesis hasta que se mida por una vía independiente. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó. Una regla entra al método solo si da rojo sobre su caso histórico.
+Una regla vale sobre todos los carriles, una afirmación es hipótesis hasta que se mida por una vía independiente. Y el método crece bajo una más, una regla entra solo si da rojo sobre su caso histórico.
 
 ## Las cinco puertas
 
@@ -58,7 +58,7 @@ Tres reglas valen sobre todos los carriles. Toda afirmación es hipótesis hasta
 - **Gate de formato**, `hooks/format-gate.sh`, revisa cómo está escrita una página y no lee código.
 - **Refutador**, un agente adversarial, intenta tumbar un hallazgo contra el código y los datos.
 - **Gate de merge**, la CI o el bot del pull request, dice si se puede mergear.
-- **Réplica ciega**, `hooks/blind-replica.sh`, recibe la afirmación y las fuentes y nada del cálculo. Con un solo modelo corre en un subagente limpio, que da una derivación independiente y no un motor independiente.
+- **Réplica ciega** recibe la afirmación y las fuentes y nada del cálculo, en un brief que arma `hooks/blind-replica.sh`. Con un solo modelo corre en un subagente limpio, que da una derivación independiente y no un motor independiente.
 
 ## Instalar
 
@@ -90,10 +90,10 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 
 ## Cómo lo usas
 
-1. **Instala una vez.** No hay un segundo plugin.
-2. **Trabaja como siempre.** Las puertas corren solas, hablan solo cuando algo está mal, y el agente recibe qué arreglar.
+1. **Instala una vez y abre una sesión nueva.** No hay un segundo plugin.
+2. **Trabaja como siempre.** Los hooks corren solos, una puerta habla solo cuando algo está mal, y el agente recibe qué arreglar.
 3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo.
-4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
+4. **Lee [la referencia](docs/reference.md)**, en inglés, cuando quieras saber qué hace una puerta, y `docs/es/METHOD.md` para saber por qué el método la pide.
 
 ## Qué hay adentro
 
@@ -101,9 +101,9 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 |---|---|---|
 | `METHOD.md`, `docs/es/METHOD.md` | el método, en inglés y en su bloque canónico en español | lo lees |
 | `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura, y cuáles hace cumplir el gate de formato | lo lees |
-| `skills/` | las cinco skills de la tabla de arriba | cuando dices "PRISMA" o llega su paso |
+| `skills/` | las cinco skills que nombra la tabla de arriba | cuando dices "PRISMA" o llega su paso |
 | `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs antes de leer el índice | `PreToolUse` en Write y Edit |
-| `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | las puertas de push, líneas de comentario en el diff, un tamaño que avisa sobre 200 líneas cambiadas y frena sobre 400, y el linter del propio repositorio | `PreToolUse` en Bash |
+| `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | las puertas de push, líneas de comentario en el diff, un tamaño que avisa sobre 200 líneas cambiadas y frena sobre 400, y el linter del propio repositorio, `php-cs-fixer` o `eslint` | `PreToolUse` en Bash |
 | `hooks/shell-traps.sh` | pone comillas a dos trampas de zsh, y frena un `timeout` que no está instalado y un `pkill` que alcanza otra carpeta | `PreToolUse` en Bash |
 | `hooks/secret-reads.sh` | deja las líneas de un archivo de secretos fuera de la consola y fuera de las búsquedas | `PreToolUse` en Bash |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy | `Stop` |
@@ -115,6 +115,7 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 | `hooks/notes-machinery.sh` | marca maquinaria de código dentro de un árbol pensado para notas | `SessionStart` y `Stop` |
 | `hooks/pr-ready.sh`, `blind-replica.sh` | si un PR está listo para mergear, y el brief de la réplica ciega | los llamas tú |
 | `hooks/receipt.sh` | una línea local por freno, corrección, escape o hueco | lo escriben las puertas, lo lees tú |
+| los demás archivos de `hooks/` | los ayudantes que comparten las puertas, y las pruebas que corre cada una | los llaman las puertas |
 
 Cada pieza completa, su escape y lo que no caza están en [la referencia](docs/reference.md), en inglés.
 
@@ -134,6 +135,6 @@ Todo ajuste es opcional. Aquí van tres, y [la referencia](docs/reference.md) li
 
 ## Dónde se ubica
 
-Prisma Harness vive en la capa del harness, las herramientas, los permisos, el estado y los evaluadores que rodean a un modelo. No es un loop ni un grafo. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 traen sus propias skills, que descienden de [las skills de ingeniería de Matt Pocock](https://github.com/mattpocock/skills), cuyo flujo termina en el commit. Los pasos 3, 4 y 5 son la parte por la que existe este harness.
+Prisma Harness vive en la capa del harness, las herramientas, los permisos, el estado y los evaluadores que rodean a un modelo. No es un loop ni un grafo, no es un revisor de gusto, y nada acá califica la calidad del código. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 traen sus propias skills, que descienden de [las skills de ingeniería de Matt Pocock](https://github.com/mattpocock/skills), cuyo flujo termina en el commit. Los pasos 3, 4 y 5 son la parte por la que existe este harness.
 
 Detrás de cada regla del método hay una falla fechada. Este repositorio trae las reglas, y la historia se queda con su autor. Las contribuciones entran con la regla que el método se aplica a sí mismo. Un control nuevo entra solo si da rojo sobre un caso real. Licencia MIT.

@@ -22,7 +22,7 @@
 
 <p align="center"><img src="assets/prisma-method-map.svg" width="100%" alt="The PRISMA map. A request is routed into one of five lanes, code with logic runs plan, build, end to end, mutation testing and verify, and five gates decide the merge. A demo ticket is sent back three times and approved on the fourth pass."></p>
 
-PRISMA is a verification method for work an agent produces, and this repository packages it as a Claude Code plugin. It routes each request into one of five lanes, runs five steps for code with logic, and lets five gates decide whether the work leaves the machine. It runs on a single model, with no second engine, no external service and no account.
+PRISMA is a verification method for work an agent produces, and this repository packages it as a Claude Code plugin. It routes each request by the kind of work, runs five steps for code with logic, checks the work with five named gates, and blocks with hooks what the method says must not pass. It runs on a single model, with no second engine, no external service and no account.
 
 ## Why it exists
 
@@ -42,15 +42,15 @@ You only say "PRISMA". The `prisma` skill routes the request and calls each of t
 
 | Step | Skill | What it does |
 |---|---|---|
-| Route | `prisma` | sends the request into one of five lanes, query, mechanical change, code with logic, data to a third party or text, and only code with logic runs the five steps |
-| 1 Plan | `prisma-plan` | an interview in rounds that leaves a written record, says whether the work fits one session, and splits it into tickets, every other session asked for with its card |
+| Route | `prisma` | routes the request into one of four lanes, query, mechanical change, code with logic or text, and into data to a third party as well when something leaves to someone else. Only code with logic runs the five steps |
+| 1 Plan | `prisma-plan` | an interview in rounds that leaves a written record, says whether the work fits one session, splits it into tickets when it does not, and asks for every other session with its card |
 | 2 Build | `prisma-build` | each test seen red before the code that turns it green, then a review by `prisma-fidelity-review` in a fresh subagent, then the commit |
 | 2b Diagnose | `prisma-diagnose` | when something is broken, reproduce it before patching, and name the step the defect escaped from |
 | 3 End to end | none | run on real data and look at the surface a person sees, not the artifact that produces it |
-| 4 Mutation testing | none | reintroduce the exact defect, add a counterexample, and check that the test fails for the expected reason |
+| 4 Mutation testing | none | reintroduce the exact defect, add a counterexample, check that the test fails for the expected reason, and run the format gate on the text |
 | 5 Verify | none | check the exit condition on the real source, and measure a figure again by another route |
 
-Three rules hold over every lane. Every claim is a hypothesis until it is measured by an independent route. The instrument is calibrated on the real corpus, and whoever calibrates says what was not tested. A rule enters the method only if it turns red on its historical case.
+One rule holds over every lane, a claim is a hypothesis until it is measured by an independent route. And the method grows under one more, a rule enters only if it turns red on its historical case.
 
 ## The five gates
 
@@ -58,7 +58,7 @@ Three rules hold over every lane. Every claim is a hypothesis until it is measur
 - **Format gate**, `hooks/format-gate.sh`, checks how a page is written and reads no code.
 - **Refuter**, an adversarial agent, tries to knock a finding down against the code and the data.
 - **Merge gate**, the CI or bot check on the pull request, says whether it can merge.
-- **Blind replica**, `hooks/blind-replica.sh`, gets the claim and the sources and nothing of the calculation. On a single model it runs in a fresh subagent, which gives an independent derivation and not an independent engine.
+- **Blind replica** gets the claim and the sources and nothing of the calculation, in a brief that `hooks/blind-replica.sh` builds. On a single model it runs in a fresh subagent, which gives an independent derivation and not an independent engine.
 
 ## Install
 
@@ -90,10 +90,10 @@ Requirements are `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mkte
 
 ## How you use it
 
-1. **Install once.** There is no second plugin.
-2. **Work as always.** The gates run on their own and speak only when something is wrong, and the agent is told what to fix.
+1. **Install once, then open a new session.** There is no second plugin.
+2. **Work as always.** The hooks run on their own, a gate speaks only when something is wrong, and the agent is told what to fix.
 3. **Say "PRISMA"** when you want the whole method on a piece of work.
-4. **Read `METHOD.md`** when you want to know why a gate did what it did.
+4. **Read [the reference](docs/reference.md)** when you want to know what a gate does, and `METHOD.md` for why the method asks for it.
 
 ## What is inside
 
@@ -101,9 +101,9 @@ Requirements are `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mkte
 |---|---|---|
 | `METHOD.md`, `docs/es/METHOD.md` | the method, in English and in its canonical Spanish block | you read it |
 | `STYLE.md`, `docs/es/STYLE.md` | the writing rules, and which ones the format gate enforces | you read it |
-| `skills/` | the five skills of the table above | when you say "PRISMA" or their step comes |
+| `skills/` | the five skills named in the table above | when you say "PRISMA" or their step comes |
 | `hooks/gate-read-index.sh` | blocks a write under the docs folder before the index is read | `PreToolUse` on Write and Edit |
-| `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | the push gates, comment lines in the diff, a size that warns over 200 changed lines and blocks over 400, and the repository's own linter | `PreToolUse` on Bash |
+| `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | the push gates, comment lines in the diff, a size that warns over 200 changed lines and blocks over 400, and the repository's own linter, `php-cs-fixer` or `eslint` | `PreToolUse` on Bash |
 | `hooks/shell-traps.sh` | quotes two zsh traps, and blocks a missing `timeout` and a `pkill` that reaches another folder | `PreToolUse` on Bash |
 | `hooks/secret-reads.sh` | keeps the lines of a secrets file out of the console and out of searches | `PreToolUse` on Bash |
 | `hooks/format-gate.sh` | the format gate over the pages touched today | `Stop` |
@@ -115,6 +115,7 @@ Requirements are `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mkte
 | `hooks/notes-machinery.sh` | flags code machinery inside a tree meant for notes | `SessionStart` and `Stop` |
 | `hooks/pr-ready.sh`, `blind-replica.sh` | whether a PR is ready to merge, and the brief of the blind replica | you call them |
 | `hooks/receipt.sh` | one local line per block, rewrite, escape or gap | the gates write it, you read it |
+| the other files under `hooks/` | the helpers the gates share, and the tests each gate runs | called by the gates |
 
 Each piece in full, its escape and what it does not catch are in [the reference](docs/reference.md).
 
@@ -134,6 +135,6 @@ Every setting is optional. Three of them are here, and [the reference](docs/refe
 
 ## Where it sits
 
-Prisma Harness lives in the harness layer, the tools, permissions, state and evaluators around a model. It is not a loop and not a graph. It gives the loop its evidence and the graph its gates, and it only speaks when a gate fails. Steps 1 and 2 ship their own skills, which descend from [the engineering skills of Matt Pocock](https://github.com/mattpocock/skills), whose flow ends at the commit. Steps 3, 4 and 5 are the part this harness exists for.
+Prisma Harness lives in the harness layer, the tools, permissions, state and evaluators around a model. It is not a loop and not a graph, it is not a reviewer of taste, and nothing here grades code quality. It gives the loop its evidence and the graph its gates, and it only speaks when a gate fails. Steps 1 and 2 ship their own skills, which descend from [the engineering skills of Matt Pocock](https://github.com/mattpocock/skills), whose flow ends at the commit. Steps 3, 4 and 5 are the part this harness exists for.
 
 The method has a history of dated failures behind every rule. This repository ships the rules, and the history stays with its author. Contributions enter under the rule the method applies to itself. A new control enters only if it turns red on a real case. License MIT.
