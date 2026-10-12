@@ -85,6 +85,7 @@ PRISMA_DEPS_CHECK=0|session-deps.sh
 PRISMA_JQ=|check-canonical-sync.sh
 PRISMA_PR_REVIEWERS=nobody-at-all|pr-ready.sh
 PRISMA_GH=/nowhere-at-all/gh|claim-ready-gate.sh
+PRISMA_JQ=|paste-block-gate.sh
 PRISMA_RECEIPT_SOURCED=1|receipt.sh|return-ends-the-script
 PRISMA_ESCAPE_SOURCED=1|escape-declared.sh|return-ends-the-script
 TMPDIR=$USER_TEMP|format-gate.sh
