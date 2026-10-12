@@ -13,9 +13,10 @@ NAME_FLAG_LONG="--name"
 DEFAULT_LAUNCH_COMMANDS=claude
 LAUNCH_COMMANDS="$DEFAULT_LAUNCH_COMMANDS ${PRISMA_LAUNCH_COMMANDS:-}"
 ASSIGNMENT_PATTERN="^[A-Za-z_][A-Za-z0-9_]*="
+FILLED_CELL_PATTERN='[\p{L}\p{N}]'
 NAME_SEPARATOR_PATTERN='[^\p{L}\p{N}_.-]+'
 CARD_CELLS=6
-SELFTEST_CASES=50
+SELFTEST_CASES=51
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 
@@ -47,7 +48,7 @@ def table_rows: .[] | select(test("^\\s*\\|") and (test("^[\\s|:-]+$") | not))
   | sub("^\\s*\\|"; "") | sub("\\|\\s*$"; "") | [split("|")[] | gsub("^\\s+|\\s+$"; "")];
 def first_cell_names($name): (.[0] | gsub("[`*]"; "") | gsub("^\\s+|\\s+$"; "")) as $cell
   | $cell == $name or ([$cell | splits($separator)] | index([$name]) != null);
-def carded($rows): .name as $name | any($rows[]; first_cell_names($name) and length >= $cells and all(.[]; length > 0));
+def carded($rows): .name as $name | any($rows[]; first_cell_names($name) and length >= $cells and all(.[]; test($filled)));
 ($launch | [splits("\\s+")] | map(select(length > 0))) as $words
 | split_fences
 | [.prose | table_rows] as $rows
@@ -72,7 +73,7 @@ run_gate() {
     || { not_measured "it could not read a final message in the stop event"; exit 0; }
   found=$(printf '%s' "$payload" | "$JQ" -r '.last_assistant_message // ""' 2>/dev/null \
     | "$JQ" -Rrs --arg launch "$LAUNCH_COMMANDS" --arg escape "$ESCAPE" --arg headless "$NOT_A_NEW_SESSION_FLAGS" --arg subcommand "$SUBCOMMAND_PATTERN" \
-      --arg assignment "$ASSIGNMENT_PATTERN" --arg separator "$NAME_SEPARATOR_PATTERN" \
+      --arg assignment "$ASSIGNMENT_PATTERN" --arg separator "$NAME_SEPARATOR_PATTERN" --arg filled "$FILLED_CELL_PATTERN" \
       --arg short "$NAME_FLAG_SHORT" --arg long "$NAME_FLAG_LONG" --argjson cells "$CARD_CELLS" "$LAUNCHES_JQ" 2>/dev/null) \
     || { not_measured "jq could not read the final message"; exit 0; }
   [ -n "$found" ] || exit 0

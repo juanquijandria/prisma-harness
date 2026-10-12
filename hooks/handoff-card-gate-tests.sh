@@ -71,6 +71,7 @@ cc -n vigia-docs \"update the docs\"")")" "0 block"
     "$(decision "$(printf 'Abre esta terminal.\n\n%s\n%s\n' "$FENCE" "$REAL_LAUNCH")")" "0 block"
   expect "48 a name with a space finds its row" \
     "$(decision "$(with_card '| fix login | otro repo | el arreglo | en paralelo | esta sesión | cuando publique |' 'cc -n "fix login" "the mission"')")" "0 pass"
+  expect "51 a row of dashes is not a card" "$(decision "$(with_card '| vigia-reclamos | - | - | - | - | - |' "$REAL_LAUNCH")")" "0 block"
   expect "27 a row inside the code block is not a card" "$(decision "$(in_fence "$REAL_ROW
 $REAL_LAUNCH")")" "0 block"
   unset LAUNCH_FOR_TEST
