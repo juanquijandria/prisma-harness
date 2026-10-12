@@ -226,10 +226,16 @@ hooks_without() { copy="$T/hooks-without-$1"; mkdir -p "$copy" && cp "$HOOKS"/*.
 without_jq() { ( PATH="$T/bin-without-jq"; gate_run /bin/sh "$HOOKS" "$1" "$2" ); }
 mkdir -p "$T/bin-without-jq"
 for tool in cat dirname basename sed tr mkdir date grep; do ln -s "$(command -v "$tool")" "$T/bin-without-jq/$tool" 2>/dev/null; done
-for gate in lint comments size; do
-  leaves_lines "M1 the $gate gate without jq leaves a not-measured line for a push" 1 without_jq "$gate" "git push origin feature"
-done
-leaves_lines "M2 counterexample, without jq a command that is not a push leaves nothing" 0 without_jq comments "ls -la"
+COPIED_TOOLS_CANNOT_RUN="tools copied into another directory cannot run on this system, so a machine without jq cannot be simulated here"
+if PATH="$T/bin-without-jq" /bin/sh -c 'dirname /a/b && date && mkdir -p "$1"' probe "$T/probe-dir" >/dev/null 2>&1; then
+  for gate in lint comments size; do
+    leaves_lines "M1 the $gate gate without jq leaves a not-measured line for a push" 1 without_jq "$gate" "git push origin feature"
+  done
+  leaves_lines "M2 counterexample, without jq a command that is not a push leaves nothing" 0 without_jq comments "ls -la"
+else
+  for gate in lint comments size; do skip "M1 the $gate gate, $COPIED_TOOLS_CANNOT_RUN"; done
+  skip "M2 $COPIED_TOOLS_CANNOT_RUN"
+fi
 leaves_lines "M3 the comments gate without measure-comments.sh leaves a not-measured line" 1 gate_run /bin/sh "$(hooks_without measure-comments.sh)" comments "git push origin feature"
 for helper in measure-diff-size.sh compare-base.sh command-invokes.sh; do
   leaves_lines "M4 the size gate without $helper leaves a not-measured line" 1 gate_run /bin/sh "$(hooks_without "$helper")" size "git push origin feature"
@@ -250,6 +256,8 @@ n=$(receipt_lines); ( GATE_CWD="$windows_cwd"; parser_fault size "git push origi
 if [ "$(receipt_lines)" = "$((n+1))" ] && [ "$(tail -1 "$PRISMA_RECEIPT_FILE" | cut -f3)" = 'C:\Users\x' ]; then pass "M12 the repository in the line is the cwd jq reads, with its escapes undone"
 else fail "M12 the repository in the line is [$(tail -1 "$PRISMA_RECEIPT_FILE" | cut -f3)]"; fi
 loader_shell=$(command -v dash || true)
+dash_reason="dash is not installed"
+if [ -n "$loader_shell" ] && ! gate_run "$loader_shell" "$HOOKS" lint "ls -la" >/dev/null 2>&1; then loader_shell=""; dash_reason="dash on this system cannot read the intact gate"; fi
 for helper in receipt.sh push-names-head.sh escape-declared.sh; do
   copy=$(hooks_without "$helper")
   if [ "$helper" = "escape-declared.sh" ]; then want=1; else want=0; fi
@@ -259,7 +267,7 @@ for helper in receipt.sh push-names-head.sh escape-declared.sh; do
       if [ -n "$loader_shell" ]; then
         leaves_lines "M10 dash runs the $gate gate without $helper on $cmd, exits 0 and leaves $want line(s)" "$want" gate_run "$loader_shell" "$copy" "$gate" "$cmd"
       else
-        skip "M10 dash is not installed, so the $gate gate without $helper cannot be run under it"
+        skip "M10 $dash_reason, so the $gate gate without $helper cannot be run under it"
       fi
     done
   done

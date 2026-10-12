@@ -28,6 +28,11 @@ expect() {
   if [ "$2" = "$3" ]; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s, expected [%s] and got [%s]\n' "$1" "$3" "$2"; ok=0; fi
 }
 
+skip() {
+  cases=$((cases+1))
+  printf 'SKIP %s\n' "$1"
+}
+
 selftest_direct_reads() {
   expect "1 cat of a .env blocks" "$(run_gate 'cat .env')" "2"
   expect "2 cat of a .env.example passes" "$(run_gate 'cat .env.example')" "0"
@@ -104,12 +109,17 @@ selftest_outcomes() {
   expect "53 the escape as an argument of echo does not count" "$(run_gate 'echo PRISMA_SECRET_READS_OK=1 && cat .env')" "2"
   without_jq=$(mktemp -d)
   for tool in dirname mkdir date tr cat sed grep; do ln -s "$(command -v "$tool")" "$without_jq/$tool"; done
-  : > "$PRISMA_RECEIPT_FILE"
-  rc=$(payload_for 'cat .env' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
-  expect "54 without jq the gate passes and writes it down as not measured" "$rc $(last_outcome)" "0 not-measured"
-  : > "$PRISMA_RECEIPT_FILE"
-  rc=$(payload_for 'ls -la' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
-  expect "80 without jq a command that names no secrets file passes and leaves no line" "$rc $(last_outcome)" "0 "
+  if PATH="$without_jq" /bin/sh -c 'dirname /a/b && date && mkdir -p "$1"' probe "$without_jq/probe-dir" >/dev/null 2>&1; then
+    : > "$PRISMA_RECEIPT_FILE"
+    rc=$(payload_for 'cat .env' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
+    expect "54 without jq the gate passes and writes it down as not measured" "$rc $(last_outcome)" "0 not-measured"
+    : > "$PRISMA_RECEIPT_FILE"
+    rc=$(payload_for 'ls -la' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
+    expect "80 without jq a command that names no secrets file passes and leaves no line" "$rc $(last_outcome)" "0 "
+  else
+    skip "54 tools copied into another directory cannot run on this system, so a machine without jq cannot be simulated here"
+    skip "80 tools copied into another directory cannot run on this system, so a machine without jq cannot be simulated here"
+  fi
   rm -rf "$without_jq"
   expect "55 an unquoted include is quoted in the same rewrite" "$(SHELL=/bin/zsh; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include='*.py' TOKEN ."
   expect "81 under bash the include keeps its own form, because only zsh aborts on it" "$(SHELL=/bin/bash; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include=*.py TOKEN ."
