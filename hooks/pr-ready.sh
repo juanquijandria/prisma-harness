@@ -9,7 +9,7 @@ JQ=$(command -v jq)
 SHORT_SHA_WIDTH=7
 NO_CUTOFF=999999999999
 PAGE_SIZE=100
-PUSH_EVENTS='"push","force_push","branch_creation"'
+HEAD_MOVES='"push","force_push","branch_creation","pr_merge","merge_queue_merge"'
 PASSING_CONCLUSIONS='"success","neutral","skipped"'
 DEFAULT_REVIEWERS='claude[bot]'
 REVIEWERS="${PRISMA_PR_REVIEWERS-$DEFAULT_REVIEWERS}"
@@ -21,8 +21,11 @@ COUNTING_REVIEWS='"APPROVED","COMMENTED"'
 LIST_SHAPE='type == "array"'
 PULL_SHAPE='type == "object" and (.head | type) == "object"'
 CHECK_RUNS_SHAPE='type == "object" and (.check_runs | type) == "array"'
+WORKFLOWS_SHAPE='type == "object" and (.workflows | type) == "array"'
+ACTIVE_WORKFLOWS_JQ='[.[].workflows[] | select(.state == "active" and (.path // "" | startswith(".github/workflows/")))] | length'
+REAL_SUCCESS=success
 TAB=$(printf '\t')
-SELFTEST_CASES=52
+SELFTEST_CASES=69
 USAGE='usage: pr-ready.sh <owner/repo> <number> [--at <ISO8601>] | --selftest'
 
 TIME_JQ='def seconds: if . == null then null else
@@ -96,7 +99,7 @@ read_head() {
   [ -n "$head_repo" ] && [ -n "$head_ref" ] || unmeasurable "the PR names no head branch that can still be read"
   ref_param=$("$JQ" -rn --arg ref "refs/heads/$head_ref" '$ref | @uri')
   fetch activity "repos/$head_repo/activity?ref=$ref_param&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
-  last_push=$("$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$PUSH_EVENTS"')) | by_cutoff(.timestamp)]
+  last_push=$("$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$HEAD_MOVES"')) | by_cutoff(.timestamp)]
     | max_by(.timestamp | seconds) // empty | [.timestamp, .after] | @tsv' "$WORK/activity.json")
   [ -n "$last_push" ] || unmeasurable "the activity log of $head_ref shows no push before that time"
   pushed_at=${last_push%"$TAB"*}; head_sha=${last_push#*"$TAB"}
@@ -108,7 +111,9 @@ judge_ci() {
   fetch statuses "repos/$REPO/commits/$head_sha/statuses?per_page=$PAGE_SIZE" "$LIST_SHAPE" all
   runs=$("$JQ" -rn --argjson cutoff "$CUTOFF" --slurpfile runs "$WORK/runs.json" --slurpfile statuses "$WORK/statuses.json" "$TIME_JQ $CI_JQ" | tr -d '\r')
   short=$(printf "%.${SHORT_SHA_WIDTH}s" "$head_sha")
-  [ "$runs" = "none" ] && { finding ok "ci: no CI runs on this PR, nothing to wait for on $short"; return; }
+  [ "$runs" = "none" ] && { judge_no_runs; return; }
+  printf '%s\n' "$runs" | awk -F "$TAB" -v real="$REAL_SUCCESS" '$1 != "ok" || $3 == real { measured = 1 } END { exit measured }' \
+    && finding unmeasured "ci: every run on $short finished skipped or neutral, so nothing shows the CI passed"
   printf '%s\n' "$runs" | while IFS="$TAB" read -r verdict name state; do
     case "$verdict" in
       ok) finding ok "ci: $name finished as $state on $short" ;;
@@ -116,6 +121,14 @@ judge_ci() {
       *) finding fail "ci: $name finished as $state on $short" ;;
     esac
   done
+}
+
+judge_no_runs() {
+  [ -z "$AT" ] || finding note "ci: GitHub only lists the workflows as they are today, so they are not read as of $AT"
+  fetch workflows "repos/$REPO/actions/workflows?per_page=$PAGE_SIZE" "$WORKFLOWS_SHAPE" all
+  active=$("$JQ" -s "$ACTIVE_WORKFLOWS_JQ" "$WORK/workflows.json")
+  [ "$active" -gt 0 ] || { finding ok "ci: no CI runs on this PR and no active workflow, nothing to wait for on $short"; return; }
+  finding unmeasured "ci: no run on $short yet, and the repository has active workflows, $active of them. One filtered by branch or path may skip this PR on purpose, so read its triggers, or run this again once it ran"
 }
 
 judge_reviewer() {
@@ -201,4 +214,5 @@ judge_ci
 judge_reviewers
 judge_mergeable
 judge_other_prs
+judge_base
 verdict

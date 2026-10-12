@@ -117,6 +117,14 @@ selftest_receipt() {
   expect "28 a session folder that does not exist lets the stop through and says so" "$(decision) $(receipt_count not-measured)" "0 pass 4"
 }
 
+selftest_two_prs() {
+  : > "$PRISMA_RECEIPT_FILE"
+  ready; CHECKS='{"check_runs":[]}'; SECOND_PR=8; said "Los PRs #7 y #8 quedaron listos para merge."
+  reason=$(stop | "$JQ" -r '.reason // empty' 2>/dev/null)
+  expect "33 of two PRs claimed ready, one not measured and one not ready, only the second blocks, and the first leaves its receipt" \
+    "$(printf '%s' "$reason" | grep -c "api#8 is ready") $(printf '%s' "$reason" | grep -c "api#7") $(receipt_count not-measured)" "1 0 1"
+}
+
 selftest() {
   GATE=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
   T=$(mktemp -d)
@@ -128,6 +136,7 @@ selftest() {
   selftest_not_claims
   selftest_denied_readiness
   selftest_receipt
+  selftest_two_prs
   rm -rf "$T"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
   [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && return 0

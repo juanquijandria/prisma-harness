@@ -3,11 +3,16 @@
 
 MERGES_CLEAN=0
 MERGE_CONFLICTS=1
+BRANCH_SHAPE='type == "object" and (.protected | type) == "boolean"'
 
 OTHER_PRS_JQ='[add[]] | unique_by(.number)[]
 | select(.user.login == $author and .number != $number) | by_cutoff(.created_at)
 | select(.closed_at == null or ((.closed_at | seconds) > $cutoff))
 | [.number, .head.ref, .head.sha, (.head.repo.full_name // "")] | @tsv'
+
+MERGED_BASE_JQ='[add[] | select(.head.ref == $base)] as $prs
+| if ([$prs[] | by_cutoff(.created_at) | select(.closed_at == null or ((.closed_at | seconds) > $cutoff))] | length) > 0 then empty
+  else [$prs[] | select(done_by_cutoff(.merged_at))] | max_by(.merged_at | seconds) // empty | [.number, .head.sha, .base.ref, .merged_at] | @tsv end'
 
 judge_mergeable() {
   [ -z "$AT" ] || { finding note "draft and conflicts: GitHub only knows the draft and mergeable state of now, so they are not judged as of $AT"; return; }
@@ -26,13 +31,21 @@ inside_clone_of_repo() {
   github_repos_of "$PWD" | grep -qxF "$wanted"
 }
 
+fetch_activity() {
+  activity_ref=$("$JQ" -rn --arg ref "refs/heads/$3" '$ref | @uri')
+  fetch "$1" "repos/$2/activity?ref=$activity_ref&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
+}
+
+tip_at_cutoff() {
+  "$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$HEAD_MOVES"')) | by_cutoff(.timestamp)]
+    | max_by(.timestamp | seconds) // empty | .after' "$WORK/$1.json"
+}
+
 read_other_head() {
   other_head="$3"
   [ -z "$AT" ] && return 0
-  other_ref=$("$JQ" -rn --arg ref "refs/heads/$2" '$ref | @uri')
-  fetch "activity-$1" "repos/${4:-$REPO}/activity?ref=$other_ref&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
-  other_head=$("$JQ" -rs --argjson cutoff "$CUTOFF" "$TIME_JQ"' [add[] | select(.activity_type | IN('"$PUSH_EVENTS"')) | by_cutoff(.timestamp)]
-    | max_by(.timestamp | seconds) // empty | .after' "$WORK/activity-$1.json")
+  fetch_activity "activity-$1" "${4:-$REPO}" "$2"
+  other_head=$(tip_at_cutoff "activity-$1")
 }
 
 compare_with_other() {
@@ -70,4 +83,24 @@ judge_other_prs() {
 $others
 OTHERS
   [ "$compared" -gt 0 ] || finding ok "conflicts with other PRs: no other open PR of $author touches a file this one changes"
+}
+
+judge_base() {
+  base=$(ask '.base.ref // empty' pull); default_branch=$(ask '.base.repo.default_branch // empty' pull)
+  [ -n "$base" ] && [ "$base" != "$default_branch" ] || return 0
+  head_param=$("$JQ" -rn --arg head "${REPO%%/*}:$base" '$head | @uri')
+  fetch base-prs "repos/$REPO/pulls?state=all&head=$head_param&per_page=$PAGE_SIZE" "$LIST_SHAPE" all
+  carrier_line=$("$JQ" -rs --argjson cutoff "$CUTOFF" --arg base "$base" "$TIME_JQ $MERGED_BASE_JQ" "$WORK/base-prs.json" | tr -d '\r')
+  [ -n "$carrier_line" ] || { finding ok "base: $base is not the head of a PR that already merged"; return; }
+  IFS="$TAB" read -r carrier carried into carried_at <<CARRIER
+$carrier_line
+CARRIER
+  branch_param=$("$JQ" -rn --arg ref "$base" '$ref | @uri')
+  fetch base-branch "repos/$REPO/branches/$branch_param" "$BRANCH_SHAPE"
+  [ "$(ask '.protected' base-branch)" != "true" ] || { finding ok "base: $base is protected, so it is a long-lived branch"; return; }
+  fetch_activity base-activity "$REPO" "$base"
+  tip=$(tip_at_cutoff base-activity)
+  [ -n "$tip" ] || { finding unmeasured "base: the activity log of $base shows no push before that time"; return; }
+  [ "$tip" = "$carried" ] || { finding ok "base: $base moved after #$carrier merged at $carried_at"; return; }
+  finding fail "base: $base points at $(printf "%.${SHORT_SHA_WIDTH}s" "$tip"), the same commit #$carrier already carried into $into at $carried_at. If $base is a work branch, merging here never reaches $default_branch, so change the base to $default_branch first. If it is a long-lived branch, say so when you claim this PR ready"
 }
