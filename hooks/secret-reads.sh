@@ -13,11 +13,15 @@ GIT_WORD="git"
 WORD_CHARACTERS='A-Za-z0-9_.-'
 GATE_NAME="secret-reads-gate"
 ESCAPE="PRISMA_SECRET_READS_OK=1"
+SHELL_TRAPS_ESCAPE="PRISMA_SHELL_TRAPS_OK=1"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 BLOCK_VERDICT="block"
 REWRITE_VERDICT="rewrite"
 QUOTE_WORDS="${PRISMA_QUOTE_WORDS:-$HOOKS_DIR/quote-zsh-words.sh}"
-SELFTEST_CASES=79
+SELFTEST_CASES=82
+SECRETS_MARK=".env"
+BASH_TOOL_FIELD='"tool_name"[[:space:]]*:[[:space:]]*"Bash"'
+JSON_STRING_VALUE='[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*'
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -59,9 +63,22 @@ collect_invocations() {
   done
 }
 
+json_field_guess() {
+  printf '%s' "$payload" | sed -nE "s/.*\"$1\"$JSON_STRING_VALUE/\\1/p"
+}
+
+guess_without_jq() {
+  printf '%s' "$payload" | grep -qE "$BASH_TOOL_FIELD" || exit 0
+  guessed=$(json_field_guess command)
+  case "${guessed:-$payload}" in *"$SECRETS_MARK"*) ;; *) exit 0 ;; esac
+  working_dir=$(json_field_guess cwd)
+  working_dir="${working_dir:-unknown}"
+  not_measured "jq is missing"
+}
+
 run_gate_hook() {
-  command -v jq >/dev/null 2>&1 || not_measured "jq is missing"
   payload=$(cat)
+  command -v jq >/dev/null 2>&1 || guess_without_jq
   [ "$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)" = "Bash" ] || exit 0
   command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
   working_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
@@ -79,12 +96,17 @@ run_gate_hook() {
   rewrite_searches "$rewrites"
 }
 
+zsh_would_quote() {
+  case "${SHELL:-}" in */zsh|zsh) ;; *) return 1 ;; esac
+  ! escape_declared "$SHELL_TRAPS_ESCAPE" "$bare_command"
+}
+
 rewrite_searches() {
   result=$(printf '%s' "$command_text" | "$SECRET_ARGS" --rewrite 2>/dev/null) || not_measured "it could not place the exclusion inside this command"
   placed=$(printf '%s' "$result" | head -n 1)
   [ "$placed" = "$1" ] || not_measured "the two parsers found $1 and $placed searches to rewrite"
   rewritten=$(printf '%s' "$result" | sed '1d')
-  quoted=$(printf '%s' "$rewritten" | "$QUOTE_WORDS" 2>/dev/null) && [ -n "$quoted" ] && rewritten="$quoted"
+  zsh_would_quote && quoted=$(printf '%s' "$rewritten" | "$QUOTE_WORDS" 2>/dev/null) && [ -n "$quoted" ] && rewritten="$quoted"
   allow_rewritten "$rewritten"
 }
 

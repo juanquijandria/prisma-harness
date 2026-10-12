@@ -80,7 +80,7 @@ def invocations(command):
     text = lexer_ready(command, markers).replace("\n", " ; ")
     lexer = shlex.shlex(text, posix=True, punctuation_chars=PUNCTUATION)
     lexer.whitespace_split = True
-    lexer.commenters = "#"
+    lexer.commenters = ""
     current, found, target_pending = None, [], False
     for token in lexer:
         if target_pending:

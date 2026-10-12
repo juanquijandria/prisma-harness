@@ -103,12 +103,17 @@ selftest_outcomes() {
   expect "52 and it is written down as escaped" "$(last_outcome)" "escaped"
   expect "53 the escape as an argument of echo does not count" "$(run_gate 'echo PRISMA_SECRET_READS_OK=1 && cat .env')" "2"
   without_jq=$(mktemp -d)
-  for tool in dirname mkdir date tr cat; do ln -s "$(command -v "$tool")" "$without_jq/$tool"; done
+  for tool in dirname mkdir date tr cat sed grep; do ln -s "$(command -v "$tool")" "$without_jq/$tool"; done
   : > "$PRISMA_RECEIPT_FILE"
   rc=$(payload_for 'cat .env' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
   expect "54 without jq the gate passes and writes it down as not measured" "$rc $(last_outcome)" "0 not-measured"
+  : > "$PRISMA_RECEIPT_FILE"
+  rc=$(payload_for 'ls -la' | PATH="$without_jq" /bin/sh "$SELF" >/dev/null 2>&1; echo "$?")
+  expect "80 without jq a command that names no secrets file passes and leaves no line" "$rc $(last_outcome)" "0 "
   rm -rf "$without_jq"
-  expect "55 an unquoted include is quoted in the same rewrite" "$(run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include='*.py' TOKEN ."
+  expect "55 an unquoted include is quoted in the same rewrite" "$(SHELL=/bin/zsh; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include='*.py' TOKEN ."
+  expect "81 under bash the include keeps its own form, because only zsh aborts on it" "$(SHELL=/bin/bash; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include=*.py TOKEN ."
+  expect "82 the declared escape of the shell traps keeps the include as written" "$(SHELL=/bin/zsh; export SHELL; run_gate 'PRISMA_SHELL_TRAPS_OK=1 grep -rn --include=*.py TOKEN .')" "0 PRISMA_SHELL_TRAPS_OK=1 grep $SEARCH_EXCLUSION -rn --include=*.py TOKEN ."
 }
 
 selftest_indirect_reads() {

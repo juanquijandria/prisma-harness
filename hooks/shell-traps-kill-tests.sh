@@ -111,6 +111,11 @@ selftest_kill_probes() {
     shifted="$shifted$(pgrep_received),"
   done
   expect_measured "97 a << inside arithmetic or backticks opens no heredoc, so the pkill below it is read" "$shifted" "-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,"
+  for glued in 'echo a#b' 'echo $#' 'curl http://x/y#top'; do
+    run_with_pgrep "$(printf '%s\npkill -f %s' "$glued" "$KILL_PROBE_NAME")" "$session_dir" "" >/dev/null
+    glued_seen="$glued_seen$(pgrep_received),"
+  done
+  expect_measured "104 a # glued to a word on the line above is no comment, so the pkill below it is read" "$glued_seen" "-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,-f $KILL_PROBE_NAME,"
   expect_measured "88 a command that leaves no private use character free is let through and recorded as not measured" "$(run_with_pgrep "$("$KILL_PYTHON" -c "$CROWDED_PRIVATE_USE")" "$session_dir" "")" "0 not-measured"
   kill "$own_sleeper" "$foreign_sleeper" 2>/dev/null
   wait "$own_sleeper" "$foreign_sleeper" 2>/dev/null
