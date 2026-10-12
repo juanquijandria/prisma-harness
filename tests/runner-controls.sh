@@ -80,6 +80,7 @@ PRISMA_INDEX_FILE=home.md|gate-read-index.sh
 PRISMA_PYTHON=|command-invokes.sh
 PRISMA_TMPDIR=/nowhere-at-all|format-gate.sh
 PRISMA_VOICE=0|session-voice.sh
+CLAUDE_CODE_DISABLE_1M_CONTEXT=1|session-size.sh
 PRISMA_DEPS_CHECK=0|session-deps.sh
 PRISMA_JQ=|check-canonical-sync.sh
 PRISMA_PR_REVIEWERS=nobody-at-all|pr-ready.sh
