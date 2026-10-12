@@ -7,6 +7,9 @@ INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 QUOTE_WORDS="${PRISMA_QUOTE_WORDS:-$HOOKS_DIR/quote-zsh-words.sh}"
 KILL_TARGETS="$HOOKS_DIR/kill-targets.sh"
+SECRET_ARGS="$HOOKS_DIR/secret-args.sh"
+SECRET_READS_ESCAPE="PRISMA_SECRET_READS_OK=1"
+SECRET_EXCLUSION_NOTE="A search over a folder also leaves files named .env out, so a match inside one will not show."
 KILLERS="pkill killall"
 PARTLY_MEASURED=5
 KILL_LINES_SHOWN=10
@@ -22,7 +25,7 @@ REQUIRED_WRAPPERS="${PRISMA_REQUIRED_WRAPPERS:-$DEFAULT_WRAPPERS}"
 PARSER_FAILED=3
 UNSAFE_INCLUDE=4
 UNSAFE_EQUALS=6
-SELFTEST_CASES=97
+SELFTEST_CASES=103
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -72,11 +75,21 @@ record_kill_gap() {
   [ -z "$kill_gap" ] || receipt_append "$GATE_NAME" "$kill_gap" not-measured
 }
 
+with_secret_exclusion() {
+  escape_declared "$SECRET_READS_ESCAPE" "$bare_command" && { printf '%s' "$1"; return 0; }
+  excluded=$(printf '%s' "$1" | "$SECRET_ARGS" --rewrite 2>/dev/null) || { printf '%s' "$1"; return 0; }
+  printf '%s' "$excluded" | sed '1d'
+}
+
 allow_rewritten() {
   receipt_append "$GATE_NAME" "$working_dir" rewritten
   record_kill_gap
-  printf '%s' "$payload" | jq --arg command "$1" --arg reason "PRISMA shell traps quoted what zsh would have expanded, an --include pattern that aborts with 'no matches found' or a word starting with = that zsh reads as the path of a command. The command that runs is: $1" \
-    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: $reason, updatedInput: (.tool_input + {command: $command})}}'
+  command_run=$(with_secret_exclusion "$1")
+  reason="PRISMA shell traps quoted what zsh would have expanded, an --include pattern that aborts with 'no matches found' or a word starting with = that zsh reads as the path of a command."
+  [ "$command_run" = "$1" ] || reason="$reason $SECRET_EXCLUSION_NOTE"
+  reason="$reason The command that runs is: $command_run"
+  printf '%s' "$payload" | jq --arg command "$command_run" --arg reason "$reason" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "allow", permissionDecisionReason: $reason, additionalContext: $reason, updatedInput: (.tool_input + {command: $command})}}'
   exit 0
 }
 

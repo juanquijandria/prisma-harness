@@ -1,4 +1,4 @@
-# Prisma Harness. Documented in README.md, section "What is inside". Loaded by kill-targets.sh and command-invokes.sh, not run alone.
+# Prisma Harness. Documented in README.md, section "What is inside". Loaded by kill-targets.sh, command-invokes.sh and secret-args.sh, not run alone.
 SHELL_TEXT_CODE=$(cat <<'PY'
 import re
 
