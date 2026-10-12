@@ -114,6 +114,9 @@ selftest_outcomes() {
   expect "55 an unquoted include is quoted in the same rewrite" "$(SHELL=/bin/zsh; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include='*.py' TOKEN ."
   expect "81 under bash the include keeps its own form, because only zsh aborts on it" "$(SHELL=/bin/bash; export SHELL; run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include=*.py TOKEN ."
   expect "82 the declared escape of the shell traps keeps the include as written" "$(SHELL=/bin/zsh; export SHELL; run_gate 'PRISMA_SHELL_TRAPS_OK=1 grep -rn --include=*.py TOKEN .')" "0 PRISMA_SHELL_TRAPS_OK=1 grep $SEARCH_EXCLUSION -rn --include=*.py TOKEN ."
+  expect "83 cut of the values blocks, only the first field passes" "$(run_gate 'cut -d= -f2 .env') $(run_gate 'cut -d= -f1,2 .env')" "2 2"
+  expect "84 sort, uniq and tac print the lines and block" "$(run_gate 'sort .env') $(run_gate 'uniq .env.dev') $(run_gate 'tac .env')" "2 2 2"
+  expect "85 an encoder prints the lines too and blocks" "$(run_gate 'base64 .env') $(run_gate 'od -c .env')" "2 2"
 }
 
 selftest_indirect_reads() {

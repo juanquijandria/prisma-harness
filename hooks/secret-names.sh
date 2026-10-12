@@ -7,7 +7,11 @@ import re
 BLOCK = "block"
 REWRITE = "rewrite"
 PASS = "pass"
-READERS = {"cat", "head", "tail", "less", "more", "bat", "sed", "awk", "xxd", "diff", "strings", "nl"}
+READERS = {"cat", "head", "tail", "less", "more", "bat", "sed", "awk", "xxd", "diff", "strings", "nl",
+           "sort", "uniq", "tac", "rev", "fold", "paste", "column", "od", "hexdump", "base64", "cut"}
+CUT = "cut"
+FIELD_FLAGS = ("-f", "--fields")
+NAME_FIELD = "1"
 SECRET_NAME = re.compile(r"\.env([.*?\[].*)?|.+\.env")
 FREE_SUFFIXES = (".example", ".sample", ".template")
 GIT = "git"
@@ -196,11 +200,29 @@ def find_commands(args):
     return commands
 
 
+def cuts_only_names(args):
+    fields, index = None, 0
+    while index < len(args):
+        arg = args[index]
+        if arg in FIELD_FLAGS and index + 1 < len(args):
+            fields, index = args[index + 1], index + 1
+        elif arg.startswith(FIELD_FLAGS[1] + "="):
+            fields = arg.split("=", 1)[1]
+        elif arg.startswith(FIELD_FLAGS[0]) and len(arg) > len(FIELD_FLAGS[0]):
+            fields = arg[len(FIELD_FLAGS[0]):]
+        index += 1
+    return fields == NAME_FIELD
+
+
+def reads_lines(program, args):
+    return program in READERS and not (program == CUT and cuts_only_names(args))
+
+
 def prints_lines(tokens):
     program, args = program_name(tokens[0]), tokens[1:]
     if program in SEARCHERS:
         return not parse_options(args, SEARCHERS[program])[0] & SEARCHERS[program].lists
-    return program in READERS
+    return reads_lines(program, args)
 
 
 def classify_runner(nested, mentions):
@@ -211,7 +233,7 @@ def classify_runner(nested, mentions):
 
 def classify(tokens, mentions=False):
     program, args = program_name(tokens[0]), tokens[1:]
-    if program in READERS and any(names_secrets(arg) for arg in args if not arg.startswith("-")):
+    if reads_lines(program, args) and any(names_secrets(arg) for arg in args if not arg.startswith("-")):
         return BLOCK
     if program in SEARCHERS:
         return classify_search(args, SEARCHERS[program])
