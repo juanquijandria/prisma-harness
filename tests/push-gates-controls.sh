@@ -84,6 +84,9 @@ git reset -q --hard HEAD~1
 records_escapes "size gate records no escape on a push under the ceiling" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
+before=$(receipt_lines)
+expect "size gate blocks a push on the line after a comment" 2 run pre-push-size.sh "echo a # n\\ngit push origin feature"
+CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q blocked; then printf 'PASS that push leaves its blocked line in the receipt\n'; else printf 'FAIL that push left %s receipt lines and not one blocked line\n' "$(($(receipt_lines)-before))"; ok=0; fi
 size_from_subdirectory() ( PAYLOAD_DIR="$T/sub"; run pre-push-size.sh "$1" )
 mkdir -p "$T/sub"; git config diff.relative true
 out=$(size_from_subdirectory "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))

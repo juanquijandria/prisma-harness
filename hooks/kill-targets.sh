@@ -74,7 +74,7 @@ def is_redirection(token):
 
 
 def invocations(command):
-    command = without_bodies_and_comments(command)
+    command = without_comments(command, drop_bodies=True)
     markers = free_markers(command)
     shown = str.maketrans({hidden: redirection for redirection, hidden in markers.items()})
     text = lexer_ready(command, markers).replace("\n", " ; ")
@@ -203,6 +203,6 @@ except (OSError, IndexError, ValueError):
 PY
 )
 HOOKS_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "$HOOKS_DIR/kill-targets-text.sh"
+. "$HOOKS_DIR/shell-text.sh"
 "$PYTHON" -c "$SHELL_TEXT_CODE
 $CODE" "$@"

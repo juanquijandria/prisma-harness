@@ -1,4 +1,4 @@
-# Prisma Harness. Documented in README.md, section "What is inside". Loaded by kill-targets.sh, not run alone.
+# Prisma Harness. Documented in README.md, section "What is inside". Loaded by kill-targets.sh and command-invokes.sh, not run alone.
 SHELL_TEXT_CODE=$(cat <<'PY'
 import re
 
@@ -82,7 +82,7 @@ def balanced_end(text, index):
     return index
 
 
-def without_bodies_and_comments(command):
+def without_comments(command, drop_bodies):
     kept, pending, index = [], [], 0
     while index < len(command):
         character, start = command[index], index
@@ -97,8 +97,9 @@ def without_bodies_and_comments(command):
             index = line_end(command, index)
             continue
         elif character == NEWLINE and pending:
-            kept.append(NEWLINE)
-            index, pending = after_bodies(command, index, pending), []
+            body_end = after_bodies(command, index, pending)
+            kept.append(NEWLINE if drop_bodies else command[index:body_end])
+            index, pending = body_end, []
             continue
         elif heredoc:
             pending.append(heredoc[:2])
