@@ -95,6 +95,11 @@
             "type": "command",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/paste-block-gate.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/handoff-card-gate.sh\"",
+            "timeout": 10
           }
         ]
       }

@@ -29,6 +29,13 @@ STEP3_EXPIRY_CLOCK_ES="en el reloj del servicio que decide"
 STEP3_EXPIRY_CLOCK_EN="on the clock of the service that decides"
 STEP3_EXPIRY_MUTANT_CLOCK="on any clock"
 STEP3_ROW_PATTERN='^| \*\*3\*\* |'
+SPLIT_RULE="**How the work is split.**"
+SPLIT_CARD="the session, why it is another session, what it delivers, its order, who it reports to, and when it closes"
+SPLIT_CLAUSES="$SPLIT_RULE|goes to a subagent of the same session|all of them asked for at once|Another repository, another lane with its own plan, or a deploy|$SPLIT_CARD|confirms each report exists"
+SPLIT_CARD_MUTANT="the session, why it is another session, what it delivers, who it reports to, and when it closes"
+SPLIT_CARD_EN="its card"
+SPLIT_CARD_ES="su tarjeta"
+STEP1C_ROW_PATTERN='^| 1c |'
 REVIEW_UNCOMMITTED_CLAUSES="When the work is not committed yet|git status --porcelain|git merge-base <fixed point> HEAD|git ls-files --others --exclude-standard|untracked files included"
 
 pass() { CASES=$((CASES+1)); printf 'PASS %s\n' "$1"; }
@@ -92,6 +99,17 @@ check_plan_closes() {
   [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ] || return 1
   carries_every_clause "$(sed -n "${a},${b}p" "$f")" "$SESSION_FIT_CLAUSES" || return 1
   sed -n "${a},${b}p" "$f" | grep -qi 'lane'
+}
+
+check_plan_splits() {
+  f="$1/skills/prisma-plan/SKILL.md"
+  a=$(line_of "$f" '^## Closing the interview'); b=$(line_of "$f" '^## The record'); c=$(grep -n -m1 -F "$SPLIT_RULE" "$f" | cut -d: -f1)
+  [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] || return 1
+  [ "$a" -lt "$c" ] && [ "$c" -lt "$b" ] || return 1
+  carries_every_clause "$(sed -n "${c}p" "$f")" "$SPLIT_CLAUSES" || return 1
+  grep -qF "$SPLIT_CARD_EN" "$1/skills/prisma/SKILL.md" || return 1
+  grep "$STEP1C_ROW_PATTERN" "$1/METHOD.md" | grep -qF "$SPLIT_CARD_EN" || return 1
+  grep "$STEP1C_ROW_PATTERN" "$1/docs/es/METHOD.md" | grep -qF "$SPLIT_CARD_ES"
 }
 
 check_no_fixed_session_size() {
@@ -183,6 +201,7 @@ else
   skip "this tree is not the repository itself, the published page list was not compared against its index"
 fi
 if check_plan_closes "$ROOT/skills"; then pass "prisma-plan names step 1 and closes with the lane and a session fit measured against the context window"; else fail "prisma-plan closing section"; fi
+if check_plan_splits "$ROOT"; then pass "prisma-plan says where each piece of work goes, the card of every session it asks for and the return, and the method pages name the card in row 1c"; else fail "the split of the work in prisma-plan and row 1c"; fi
 if check_no_fixed_session_size "$ROOT"; then pass "no method page and no skill brings back the fixed session size of 140k tokens or a dozen files"; else fail "a fixed session size in the method pages or the skills"; fi
 if carries_every_clause "$(cat "$ROOT/skills/prisma/SKILL.md")" "$STEP1_SUMMARY_CLAUSES"; then pass "the prisma skill sums up step 1 with the session fit against the window and the compaction inside a ticket"; else fail "the step 1 summary of the prisma skill"; fi
 if check_plan_filters_decisions "$ROOT/skills"; then pass "prisma-plan keeps for the person only the choices that change the work, cost money, cannot be undone or reach an audience"; else fail "prisma-plan decision filter"; fi
@@ -251,6 +270,14 @@ if check_helper_paths "$T/skills"; then fail "control: a helper that does not ex
 rm -rf "$T/hooks"
 mutate; grep -vF "$DIAGNOSE_RECORD_RULE" "$T/skills/prisma-diagnose/SKILL.md" > "$T/d.md"; mv "$T/d.md" "$T/skills/prisma-diagnose/SKILL.md"
 if check_diagnose_without_record "$T/skills"; then fail "control: removing the condition on the plan record was not caught"; else pass "control: removing the condition on the plan record turns the diagnose record case red"; fi
+rm -rf "$T/split"; mkdir -p "$T/split/docs/es"; cp -R "$ROOT/skills" "$T/split/skills"; cp "$ROOT/METHOD.md" "$T/split/METHOD.md"; cp "$ROOT/docs/es/METHOD.md" "$T/split/docs/es/METHOD.md"
+grep -vF "$SPLIT_RULE" "$ROOT/skills/prisma-plan/SKILL.md" > "$T/split/skills/prisma-plan/SKILL.md"
+if check_plan_splits "$T/split"; then fail "control: removing the split of the work was not caught"; else pass "control: removing the split of the work turns the split case red"; fi
+sed "s/$SPLIT_CARD/$SPLIT_CARD_MUTANT/" "$ROOT/skills/prisma-plan/SKILL.md" > "$T/split/skills/prisma-plan/SKILL.md"
+if check_plan_splits "$T/split"; then fail "control: a card that lost its order was not caught"; else pass "control: a card that lost its order turns the split case red"; fi
+cp "$ROOT/skills/prisma-plan/SKILL.md" "$T/split/skills/prisma-plan/SKILL.md"; sed "/$STEP1C_ROW_PATTERN/s/$SPLIT_CARD_ES/los tickets/" "$ROOT/docs/es/METHOD.md" > "$T/split/docs/es/METHOD.md"
+if check_plan_splits "$T/split"; then fail "control: a canonical row 1c without the card was not caught"; else pass "control: a canonical row 1c without the card turns the split case red"; fi
+rm -rf "$T/split"
 published_copy() {
   rm -rf "$T/published"
   mkdir -p "$T/published/skills"

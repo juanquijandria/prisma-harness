@@ -43,6 +43,8 @@ Two declarations close the interview, and both are said out loud to the person, 
 
 **The session estimate.** Say whether the work fits in one session, which means it fits before 80% of its context window, about 800k tokens when the window is 1M. Count what the session will have to read, the files it touches and their neighbors, what the tests will print, the review round trip, and every unknown that still needs exploration. Work that depends on more than one unknown does not fit. If it does not fit, split it into session-sized tickets before anything is built. Each ticket carries the destination, what this ticket builds, its own exit condition, and what it depends on. Within one ticket, a session that nears that ceiling compacts instead of asking for a handoff. A new session is only for another ticket.
 
+**How the work is split.** Every piece of work goes to one of four places, and the closing says which. The same ticket in the same repository stays in this session and compacts near the ceiling. A side task that needs no decision from the person, touches no other repository and deploys nothing goes to a subagent of the same session, so the person has no other session to follow. Another ticket of a plan that does not fit goes to another session, all of them asked for at once when the plan closes, never one at a time as they come up. Another repository, another lane with its own plan, or a deploy is another ticket too, and goes to another session. Every session you ask for carries its card, a name passed with `-n` on its launch command and a row in a table whose first cell is that name, with six filled cells in this order, the session, why it is another session, what it delivers, its order, who it reports to, and when it closes. Each session writes its report where the plan says and tells the session that asked for it, which keeps the batch as a checklist and confirms each report exists before telling the person which sessions to close.
+
 **The facts a transversal rule touches.** When the interview adopts a rule that applies to the whole system, list every fact that rule touches and review the list whole before anything is built. A rule applied only to the facts that already failed leaves the next one out.
 
 ```
@@ -51,6 +53,14 @@ Destination: the nightly file lands in the table and the chart reads it
 This ticket builds: the endpoint and its validation, nothing of the scheduler
 Exit condition: a real file from last night loads with zero rejected rows, counted by two routes
 Depends on: ticket 1
+```
+
+| Session | Why | Delivers | Order | Reports to | Closes when |
+|---|---|---|---|---|---|
+| import-endpoint | another ticket of this plan | the endpoint and its validation | after ticket 1 | the session that planned it | its report is in the plan folder |
+
+```
+cd ~/code/app && claude -n import-endpoint "Read ticket 2 in the plan record and run PRISMA from step 1"
 ```
 
 ## The record
