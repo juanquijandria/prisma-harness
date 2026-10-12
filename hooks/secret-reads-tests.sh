@@ -111,6 +111,39 @@ selftest_outcomes() {
   expect "55 an unquoted include is quoted in the same rewrite" "$(run_gate 'grep -rn --include=*.py TOKEN .')" "0 grep $SEARCH_EXCLUSION -rn --include='*.py' TOKEN ."
 }
 
+selftest_indirect_reads() {
+  heredoc_naming=$(printf "cat > notes.md <<'EOF'\nrun sort < .env\nEOF")
+  expect "56 an input redirection from a .env blocks" "$(run_gate 'cat < .env')" "2"
+  expect "57 a read loop fed from a .env blocks" "$(run_gate 'while read l; do echo $l; done < config/.env.dev')" "2"
+  expect "58 a redirection from a .env.example passes" "$(run_gate 'wc -l < .env.example')" "0"
+  expect "59 a redirection written inside a heredoc body passes" "$(run_gate "$heredoc_naming")" "0"
+  expect "60 a here-string that says .env passes" "$(run_gate 'cat <<< .env')" "0"
+  expect "61 find that selects .env files and runs cat blocks" "$(run_gate "find . -name '.env*' -exec cat {} \\;")" "2"
+  expect "62 find that runs cat on other files passes" "$(run_gate "find . -name '*.py' -exec cat {} \\;")" "0"
+  expect "63 find that only lists matches inside .env files passes" "$(run_gate "find . -name '.env*' -exec grep -l TOKEN {} +")" "0"
+  expect "64 a .env fed through a pipe to xargs cat blocks" "$(run_gate 'ls .env.dev | xargs cat')" "2"
+  expect "65 xargs running a grep that names a .env blocks" "$(run_gate 'xargs -n1 grep TOKEN .env.dev < hosts.txt')" "2"
+  expect "66 xargs that only lists matches passes" "$(run_gate 'ls src | xargs grep -l TOKEN')" "0"
+  expect "67 find with a glob that reaches .env files and runs cat blocks" "$(run_gate "find . -name '*.env*' -exec cat {} \\;")" "2"
+  expect "68 a glob that names no .env fed to xargs cat passes" "$(run_gate 'ls src/* | xargs cat')" "0"
+  expect "69 cat of a glob that reaches .env files blocks" "$(run_gate 'cat config/*.env*')" "2"
+  expect "70 the replace option of the BSD xargs takes its value" "$(run_gate 'ls .env.dev | xargs -J % cat %')" "2"
+  expect "71 a second -exec of find is read too" "$(run_gate "find . -name '.env*' -exec echo {} \\; -exec cat {} \\;")" "2"
+  expect "72 a redirection inside backticks blocks" "$(run_gate 'x=`cat < .env`')" "2"
+  expect "73 a redirection inside a quoted substitution blocks" "$(run_gate 'echo "$(< .env)"')" "2"
+  expect "74 a redirection written as quoted text passes" "$(run_gate 'echo "use cat < .env to see it"')" "0"
+  expect "75 find -execdir that runs cat on .env files blocks" "$(run_gate "find . -name '.env*' -execdir cat {} \\;")" "2"
+  expect "76 a process substitution is not a file" "$(run_gate 'diff <(sort a) <(sort b)')" "0"
+  expect "77 a redirection written in a comment passes" "$(run_gate 'ls # then cat < .env')" "0"
+  expect "79 an escaped less-than sign is not a redirection" "$(run_gate 'echo \< .env')" "0"
+  lonely=$(mktemp -d)
+  cp "$HOOKS_DIR"/*.sh "$lonely/" && rm -f "$lonely/secret-names.sh"
+  : > "$PRISMA_RECEIPT_FILE"
+  rc=$(payload_for 'cat .env' | sh "$lonely/secret-reads.sh" >/dev/null 2>&1; echo "$?")
+  expect "78 without secret-names.sh the gate passes and writes it down as not measured" "$rc $(last_outcome)" "0 not-measured"
+  rm -rf "$lonely"
+}
+
 selftest() {
   ok=1; cases=0
   selftest_direct_reads
@@ -118,6 +151,7 @@ selftest() {
   selftest_folder_searches
   selftest_git_patches
   selftest_outcomes
+  selftest_indirect_reads
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
   [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && exit 0
   printf 'SELFTEST FAILED\n'; exit 1

@@ -6,7 +6,8 @@ HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 SELF="$HOOKS_DIR/secret-reads.sh"
 INVOKES="$HOOKS_DIR/command-invokes.sh"
 SECRET_ARGS="$HOOKS_DIR/secret-args.sh"
-PROGRAM_WORDS='cat|head|tail|less|more|bat|sed|awk|xxd|diff|strings|nl|grep|egrep|fgrep|rg|git'
+PROGRAM_WORDS='cat|head|tail|less|more|bat|sed|awk|xxd|diff|strings|nl|grep|egrep|fgrep|rg|git|xargs|find'
+INPUT_REDIRECTION='<'
 GIT_PRINTERS='grep|diff|show|log'
 GIT_WORD="git"
 WORD_CHARACTERS='A-Za-z0-9_.-'
@@ -16,7 +17,7 @@ STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 BLOCK_VERDICT="block"
 REWRITE_VERDICT="rewrite"
 QUOTE_WORDS="${PRISMA_QUOTE_WORDS:-$HOOKS_DIR/quote-zsh-words.sh}"
-SELFTEST_CASES=55
+SELFTEST_CASES=79
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -44,6 +45,11 @@ named_programs() {
   printf '%s\n' "$words" | grep -xE "$PROGRAM_WORDS" | tr '\n' ' '
 }
 
+reads_input_from_a_file() {
+  case "$command_text" in *"$INPUT_REDIRECTION"*) return 0 ;; esac
+  return 1
+}
+
 collect_invocations() {
   invocations=""
   for program in $1; do
@@ -60,12 +66,12 @@ run_gate_hook() {
   command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
   working_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
   programs=$(named_programs)
-  [ -n "$programs" ] || exit 0
+  [ -n "$programs" ] || reads_input_from_a_file || exit 0
   bare_command=$(printf '%s' "$command_text" | "$STRIP_QUOTES" 2>/dev/null) || not_measured "strip-quotes.sh could not read the command"
   if escape_declared "$ESCAPE" "$bare_command"; then receipt_append "$GATE_NAME" "$working_dir" escaped; exit 0; fi
   collect_invocations "$programs"
-  [ -n "$invocations" ] || exit 0
-  verdicts=$(printf '%s' "$invocations" | "$SECRET_ARGS" --classify 2>/dev/null) || not_measured "secret-args.sh could not classify the command"
+  [ -n "$invocations" ] || reads_input_from_a_file || exit 0
+  verdicts=$(printf '%s' "$invocations" | SECRET_COMMAND="$command_text" "$SECRET_ARGS" --classify 2>/dev/null) || not_measured "secret-args.sh could not classify the command"
   blocked=$(printf '%s\n' "$verdicts" | sed -n "s/^$BLOCK_VERDICT	//p")
   [ -n "$blocked" ] && block "$blocked"
   rewrites=$(printf '%s\n' "$verdicts" | grep -c "^$REWRITE_VERDICT	")

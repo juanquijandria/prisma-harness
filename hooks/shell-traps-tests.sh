@@ -72,23 +72,23 @@ expect() {
 }
 
 selftest_include_glob() {
-  expect_command "1 an unquoted include glob under zsh is quoted and runs" "$(run_command 'grep -rn --include=*.md foo .' "$ZSH")" "0 grep -rn --include='*.md' foo ."
+  expect_command "1 an unquoted include glob under zsh is quoted and runs" "$(run_command 'grep -rn --include=*.md foo .' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn --include='*.md' foo ."
   expect "2 the same pattern in single quotes passes untouched" "$(run_command "grep -rn --include='*.md' foo ." "$ZSH")" "0 "
   expect "3 the whole flag in double quotes passes untouched" "$(run_command 'grep -rn "--include=*.md" foo .' "$ZSH")" "0 "
   expect "4 a search only mentioned inside quotes passes untouched" "$(run_command 'echo "grep -rn --include=*.md foo ."' "$ZSH")" "0 "
   expect "5 a real search next to a quoted mention of the glob passes untouched" "$(run_command 'grep -rn foo . && echo "next time use --include=*.md"' "$ZSH")" "0 "
-  expect_command "6 an escaped quote inside double quotes stays and the glob is quoted" "$(run_command 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' "$ZSH")" "0 grep -rn \"a\|href=\\\"#\" src/ --include='*.tsx' | grep -v \"test\""
+  expect_command "6 an escaped quote inside double quotes stays and the glob is quoted" "$(run_command 'grep -rn "a\|href=\"#" src/ --include=*.tsx | grep -v "test"' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn \"a\|href=\\\"#\" src/ --include='*.tsx' | grep -v \"test\""
   expect "7 under bash the unquoted glob reaches grep and passes untouched" "$(run_command 'grep -rn --include=*.md foo .' /bin/bash)" "0 "
   expect_command "8 a brace glob becomes one quoted flag per item" "$(run_command 'cd notes && grep -rln --include=*.{md,txt} foo . | wc -l' /usr/bin/zsh)" "0 cd notes && grep -rln --include='*.md' --include='*.txt' foo . | wc -l"
   expect "9 a brace list with no glob character expands and passes untouched" "$(run_command 'grep -rn --include={a.md,b.md} foo .' "$ZSH")" "0 "
   expect "10 a search written only in a trailing comment passes untouched" "$(run_command 'ls -la # then grep -rn --include=*.md foo .' "$ZSH")" "0 "
   expect "11 the escape lets the unquoted glob through untouched" "$(run_command "$ESCAPE grep -rn --include=*.md foo ." "$ZSH")" "0 "
-  expect_command "12 the pattern as a separate word is quoted too" "$(run_command 'grep -rn --include *.md foo .' "$ZSH")" "0 grep -rn --include '*.md' foo ."
+  expect_command "12 the pattern as a separate word is quoted too" "$(run_command 'grep -rn --include *.md foo .' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn --include '*.md' foo ."
   expect "13 a glob character escaped with a backslash passes untouched" "$(run_command 'grep -rn --include=\*.md foo .' "$ZSH")" "0 "
-  expect_command "14 egrep counts as a search" "$(run_command 'egrep -rn --include=*.md foo .' "$ZSH")" "0 egrep -rn --include='*.md' foo ."
-  expect_command "15 a SHELL named without its path still counts as zsh" "$(run_command 'grep -rn --include=*.md foo .' zsh)" "0 grep -rn --include='*.md' foo ."
+  expect_command "14 egrep counts as a search" "$(run_command 'egrep -rn --include=*.md foo .' "$ZSH")" "0 egrep $SECRET_EXCLUSION -rn --include='*.md' foo ."
+  expect_command "15 a SHELL named without its path still counts as zsh" "$(run_command 'grep -rn --include=*.md foo .' zsh)" "0 grep $SECRET_EXCLUSION -rn --include='*.md' foo ."
   expect "23 nested braces cannot be rewritten safely and block" "$(run_payload 'grep -rn --include=*.{md,{txt,csv}} foo .' "$ZSH")" 2
-  expect_command "24 every unquoted include on the line is quoted" "$(run_command 'grep -rn --include=*.md --include=*.txt foo .' "$ZSH")" "0 grep -rn --include='*.md' --include='*.txt' foo ."
+  expect_command "24 every unquoted include on the line is quoted" "$(run_command 'grep -rn --include=*.md --include=*.txt foo .' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn --include='*.md' --include='*.txt' foo ."
   expect "25 the rewrite keeps the other fields of the call" "$(run_fields 'grep -rn --include=*.md foo .' "$ZSH")" "keeps description and timeout"
   expect "26 the reason names the quoted pattern" "$(run_reason 'grep -rn --include=*.md foo .' "$ZSH")" "names the pattern"
   expect "28 an include glob inside a heredoc body is data and passes untouched" "$(run_command "$HEREDOC_PROBE" "$ZSH")" "0 "
@@ -110,7 +110,7 @@ selftest_equals_word() {
   expect "62 a block for an unsafe == word names the equals trap" "$(run_payload_in_stderr 'echo ==$HOME' /tmp | grep -c '= not found')" 1
   expect "66 a == word with a quote, a glob or a brace cannot be quoted safely and blocks" "$(run_payload 'echo =="x"' "$ZSH") $(run_payload 'echo ==*' "$ZSH") $(run_payload 'echo =={a,b}' "$ZSH")" "2 2 2"
   expect "65 an unsafe include next to a == word names the include trap" "$(run_payload_in_stderr 'rsync -a --include=*.{md,{txt,csv}} src/ dst/ && echo ====' /tmp | grep -c 'no matches found')" 1
-  expect_command "51 both traps on one line are quoted in one pass" "$(run_command 'grep -rn --include=*.md foo . && echo ====' "$ZSH")" "0 grep -rn --include='*.md' foo . && echo '===='"
+  expect_command "51 both traps on one line are quoted in one pass" "$(run_command 'grep -rn --include=*.md foo . && echo ====' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn --include='*.md' foo . && echo '===='"
   receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
   equals_rc=$(run_payload 'echo ==== && echo after' "$ZSH")
   expect "52 a rewrite of a == word leaves its line in the receipt" "$equals_rc $(grep -c "	$GATE_NAME	.*	rewritten$" "$receipt")" "0 1"
@@ -120,7 +120,7 @@ selftest_unexpanded_regions() {
   expect_command "53 a == inside [[ ]] is an operator and stays, the word after the test is quoted" "$(run_command '[[ $a == b ]] && echo ====' "$ZSH")" "0 [[ \$a == b ]] && echo '===='"
   expect "54 an include pattern inside [[ ]] keeps its meaning" "$(run_command '[[ $f == --include=*.md ]] && grep -rn foo .' "$ZSH")" "0 "
   expect_command "55 arithmetic in (( )) and \$(( )) stays as written" "$(run_command 'echo $(( 1 == 1 )) && (( 2 == 2 )) && echo ====' "$ZSH")" "0 echo \$(( 1 == 1 )) && (( 2 == 2 )) && echo '===='"
-  expect_command "63 case and in written as plain arguments do not stop the rewrite" "$(run_command 'grep -rn -e case -e in --include=*.md . && echo ====' "$ZSH")" "0 grep -rn -e case -e in --include='*.md' . && echo '===='"
+  expect_command "63 case and in written as plain arguments do not stop the rewrite" "$(run_command 'grep -rn -e case -e in --include=*.md . && echo ====' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn -e case -e in --include='*.md' . && echo '===='"
   expect "56 an include pattern of a case keeps its meaning" "$(run_command 'case $f in --include=*.md) grep -rn foo . ;; esac' "$ZSH")" "0 "
   expect_command "57 a == pattern of a case stays and its body is still quoted" "$(run_command 'case $x in ==*) echo ==== ;; esac' "$ZSH")" "0 case \$x in ==*) echo '====' ;; esac"
   expect "76 a command substitution in backticks is left as written" "$(run_command 'echo `echo ====` && echo after' "$ZSH")" "0 "
@@ -164,6 +164,29 @@ selftest_receipt() {
   selftest_without_jq
 }
 
+updated_input_of() {
+  payload_for "$2" | SHELL="$ZSH" sh "$HOOKS_DIR/$1" 2>/dev/null | jq -c '.hookSpecificOutput.updatedInput // empty' 2>/dev/null
+}
+
+selftest_secret_exclusion() {
+  expect_command "98 a rewritten search also leaves the secrets files out" "$(run_command 'grep -rn X . && echo ====' "$ZSH")" "0 grep $SECRET_EXCLUSION -rn X . && echo '===='"
+  told=$(payload_for 'grep -rn X . && echo ====' | SHELL="$ZSH" sh "$SELF" 2>/dev/null | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null)
+  case "$told" in *"echo '===='"*) got="the agent is told" ;; *) got="the agent is not told" ;; esac
+  expect "99 the agent is told the command that runs" "$got" "the agent is told"
+  expect_command "100 the declared escape of the secret reads gate keeps the files in" "$(run_command 'PRISMA_SECRET_READS_OK=1 grep -rn X . && echo ====' "$ZSH")" "0 PRISMA_SECRET_READS_OK=1 grep -rn X . && echo '===='"
+  traps=$(updated_input_of shell-traps.sh 'grep -rn X . --include=*.md | head && echo ====')
+  reads=$(updated_input_of secret-reads.sh 'grep -rn X . --include=*.md | head && echo ====')
+  quiet=$(payload_for 'echo ==== && ls' | SHELL="$ZSH" sh "$SELF" 2>/dev/null | jq -r '.hookSpecificOutput.additionalContext // empty' 2>/dev/null)
+  case "$quiet" in *".env"*) got="it claims an exclusion" ;; "") got="it says nothing" ;; *) got="it claims nothing it did not do" ;; esac
+  expect "102 when nothing was left out the agent is not told otherwise" "$got" "it claims nothing it did not do"
+  lonely=$(mktemp -d)
+  cp "$HOOKS_DIR"/*.sh "$lonely/" && rm -f "$lonely/secret-args.sh"
+  alone=$(payload_for 'grep -rn --include=*.md foo .' | SHELL="$ZSH" PRISMA_HOOKS_DIR="$lonely" sh "$lonely/shell-traps.sh" 2>/dev/null | jq -r '.hookSpecificOutput.updatedInput.command // empty' 2>/dev/null)
+  rm -rf "$lonely"
+  expect "103 without secret-args.sh the trap still hands back its own quoting" "$alone" "grep -rn --include='*.md' foo ."
+  expect "101 both gates hand back the same command, whichever wins" "$([ -n "$traps" ] && [ "$traps" = "$reads" ] && echo same || echo "differ: $traps / $reads")" "same"
+}
+
 run_without_jq() {
   : > "$PRISMA_RECEIPT_FILE"
   payload_in "$1" "${2:-/tmp}" | PATH="$no_jq" SHELL="$ZSH" "$SH_PATH" "$SELF" >/dev/null 2>&1
@@ -203,6 +226,7 @@ selftest() {
   HERESTRING_THEN_SEARCH_FIXED=$(printf "cat <<<'x'\ngrep -rn --include='*.md' foo .")
   HEREDOC_THEN_SEARCH_FIXED=$(printf "cat > notes.txt <<'EOF'\nuse --include=*.md\nEOF\ngrep -rn --include='*.txt' foo .")
   MISSING_WRAPPER=no-such-wrapper-alpha
+  SECRET_EXCLUSION="--exclude='.env*' --exclude='*.env'"
   fake_bin=$(mktemp -d)
   printf '#!/bin/sh\nexit 0\n' > "$fake_bin/$DEFAULT_WRAPPERS"; chmod +x "$fake_bin/$DEFAULT_WRAPPERS"
   ok=1; cases=0
@@ -214,6 +238,7 @@ selftest() {
   selftest_kills
   selftest_kill_probes
   selftest_receipt
+  selftest_secret_exclusion
   rm -rf "$fake_bin"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }
   [ "$ok" = "1" ] && printf 'SELFTEST OK: %s/%s\n' "$SELFTEST_CASES" "$SELFTEST_CASES" && exit 0
