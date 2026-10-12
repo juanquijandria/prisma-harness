@@ -6,16 +6,16 @@ INVOKES="$HOOKS_DIR/command-invokes.sh"
 STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 GATE="$HOOKS_DIR/measure-comments.sh"
 ESCAPE="PRISMA_COMMENTS_OK=1"
+payload=$(cat)
+[ -r "$HOOKS_DIR/receipt.sh" ] && [ -r "$HOOKS_DIR/push-names-head.sh" ] || { echo "WARN: the comments gate did not run, receipt.sh or push-names-head.sh is missing, so it cannot leave its line in the receipt either." >&2; exit 0; }
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
+. "$HOOKS_DIR/push-names-head.sh"
+[ -r "$HOOKS_DIR/escape-declared.sh" ] || push_gate_not_measured comments-gate "$payload" "the comments gate did not run, escape-declared.sh is missing."
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
-. "$HOOKS_DIR/push-names-head.sh"
-
-command -v jq >/dev/null 2>&1 || { echo "WARN: the comments gate did not run, jq is missing." >&2; exit 0; }
-[ -x "$GATE" ] || { echo "WARN: the comments gate did not run, measure-comments.sh is missing." >&2; exit 0; }
-
-payload=$(cat)
+command -v jq >/dev/null 2>&1 || push_gate_not_measured comments-gate "$payload" "the comments gate did not run, jq is missing."
+[ -x "$GATE" ] || push_gate_not_measured comments-gate "$payload" "the comments gate did not run, measure-comments.sh is missing."
 [ -n "$payload" ] || exit 0
 
 tool=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
@@ -33,9 +33,9 @@ fi
 [ "$strip_rc" = "0" ] || bare_command=""
 if [ -x "$INVOKES" ]; then
   segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
-  [ "$rc" = "3" ] && { echo "WARN: the comments gate did not run, the command parser could not read the command." >&2; exit 0; }
+  [ "$rc" = "3" ] && push_gate_not_measured comments-gate "$payload" "the comments gate did not run, the command parser could not read the command."
   pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
-  [ "$pr_rc" = "3" ] && { echo "WARN: the gate did not run, the command parser failed." >&2; exit 0; }
+  [ "$pr_rc" = "3" ] && push_gate_not_measured comments-gate "$payload" "the gate did not run, the command parser failed."
   pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)
   [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 else
@@ -60,10 +60,7 @@ case "$dir" in
   "~/"*) dir="$HOME/${dir#\~/}" ;;
 esac
 
-if [ -z "$dir" ] || [ ! -d "$dir" ]; then
-  echo "WARN: the comments gate could not locate the repo, nothing was measured." >&2
-  exit 0
-fi
+[ -n "$dir" ] && [ -d "$dir" ] || push_gate_not_measured comments-gate "$payload" "the comments gate could not locate the repo, nothing was measured." "$dir"
 
 real_dir=$(cd "$dir" 2>/dev/null && pwd -P)
 

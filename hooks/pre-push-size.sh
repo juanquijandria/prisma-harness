@@ -10,19 +10,19 @@ STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 WARN_OVER="${PRISMA_SIZE_WARN_OVER:-200}"
 BLOCK_OVER="${PRISMA_SIZE_BLOCK_OVER:-400}"
 ESCAPE="PRISMA_SIZE_OK=1"
+payload=$(cat)
+[ -r "$HOOKS_DIR/receipt.sh" ] && [ -r "$HOOKS_DIR/push-names-head.sh" ] || { echo "WARN: the size gate did not run, receipt.sh or push-names-head.sh is missing, so it cannot leave its line in the receipt either." >&2; exit 0; }
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
+. "$HOOKS_DIR/push-names-head.sh"
+[ -r "$HOOKS_DIR/escape-declared.sh" ] || push_gate_not_measured size-gate "$payload" "the size gate did not run, escape-declared.sh is missing."
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
-. "$HOOKS_DIR/push-names-head.sh"
-
-[ -n "$JQ" ] || { echo "WARN: the size gate did not run, jq is missing." >&2; exit 0; }
-[ -x "$MEASURE" ] || { echo "WARN: the size gate did not run, measure-diff-size.sh is missing." >&2; exit 0; }
-[ -x "$COMPARE_BASE" ] || { echo "WARN: the size gate did not run, compare-base.sh is missing." >&2; exit 0; }
-[ -x "$INVOKES" ] || { echo "WARN: the size gate did not run, command-invokes.sh is missing." >&2; exit 0; }
+[ -n "$JQ" ] || push_gate_not_measured size-gate "$payload" "the size gate did not run, jq is missing."
+for helper in "$MEASURE" "$COMPARE_BASE" "$INVOKES"; do
+  [ -x "$helper" ] || push_gate_not_measured size-gate "$payload" "the size gate did not run, $(basename "$helper") is missing."
+done
 [ -x "$STRIP_QUOTES" ] || echo "WARN: strip-quotes.sh is missing, so a declared escape will not be honored here." >&2
-
-payload=$(cat)
 [ -n "$payload" ] || exit 0
 
 tool=$(printf '%s' "$payload" | "$JQ" -r '.tool_name // empty' 2>/dev/null)
@@ -39,9 +39,9 @@ fi
 [ "$strip_rc" = "0" ] || bare_command=""
 
 segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
-[ "$rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser could not read the command." >&2; exit 0; }
+[ "$rc" = "3" ] && push_gate_not_measured size-gate "$payload" "the size gate did not run, the command parser could not read the command."
 pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
-[ "$pr_rc" = "3" ] && { echo "WARN: the size gate did not run, the command parser failed." >&2; exit 0; }
+[ "$pr_rc" = "3" ] && push_gate_not_measured size-gate "$payload" "the size gate did not run, the command parser failed."
 pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)
 [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 
@@ -60,7 +60,7 @@ esac
 if [ -z "$dir" ] || [ ! -d "$dir" ]; then
   dir=$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)
 fi
-[ -n "$dir" ] && [ -d "$dir" ] || { echo "WARN: the size gate could not locate the repo, nothing was measured." >&2; exit 0; }
+[ -n "$dir" ] && [ -d "$dir" ] || push_gate_not_measured size-gate "$payload" "the size gate could not locate the repo, nothing was measured." "$dir"
 real_dir=$(cd "$dir" 2>/dev/null && pwd -P)
 for skip in ${PRISMA_SKIP_REPOS:-}; do
   case "$dir" in "$skip"|"$skip"/*) exit 0 ;; esac

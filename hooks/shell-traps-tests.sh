@@ -1,4 +1,5 @@
 # Prisma Harness. Documented in README.md, section "What is inside". Loaded by shell-traps.sh, not run alone.
+. "$HOOKS_DIR/shell-traps-kill-tests.sh"
 
 payload_for() {
   printf '{"tool_name":"Bash","cwd":"/tmp","tool_input":{"command":%s,"description":"probe","timeout":%s}}' "$(printf '%s' "$1" | jq -Rs .)" "$PROBE_TIMEOUT"
@@ -43,21 +44,9 @@ run_payload_in_stderr() {
   payload_in "$1" "$2" | SHELL="$ZSH" sh "$SELF" 2>&1 >/dev/null
 }
 
-run_without_lsof() {
-  payload_in "$1" "$2" | PRISMA_LSOF="$MISSING_TOOL" SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
-  echo "$?"
-}
-
-run_without_pgrep() {
-  payload_in "$1" "$2" | PRISMA_PGREP="$MISSING_TOOL" SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
-  echo "$?"
-}
-
 skip_case() {
   cases=$((cases+1)); printf 'SKIP %s, %s\n' "$1" "$2"
 }
-
-not_measured_lines() { cat "$PRISMA_RECEIPT_FILE" 2>/dev/null | grep -c "	$GATE_NAME	.*	not-measured$"; }
 
 expect_measured() {
   if command -v pgrep >/dev/null 2>&1; then expect "$@"; else skip_case "$1" "this system has no pgrep"; fi
@@ -110,47 +99,6 @@ selftest_include_glob() {
   expect "33 a quoter that fails blocks as before, never opens" "$(PRISMA_QUOTE_WORDS=/usr/bin/false run_payload 'grep -rn --include=*.md foo .' "$ZSH")" 2
   expect_command "34 a herestring is not a heredoc, the search below it is quoted" "$(run_command "$HERESTRING_THEN_SEARCH" "$ZSH")" "0 $HERESTRING_THEN_SEARCH_FIXED"
   expect "35 an include next to a missing wrapper blocks" "$(run_payload "$MISSING_WRAPPER 5 grep -rn --include=*.md foo ." "$ZSH" "$PATH" "$MISSING_WRAPPER")" 2
-}
-
-selftest_kills() {
-  other_dir=$(mktemp -d); own_dir=$(mktemp -d)
-  ln -s "$(command -v sleep)" "$other_dir/$KILL_PROBE_NAME"
-  (cd "$other_dir" && exec "./$KILL_PROBE_NAME" "$KILL_PROBE_SECONDS") &
-  foreign_pid=$!
-  (cd "$other_dir" && exec "$KILL_PYTHON" -c "$KILL_SLEEPER" "$KILL_PROBE_SECONDS" "$REDIRECTION") &
-  redirection_pid=$!
-  sleep "$PROBE_START_SECONDS"
-  expect_measured "36 pkill whose pattern reaches a process in another folder blocks" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
-  expect_measured "37 killall of a name that runs in another folder blocks" "$(run_payload_in "killall $KILL_PROBE_NAME" "$own_dir")" 2
-  expect_measured "72 a killall of another long name that shares the first 15 letters passes" "$(run_payload_in "killall $KILL_PROBE_NAME-other" "$own_dir")" 0
-  expect_measured "38 the same pkill from the folder that owns the process passes" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$other_dir")" 0
-  expect_measured "39 a pkill that matches nothing passes" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
-  expect "40 a pkill only mentioned inside quotes passes" "$(run_payload_in "echo \"pkill -f $KILL_PROBE_NAME\"" "$own_dir")" 0
-  expect_measured "41 the escape lets a foreign pkill through" "$(run_payload_in "$ESCAPE pkill -f $KILL_PROBE_NAME" "$own_dir")" 0
-  foreign_block=$(run_payload_in_stderr "pkill -f $KILL_PROBE_NAME" "$own_dir")
-  expect_measured "42 the block names the foreign folder" "$(printf '%s' "$foreign_block" | grep -c "$other_dir")" 1
-  expect_measured "67 the block says the processes run in another folder, never that another session started them" "$(printf '%s' "$foreign_block" | grep -c 'another session') $(printf '%s' "$foreign_block" | grep -c 'another folder')" "0 1"
-  expect_measured "43 a foreign pkill after an own pkill on the same line still blocks" "$(run_payload_in "pkill -x $KILL_OWN_NAME; pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
-  expect_measured "68 a pkill with a redirection still blocks a process in another folder" "$(run_payload_in "pkill -f $KILL_PROBE_NAME $REDIRECTION" "$own_dir") $(run_payload_in "pkill -f $KILL_PROBE_NAME > out.log" "$own_dir") $(run_payload_in "killall $KILL_OWN_NAME $REDIRECTION; pkill -f $KILL_PROBE_NAME 2>&1" "$own_dir")" "2 2 2"
-  expect_measured "69 a redirection is not a pattern, so it never reaches a process whose command line holds it" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS $REDIRECTION" "$own_dir")" 0
-  expect_measured "74 a redirection glued to the pattern is not part of it" "$(run_payload_in "pkill -f $KILL_PROBE_NAME>/dev/null" "$own_dir")" 2
-  expect_measured "75 a quoted pattern that holds a > stays a pattern" "$(run_payload_in "pkill -f '$KILL_PROBE_SECONDS $REDIRECTION'" "$own_dir")" 2
-  expect_measured "80 a pattern that is only a quoted > is a pattern, so it still reaches a process whose command line holds it" "$(run_payload_in "pkill -f '>'" "$own_dir")" 2
-  expect_measured "81 an escaped > is a pattern too" "$(run_payload_in "pkill -f \\>" "$own_dir")" 2
-  unmeasured_before=$(not_measured_lines)
-  expect_measured "83 a quoted < is a pattern too, so the pkill is measured" "$(run_payload_in "pkill -f '<'" "$own_dir" >/dev/null; echo $(( $(not_measured_lines) - unmeasured_before )))" 0
-  expect_where_proc "70 without lsof the folder is read from /proc, so a foreign pkill still blocks" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
-  : > "$PRISMA_RECEIPT_FILE"
-  expect_without_proc "71 a process whose folder neither lsof nor /proc can read is let through and recorded as not measured" "$(run_without_lsof "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
-  expect_measured "44 the flags of one pkill do not leak into the next" "$(run_payload_in "pkill -f $KILL_OWN_NAME; pkill -9 -f no-such-process-$KILL_PROBE_SECONDS" "$own_dir")" 0
-  : > "$PRISMA_RECEIPT_FILE"
-  expect "73 where pgrep is missing a pkill is let through and recorded as not measured" "$(run_without_pgrep "pkill -f $KILL_PROBE_NAME" "$own_dir") $(grep -c "	$GATE_NAME	.*	not-measured$" "$PRISMA_RECEIPT_FILE")" "0 1"
-  receipt="$PRISMA_RECEIPT_FILE"; : > "$receipt"
-  printf '{"tool_name":"Bash","tool_input":{"command":"pkill -f %s"}}' "$KILL_PROBE_NAME" | SHELL="$ZSH" sh "$SELF" >/dev/null 2>&1
-  expect "45 a pkill without a session folder is let through and recorded as not measured" "$? $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
-  kill "$foreign_pid" "$redirection_pid" 2>/dev/null
-  wait "$foreign_pid" "$redirection_pid" 2>/dev/null
-  rm -rf "$other_dir" "$own_dir"
 }
 
 selftest_equals_word() {
@@ -213,6 +161,27 @@ selftest_receipt() {
   expect "27 a rewrite leaves its own line in the receipt" "$rewritten_rc $(grep -c "	$GATE_NAME	.*	rewritten$" "$receipt")" "0 1"
   fault_rc=$(PRISMA_PARSER_FAULT=1 run_payload 'grep -rn --include=*.md foo .' "$ZSH")
   expect "22 a parser that fails lets the command through and says so in the receipt" "$fault_rc $(grep -c "	$GATE_NAME	.*	not-measured$" "$receipt")" "0 1"
+  selftest_without_jq
+}
+
+run_without_jq() {
+  : > "$PRISMA_RECEIPT_FILE"
+  payload_in "$1" "${2:-/tmp}" | PATH="$no_jq" SHELL="$ZSH" "$SH_PATH" "$SELF" >/dev/null 2>&1
+  printf '%s %s' "$?" "$(receipt_states)"
+}
+
+selftest_without_jq() {
+  TOOLS_WITHOUT_JQ='cat dirname basename sed tr mkdir date grep'
+  no_jq=$(mktemp -d); SH_PATH=$(command -v sh)
+  for tool in $TOOLS_WITHOUT_JQ; do ln -s "$(command -v "$tool")" "$no_jq/$tool" 2>/dev/null; done
+  if PATH="$no_jq" "$SH_PATH" -c 'dirname /a/b && date && mkdir -p "$1"' probe "$no_jq/probe-dir" >/dev/null 2>&1; then
+    expect "89 without jq a pkill is let through and recorded as not measured" "$(run_without_jq "pkill -f $KILL_PROBE_NAME")" "0 not-measured"
+    expect "90 counterexample, without jq a command that touches no trap leaves nothing, even in a folder named after one" "$(run_without_jq 'ls -la' /tmp/pkill-notes)" "0 none"
+  else
+    skip_case "89 without jq a pkill is let through and recorded as not measured" "tools linked into another directory cannot run on this system"
+    skip_case "90 counterexample, without jq a command that touches no trap leaves nothing, even in a folder named after one" "tools linked into another directory cannot run on this system"
+  fi
+  rm -rf "$no_jq"
 }
 
 selftest() {
@@ -243,6 +212,7 @@ selftest() {
   selftest_heredoc_delimiters
   selftest_wrappers_and_input
   selftest_kills
+  selftest_kill_probes
   selftest_receipt
   rm -rf "$fake_bin"
   [ "$cases" = "$SELFTEST_CASES" ] || { printf 'FAIL %s cases ran and %s were expected\n' "$cases" "$SELFTEST_CASES"; ok=0; }

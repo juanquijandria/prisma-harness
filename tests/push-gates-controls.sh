@@ -84,6 +84,9 @@ git reset -q --hard HEAD~1
 records_escapes "size gate records no escape on a push under the ceiling" 0 run pre-push-size.sh "PRISMA_SIZE_OK=1 git push origin feature"
 seq 1 1200 > big.txt; git add big.txt; git commit -qm big
 expect "size gate blocks 1200 lines" 2 run pre-push-size.sh "git push origin feature"
+before=$(receipt_lines)
+expect "size gate blocks a push on the line after a comment" 2 run pre-push-size.sh "echo a # n\\ngit push origin feature"
+CHECKS=$((CHECKS+1)); if [ "$(receipt_lines)" = "$((before+1))" ] && tail -1 "$PRISMA_RECEIPT_FILE" | grep -q blocked; then printf 'PASS that push leaves its blocked line in the receipt\n'; else printf 'FAIL that push left %s receipt lines and not one blocked line\n' "$(($(receipt_lines)-before))"; ok=0; fi
 size_from_subdirectory() ( PAYLOAD_DIR="$T/sub"; run pre-push-size.sh "$1" )
 mkdir -p "$T/sub"; git config diff.relative true
 out=$(size_from_subdirectory "git push origin feature" 2>&1); rc=$?; CHECKS=$((CHECKS+1))
@@ -250,10 +253,11 @@ git -C "$P" commit -qam "php fixed"; printf '<?php $base = BAD;\n' > "$P/base.ph
 warns_unmeasured "lint gate says it measured nothing when the uncommitted php change is in a file the push does not send" php_at "git push origin feature"
 rm -rf "$P"
 
-out=$(cd / && payload "git push origin feature" | sh "$HOOKS/pre-push-size.sh" 2>&1); rc=$?
-CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS size gate warns when the directory is not a git repository\n'; else printf 'FAIL size gate silent outside a repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
-out=$(payload "cd /nonexistent-dir-xyz && git push origin feature" | sh "$HOOKS/pre-push-lint.sh" 2>&1); rc=$?
-CHECKS=$((CHECKS+1)); if [ "$rc" = "0" ] && printf '%s' "$out" | grep -q WARN; then printf 'PASS lint gate warns when it cannot locate the repo\n'; else printf 'FAIL lint gate silent on a missing repo (rc=%s) %s\n' "$rc" "$out"; ok=0; fi
+NOT_A_REPO=$(mktemp -d)
+size_outside_a_repo() { PAYLOAD_DIR="$NOT_A_REPO" run pre-push-size.sh "git push origin feature"; }
+warns_unmeasured "size gate warns and leaves its line when the directory is not a git repository" size_outside_a_repo
+rmdir "$NOT_A_REPO"
+warns_unmeasured "lint gate warns and leaves its line when it cannot locate the repo" run pre-push-lint.sh "cd /nonexistent-dir-xyz && git push origin feature"
 
 CHECKS=$((CHECKS+1))
 if sh "$HOOKS/receipt.sh" --summary | grep -qE 'gate +[0-9]'; then printf 'PASS a separate process reads back the receipt these gates wrote\n'; else printf 'FAIL the receipt summary shows no gate row\n'; ok=0; fi

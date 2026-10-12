@@ -8,14 +8,15 @@ STRIP_QUOTES="$HOOKS_DIR/strip-quotes.sh"
 COMPARE_BASE="$HOOKS_DIR/compare-base.sh"
 ESCAPE="PRISMA_LINT_OK=1"
 ESLINT_PATHSPECS='*.js *.jsx *.mjs *.cjs *.ts *.tsx *.mts *.cts *.vue'
+payload=$(cat)
+[ -r "$HOOKS_DIR/receipt.sh" ] && [ -r "$HOOKS_DIR/push-names-head.sh" ] || { echo "WARN: the lint gate did not run, receipt.sh or push-names-head.sh is missing, so it cannot leave its line in the receipt either." >&2; exit 0; }
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
+. "$HOOKS_DIR/push-names-head.sh"
+[ -r "$HOOKS_DIR/escape-declared.sh" ] || push_gate_not_measured lint-gate "$payload" "the lint gate did not run, escape-declared.sh is missing."
 PRISMA_ESCAPE_SOURCED=1
 . "$HOOKS_DIR/escape-declared.sh"
-. "$HOOKS_DIR/push-names-head.sh"
-[ -n "$JQ" ] || { echo "WARN: the lint gate did not run, jq is missing." >&2; exit 0; }
-
-payload=$(cat)
+[ -n "$JQ" ] || push_gate_not_measured lint-gate "$payload" "the lint gate did not run, jq is missing."
 [ -n "$payload" ] || exit 0
 
 tool=$(printf '%s' "$payload" | "$JQ" -r '.tool_name // empty' 2>/dev/null)
@@ -33,9 +34,9 @@ fi
 [ "$strip_rc" = "0" ] || bare_command=""
 if [ -x "$INVOKES" ]; then
   segments=$(printf '%s' "$command_text" | "$INVOKES" git push); rc=$?
-  [ "$rc" = "3" ] && { echo "WARN: the lint gate did not run, the command parser could not read the command." >&2; exit 0; }
+  [ "$rc" = "3" ] && push_gate_not_measured lint-gate "$payload" "the lint gate did not run, the command parser could not read the command."
   pr_raw=$(printf '%s' "$command_text" | "$INVOKES" gh pr); pr_rc=$?
-  [ "$pr_rc" = "3" ] && { echo "WARN: the gate did not run, the command parser failed." >&2; exit 0; }
+  [ "$pr_rc" = "3" ] && push_gate_not_measured lint-gate "$payload" "the gate did not run, the command parser failed."
   pr_segments=$(printf '%s' "$pr_raw" | grep -E '(^| )pr +(create|ready)( |$)' || true)
   [ -n "$segments" ] || [ -n "$pr_segments" ] || exit 0
 else
@@ -59,7 +60,7 @@ case "$dir" in
   "~") dir="$HOME" ;;
   "~/"*) dir="$HOME/${dir#\~/}" ;;
 esac
-[ -n "$dir" ] && [ -d "$dir" ] || { echo "WARN: the lint gate could not locate the repo, nothing was measured." >&2; exit 0; }
+[ -n "$dir" ] && [ -d "$dir" ] || push_gate_not_measured lint-gate "$payload" "the lint gate could not locate the repo, nothing was measured." "$dir"
 
 real_dir=$(cd "$dir" 2>/dev/null && pwd -P)
 for skip in ${PRISMA_SKIP_REPOS:-}; do
