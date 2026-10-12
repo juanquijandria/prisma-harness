@@ -15,53 +15,50 @@
 
 <p align="center">
   <a href="#instalar"><b>Instalar</b></a> ·
+  <a href="#los-pasos-y-sus-skills"><b>Los pasos</b></a> ·
   <a href="docs/es/METHOD.md"><b>El método</b></a> ·
-  <a href="docs/es/STYLE.md"><b>Las reglas de escritura</b></a> ·
-  <a href="#cómo-lo-usa-una-persona"><b>Cómo se usa</b></a> ·
-  <a href="#configurar"><b>Configurar</b></a>
+  <a href="docs/reference.md"><b>Referencia</b></a>
 </p>
+
+<p align="center"><img src="assets/prisma-method-map.svg" width="100%" alt="El mapa de PRISMA. Un pedido se rutea a uno de cinco carriles, el código con lógica corre plan, build, end to end, mutation testing y verify, y cinco puertas deciden el merge. Un ticket de ejemplo vuelve tres veces y se aprueba en la cuarta vuelta."></p>
+
+PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio lo empaqueta como plugin de Claude Code. Rutea cada pedido a uno de cinco carriles, corre cinco pasos para el código con lógica, y deja que cinco puertas decidan si el trabajo sale de la máquina. Corre con un solo modelo, sin segundo motor, sin servicio externo y sin cuenta. El dibujo está en inglés.
 
 ## Por qué existe
 
-Un agente escribe el código y escribe también la afirmación de que el código funciona. Elige los tests, lee su salida y decide que pasaron. De ese círculo no se sale desde adentro, porque un test no puede refutar la premisa que comparte con lo que verifica. Las fallas que llegan a producción son justo aquellas en las que todos los chequeos estuvieron de acuerdo.
+Un agente escribe el código y también la afirmación de que el código funciona. Elige los tests, lee su salida y decide que pasaron, y un test no puede refutar la premisa que comparte con lo que verifica. PRISMA agrega los chequeos que un agente no puede darse a sí mismo, puertas que frenan antes de un push, un paso que obliga a mirar la superficie real, un refutador que intenta tumbar el hallazgo, y una réplica ciega que recibe la afirmación y las fuentes pero nunca el razonamiento.
 
-PRISMA agrega los chequeos que un agente no puede darse a sí mismo. Puertas que frenan de forma mecánica antes de un push, un paso que obliga a mirar la superficie real, un refutador cuyo trabajo es tumbar el hallazgo, y una réplica ciega que recibe la afirmación y las fuentes pero nunca el razonamiento. Cada regla la pagó una falla real, y una nueva entra solo si da rojo sobre el caso que la paga.
-
-Así se ve dentro de una sesión. El agente intentó escribir una página de documentación sin abrir el índice, y después intentó empujar un cambio de 1.202 líneas.
+Así habla una puerta dentro de una sesión, después de que un agente intentó empujar un cambio de 1.202 líneas.
 
 ```
-INDEX GATE: you are about to write a page under wiki/ without having opened
-index.md in this session. Read <docs root>/index.md first so you do not create
-a duplicate page or leave the index stale, then retry.
-
 SIZE GATE: 1202 lines changed, the push is blocked.
 This repository blocks a push over 400 changed lines and warns
 over 200.
 ```
 
-PRISMA es un método de verificación para el trabajo que produce un agente, y este repositorio es el método empaquetado como plugin de Claude Code. Cinco carriles deciden cuánta verificación necesita un pedido, cinco pasos corren para el código con lógica, y cinco puertas con nombres distintos deciden si el trabajo sale de la máquina. Los hooks frenan lo que el método dice que no debe pasar, las skills corren los pasos, y el método escrito dice por qué.
+## Los pasos y sus skills
 
-Corre con un solo modelo, sin segundo motor, sin servicio externo y sin cuenta. La réplica ciega, el único lugar donde el método nació con dos motores, se declara de un solo modelo y dice lo que eso cuesta.
+Tú solo dices "PRISMA". La skill `prisma` rutea el pedido y llama a cada una de las otras cuando llega su paso.
 
-## El método en un dibujo
+| Paso | Skill | Qué hace |
+|---|---|---|
+| Ruteo | `prisma` | manda el pedido a uno de cinco carriles, consulta, cambio mecánico, código con lógica, datos a un tercero o texto, y solo el código con lógica corre los cinco pasos |
+| 1 Plan | `prisma-plan` | una entrevista en rondas que deja un registro escrito, dice si el trabajo cabe en una sesión y lo parte en tickets, y cada otra sesión que pide va con su tarjeta |
+| 2 Build | `prisma-build` | cada test visto en rojo antes del código que lo pone en verde, después la revisión de `prisma-fidelity-review` en un subagente limpio, después el commit |
+| 2b Diagnose | `prisma-diagnose` | cuando algo está roto, reproducirlo antes de parchar, y nombrar el paso del que se escapó el defecto |
+| 3 End to end | ninguna | correr sobre datos reales y mirar la superficie que ve una persona, no el artefacto que la produce |
+| 4 Mutation testing | ninguna | reintroducir el defecto exacto, sumar un contraejemplo, y comprobar que el test falla por la razón esperada |
+| 5 Verify | ninguna | comprobar la condición de salida en la fuente real, y medir una cifra otra vez por otra vía |
 
-![PRISMA: primero se rutea a uno de cinco carriles; el código con lógica corre cinco pasos por cuatro carriles de actor, la persona, el agente, las puertas y la réplica ciega; cinco puertas cruzan carriles y frenan](assets/method-map.png)
+Tres reglas valen sobre todos los carriles. Toda afirmación es hipótesis hasta que se mida por una vía independiente. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó. Una regla entra al método solo si da rojo sobre su caso histórico.
 
-Tres reglas valen sobre todos los carriles y no son un paso más.
+## Las cinco puertas
 
-1. Toda afirmación es hipótesis hasta que se mida por una vía independiente.
-2. El instrumento se calibra en el corpus real, y quien calibra dice qué no probó.
-3. Una línea entra al método solo si da rojo sobre su caso histórico.
-
-El orden que sigue el agente está escrito, no dibujado. Vive en `docs/es/METHOD.md` y en `skills/prisma/SKILL.md`, que es lo que corre cuando dices PRISMA, con las cuatro skills de los pasos al lado. El dibujo está en inglés.
-
-## Cómo lo usa una persona
-
-1. **Instala una vez**, con los dos comandos de abajo. No hay un segundo plugin que instalar.
-2. **Abre una sesión nueva y trabaja como siempre.** No llamas a nada. Las puertas corren solas, hablan solo cuando algo está mal, y el agente recibe qué arreglar. Se frenan una página escrita sin abrir el índice, un push con más de cuatrocientas líneas cambiadas o con el linter en rojo, y una página con em-dash o voseo. Las reglas de escritura llegan al arrancar la sesión, así que el agente escribe así sin que se lo pidas.
-3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo. Es lo único que se llama, y rutea el pedido por los cinco carriles.
-4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
-5. **Actualiza** con los comandos de la sección siguiente, o enciende una vez el auto-update de este marketplace en `/plugin`.
+- **Revisor de fidelidad**, `prisma-fidelity-review`, comprueba que lo construido es lo acordado, ni más ni menos.
+- **Gate de formato**, `hooks/format-gate.sh`, revisa cómo está escrita una página y no lee código.
+- **Refutador**, un agente adversarial, intenta tumbar un hallazgo contra el código y los datos.
+- **Gate de merge**, la CI o el bot del pull request, dice si se puede mergear.
+- **Réplica ciega**, `hooks/blind-replica.sh`, recibe la afirmación y las fuentes y nada del cálculo. Con un solo modelo corre en un subagente limpio, que da una derivación independiente y no un motor independiente.
 
 ## Instalar
 
@@ -82,149 +79,61 @@ Después, dentro de Claude Code, dos comandos.
 /plugin install prisma-harness@prisma-harness
 ```
 
-Para actualizar, corre esto en tu terminal y abre una sesión nueva.
+Para actualizar, corre esto en tu terminal y abre una sesión nueva, o enciende una vez el auto-update de `prisma-harness` en `/plugin`.
 
 ```
 claude plugin marketplace update
 claude plugin update prisma-harness@prisma-harness
 ```
 
-Para no pensar más en eso, abre `/plugin` dentro de Claude Code, entra a Marketplaces, elige `prisma-harness` y enciende auto-update.
+Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mktemp`, `find` y `sed`, y PRISMA nombra el que falte al arrancar la sesión. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash, y las herramientas se instalan con `winget install jqlang.jq Python.Python.3.12`. WSL 2 se comporta como Linux.
 
-Requisitos: `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mktemp`, `find`, `sed`. Si falta alguno, PRISMA te lo dice al arrancar la sesión con el comando para instalarlo, y pregunta antes de instalar nada.
+## Cómo lo usas
 
-Todos los selftests y los controles de las puertas de push corren en GitHub Actions en Ubuntu, macOS y Windows con Git Bash, en cada push, y la insignia de arriba es esa corrida. En Windows, Claude Code necesita Git for Windows para que los hooks corran bajo Git Bash, y las herramientas se instalan con `winget install jqlang.jq Python.Python.3.12`. WSL 2 se comporta como Linux.
+1. **Instala una vez.** No hay un segundo plugin.
+2. **Trabaja como siempre.** Las puertas corren solas, hablan solo cuando algo está mal, y el agente recibe qué arreglar.
+3. **Di "PRISMA"** cuando quieras el método entero sobre un trabajo.
+4. **Lee `docs/es/METHOD.md`** cuando quieras saber por qué una puerta hizo lo que hizo.
 
 ## Qué hay adentro
 
 | Pieza | Qué hace | Cuándo corre |
 |---|---|---|
-| `METHOD.md` | el método en inglés, carriles, pasos, puertas, modo de un solo modelo | lo lees |
-| `docs/es/METHOD.md` | el bloque canónico en español, la referencia que trae este plugin | `check-canonical-sync.sh` compara tus copias contra él al arrancar la sesión |
-| `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura y cuáles hace cumplir el gate de formato | lo lees |
-| `skills/prisma/SKILL.md` | el orden operativo del método, se invoca como `prisma` | cuando dices "PRISMA" |
-| `skills/prisma-plan/SKILL.md` | el paso 1, la entrevista en rondas que deja registro y cierra con el carril y la estimación de sesión | cuando `prisma` llega al paso 1 |
-| `skills/prisma-build/SKILL.md` | el paso 2, tests primero en los seams acordados, cada control visto en rojo antes del código, después la revisión, después el commit | cuando `prisma` llega al paso 2 |
-| `skills/prisma-fidelity-review/SKILL.md` | el revisor de fidelidad, dos ejes separados, corre en un subagente limpio contra el registro del plan | cuando `prisma-build` llega a su revisión, o cuando pides una revisión |
-| `skills/prisma-diagnose/SKILL.md` | el paso 2b, el loop antes de la hipótesis, y al final el paso del que se escapó el defecto | cuando algo está roto |
-| `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs si la sesión nunca leyó el índice | `PreToolUse` en Write y Edit |
-| `hooks/pre-push-comments.sh` | mide si un push o PR agrega comentarios, cifras en comentarios o referencias `archivo:línea`, y frena cuando `PRISMA_COMMENTS_BLOCK=1` | `PreToolUse` en Bash |
-| `hooks/pre-push-size.sh` | avisa sobre 200 líneas cambiadas, frena sobre 400, y distingue rama vieja de cambio grande | `PreToolUse` en Bash |
-| `hooks/pre-push-lint.sh` | corre el linter del propio repo, `php-cs-fixer` o `eslint`, sobre el diff antes del push | `PreToolUse` en Bash |
-| `hooks/shell-traps.sh` | atrapa cuatro comandos que fallan o hacen daño sin avisar. En zsh, a un patrón de `grep --include` sin comillas, que zsh corta por no encontrar archivos mientras el resto de la línea sigue, y a una palabra que empieza con `==`, que zsh lee como la ruta de un comando y corta con `= not found`, el propio gate les pone comillas y corre el comando corregido, con `hooks/quote-zsh-words.sh`, y la misma reescritura deja fuera de una búsqueda sobre carpeta los archivos `.env`, así coincide con la de `hooks/secret-reads.sh` sin importar cuál de las dos aplique Claude Code; cuando eso no se puede hacer sin riesgo, como con llaves anidadas o un `$` dentro de la palabra, frena. Un `timeout` que no está instalado frena, porque el comando que envuelve nunca corre. La cuarta trampa es un `pkill` o un `killall` cuyo patrón alcanza un proceso cuya carpeta de trabajo queda fuera de la carpeta de la sesión, y el gate compara carpetas, no sesiones; `hooks/kill-targets.sh` lista lo que el patrón alcanza y el gate frena nombrando cada proceso. `PRISMA_SHELL_TRAPS_OK=1` deja pasar uno | `PreToolUse` en Bash |
-| `hooks/secret-reads.sh` | evita que las líneas de un archivo de secretos salgan en la consola, donde quedarían en el transcript. Un archivo de secretos es `.env`, `.env.<lo que sea>` o un nombre que termina en `.env`, y `.env.example`, `.env.sample` y `.env.template` se pueden leer directo, mientras que una búsqueda sobre una carpeta los deja fuera junto con los demás `.env`. Leerlo con `cat`, `head`, `tail`, `less`, `more`, `bat`, `sed`, `awk`, `xxd`, `diff`, `strings`, `nl`, `sort`, `uniq`, `tac`, `rev`, `fold`, `paste`, `column`, `od`, `hexdump`, `base64` o `cut` más allá de su primer campo, o buscar en él nombrándolo con `grep`, `rg`, `git grep`, `git diff`, `git show` o `git log -p`, frena, y también un `grep --include` o un `rg -g` que lo alcanza, porque le ganaría a la exclusión, y el aviso dice cómo ver solo los nombres. Una redirección de entrada desde uno frena con cualquier programa, y también `xargs` o `find -exec` que corren un lector cuando el comando nombra un archivo de secretos. Una búsqueda sobre una carpeta no se frena, corre con los archivos de secretos excluidos, con `--exclude` en `grep -r`, `-g` en `rg` y una pathspec en `git grep`, `git diff`, `git show` y `git log -p`. Al agente se le dice qué corrió, para que no tome las líneas que faltan como ausentes. Listar nombres con `-l` o contar con `-c` pasa sin tocar. `hooks/secret-args.sh` pone la exclusión y `hooks/secret-names.sh` lee los argumentos, y un comando que no puede leer pasa y queda anotado como no medido. `PRISMA_SECRET_READS_OK=1` deja pasar uno | `PreToolUse` en Bash |
-| `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy, reglas en `.prisma-format.conf`. Frena un cierre una vez, y deja pasar el cierre que Claude Code marca como ya continuado | `Stop` |
-| `hooks/claim-ready-gate.sh` | lee el último mensaje del agente, y cuando una frase dice que un PR está listo para mergear o en verde y lo nombra, por enlace o por número, corre `pr-ready.sh` sobre ese PR y frena el cierre con lo que falta. Una afirmación negada o preguntada no es afirmación, y en verde no es afirmación en una frase que niega que el PR esté listo. Cuando no puede medir deja pasar el cierre y lo anota en el recibo | `Stop` |
-| `hooks/paste-block-gate.sh` | lee el último mensaje del agente, y cuando un bloque entre dos líneas de `═` trae un hueco por rellenar, un valor cortado como `=TEST…` o uno que se nombra como hueco, como `TU_CODIGO_AQUI`, un marcador como `<tu token>` o `[nombre]`, o una palabra como `TODO`, frena el cierre nombrando el hueco, porque ese bloque se pega tal cual. Una variable de plantilla como `{{nombre}}`, unos puntos suspensivos dentro de una frase, una cita y un hueco fuera del bloque no cuentan. `PRISMA_PASTE_OK=1` en una línea propia fuera del bloque deja pasar uno, y cuando no puede medir deja pasar el cierre y lo anota en el recibo | `Stop` |
-| `hooks/handoff-card-gate.sh` | lee los bloques de código del último mensaje del agente, y cuando uno abre otra sesión con `claude` o con un comando nombrado en `PRISMA_LAUNCH_COMMANDS`, frena el cierre salvo que ese pedido traiga su tarjeta, un nombre después de `-n` y una fila de una tabla fuera del código cuya primera celda lo nombra y cuyas seis celdas traen cada una una letra o un número, la sesión, por qué, qué entrega, su orden, a quién reporta y cuándo se cierra. Una corrida sin pantalla con `-p`, una sesión que se reabre con `--resume` o `--continue`, un subcomando como `claude plugin update`, y `--version` o `--help` no cuentan. Un primer argumento que es una palabra suelta en minúsculas se lee como subcomando, así que la misión va entre comillas. Las palabras del encabezado no se leen, así que la tarjeta sirve en cualquier idioma. `PRISMA_HANDOFF_OK=1` en una línea propia fuera del código deja pasar uno, y cuando no puede medir deja pasar el cierre y lo anota en el recibo | `Stop` |
-| `hooks/pr-ready.sh` | dice si un PR está listo para mergear con lo que muestra GitHub, ahora o como estaba en un momento pasado con `--at`. Toda corrida de CI sobre la cabeza terminó en success, neutral o skipped, con al menos un success real, y una cabeza sin ninguna corrida solo cuenta cuando el repositorio no tiene ningún workflow activo bajo `.github/workflows/`, así que en un repositorio cuyo único workflow corre por horario todo PR sin corridas queda no medido. Cada revisor de `PRISMA_PR_REVIEWERS` escribió después del último push, ningún revisor, esté o no en esa lista, tiene un pedido de cambios en pie desde su última aprobación, el PR no es borrador, GitHub no lo da por bloqueado, no choca con su base, y dentro de un clon del repositorio no choca con otro PR abierto del mismo autor sobre un archivo compartido, que `hooks/pr-ready-conflicts.sh` mide con `git merge-tree`. Una base que no es la rama por defecto no es la cabeza de un PR mergeado que sigue apuntando al commit que ese PR llevó, salvo que la rama esté protegida, porque mergear ahí nunca llega a la rama por defecto. Una revisión formal cuenta solo cuando aprueba o comenta sobre la cabeza misma. Una respuesta de GitHub con otra forma que la del endpoint no se mide. Sale 0 listo, 1 no listo y 3 cuando no pudo medir | lo llamas tú, y lo llama el gate de afirmaciones |
-| `hooks/check-canonical-sync.sh` | compara el bloque canónico en toda copia registrada, nunca edita | `SessionStart` |
-| `hooks/session-voice.sh` | inyecta las reglas de escritura de `STYLE.md` en cada sesión, lo avisa una vez por proyecto, y `PRISMA_VOICE=0` lo apaga | `SessionStart` |
-| `hooks/session-size.sh` | le dice al agente una vez por sesión, cuando el contexto pasa el 80% de su ventana, cuántos miles de tokens relee cada llamada y qué parte de la ventana es, y que recomiende /compact. Nunca propone una sesión nueva. La ventana es de 1M salvo que `PRISMA_CONTEXT_WINDOW` o `CLAUDE_CODE_DISABLE_1M_CONTEXT` digan otra cosa, y un `CLAUDE_CODE_AUTO_COMPACT_WINDOW` menor manda. `PRISMA_SESSION_SIZE=0` lo apaga | `UserPromptSubmit` |
-| `hooks/session-deps.sh` | nombra las herramientas requeridas que faltan, con el comando para instalarlas, y le dice al agente que pregunte antes de instalar. Calla cuando no falta nada. `PRISMA_DEPS_CHECK=0` lo apaga | `SessionStart` |
-| `hooks/notes-machinery.sh` | reporta un repositorio de git, un manifiesto de paquete, una carpeta de módulos o un entorno virtual metidos dentro de un árbol que guarda información y no código. Necesita `PRISMA_NOTES_ROOT` | `SessionStart` y `Stop` |
-| `hooks/blind-replica.sh` | arma el brief ciego, solo afirmación y fuentes, para la quinta puerta, y con un auditor configurado su código de salida es el veredicto | lo llamas tú |
-| `hooks/receipt.sh` | una línea local por freno, corrección, escape, aviso o puerta que no pudo medir, y un resumen que pegas a quien lo pida | lo escriben las puertas, lo lees tú |
-| `hooks/measure-comments.sh`, `measure-diff-size.sh`, `compare-base.sh`, `command-invokes.sh`, `strip-quotes.sh`, `escape-declared.sh`, `github-remote.sh` | los ayudantes que comparten las puertas | los llaman las puertas |
+| `METHOD.md`, `docs/es/METHOD.md` | el método, en inglés y en su bloque canónico en español | lo lees |
+| `STYLE.md`, `docs/es/STYLE.md` | las reglas de escritura, y cuáles hace cumplir el gate de formato | lo lees |
+| `skills/` | las cinco skills de la tabla de arriba | cuando dices "PRISMA" o llega su paso |
+| `hooks/gate-read-index.sh` | frena una escritura bajo la carpeta de docs antes de leer el índice | `PreToolUse` en Write y Edit |
+| `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | las puertas de push, líneas de comentario en el diff, un tamaño que avisa sobre 200 líneas cambiadas y frena sobre 400, y el linter del propio repositorio | `PreToolUse` en Bash |
+| `hooks/shell-traps.sh` | pone comillas a dos trampas de zsh, y frena un `timeout` que no está instalado y un `pkill` que alcanza otra carpeta | `PreToolUse` en Bash |
+| `hooks/secret-reads.sh` | deja las líneas de un archivo de secretos fuera de la consola y fuera de las búsquedas | `PreToolUse` en Bash |
+| `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy | `Stop` |
+| `hooks/claim-ready-gate.sh` | frena un mensaje que da un PR por listo cuando `pr-ready.sh` dice que no lo está | `Stop` |
+| `hooks/paste-block-gate.sh` | frena un bloque para pegar que todavía trae un hueco por rellenar | `Stop` |
+| `hooks/handoff-card-gate.sh` | frena un pedido de otra sesión que llega sin su tarjeta | `Stop` |
+| `hooks/check-canonical-sync.sh`, `session-voice.sh`, `session-deps.sh` | la sincronía del bloque canónico, las reglas de escritura y las herramientas que faltan | `SessionStart` |
+| `hooks/session-size.sh` | avisa una vez, pasado el 80% de la ventana de contexto, que conviene compactar | `UserPromptSubmit` |
+| `hooks/notes-machinery.sh` | marca maquinaria de código dentro de un árbol pensado para notas | `SessionStart` y `Stop` |
+| `hooks/pr-ready.sh`, `blind-replica.sh` | si un PR está listo para mergear, y el brief de la réplica ciega | los llamas tú |
+| `hooks/receipt.sh` | una línea local por freno, corrección, escape o hueco | lo escriben las puertas, lo lees tú |
 
-Diecisiete piezas tienen `--selftest`, el gate de índice, el de formato, la sincronía, la réplica ciega, la voz de sesión, el aviso de tamaño de sesión, el chequeo de dependencia, el recibo, el detector de maquinaria, el parser de comandos, el parser del escape, el gate de trampas de shell, el gate de lecturas de secretos, el chequeo de PR listo, el gate de afirmaciones, el gate del bloque para pegar y el gate de la tarjeta de sesión. Las tres puertas de push están cubiertas por 127 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`, que frenan un defecto real y después dejan pasar el diff corregido. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 99 más sobre lo que reporta una puerta cuando no midió, que nunca reporta un veredicto y que deja su línea en el recibo. `tests/skills-controls.sh` suma 45 sobre el texto de la skill `prisma`, las cuatro skills de paso, la fila del paso 3 del método, el tamaño de una sesión y el reparto del trabajo, veintiséis de ellos sobre copias mutadas que tienen que ponerse rojas. Una sesión se mide contra su ventana de contexto, y un control falla si vuelve la cifra fija de antes. `tests/runner-controls.sh` suma 28 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. `tests/run-selftests.sh` corre todo eso, comprueba que las páginas que este repositorio publica cumplen las reglas que propone, y hace fallar a la suite cuyos casos impresos no coinciden con los que declara, o que no imprime conteo. La suite del gate de formato, de 47 casos, vive en `hooks/format-gate.sh`. Una puerta cuyas pruebas nunca fallan es decoración.
+Cada pieza completa, su escape y lo que no caza están en [la referencia](docs/reference.md), en inglés.
 
-## Las reglas de escritura, y cómo apagarlas
+## Cómo se prueba
 
-Este plugin pone reglas de escritura al inicio de cada sesión, y lo avisa en la primera sesión de cada proyecto. Si quieres la verificación y no el estilo de prosa, pon esto en tu configuración de Claude Code.
-
-```json
-{ "env": { "PRISMA_VOICE": "0" } }
-```
-
-O díselo a tu agente con tus palabras, que es más corto.
-
-```
-Apaga las reglas de escritura de PRISMA en este proyecto.
-```
-
-## Dos cosas que se leen más pesadas de lo que son
-
-**Algo roto no pasa por la entrevista.** `skills/prisma-diagnose/SKILL.md` tiene su propio disparador y no pide registro de plan. El paso 1 es para trabajo que se está decidiendo, no para un defecto que se está reproduciendo.
-
-**La puerta de comentarios no frena hasta que se lo pidas.** Recién instalada mide el diff y dice qué encontró. `PRISMA_COMMENTS_BLOCK=1` convierte esa medición en un freno.
-
-## Qué se hace cumplir, y quién
-
-"Pasó PRISMA" significa tres cosas distintas según la promesa. Un hook frena solo. Al agente se le pide, y el transcript y el recibo son la evidencia. Una persona, o evidencia de fuera de la máquina, decide el resto, y nada de ese tercer tipo lo hace cumplir este repositorio. Las puertas de push miden el HEAD activo contra su base, así que una rama empujada desde otro lado no se mide y la puerta lo dice, y un repositorio listado en `PRISMA_SKIP_REPOS` nunca se mide.
-
-| Promesa | La sostiene | Cómo lo sabes |
-|---|---|---|
-| ninguna página bajo el directorio de docs se escribe **con Write o Edit** sin leer el índice | hook | el gate de índice frena, y no tiene escape. Una página escrita por un comando de shell queda fuera |
-| ningún push de un repositorio vigilado lleva líneas de comentario, cifras en comentarios ni referencias de archivo y línea | hook, con `PRISMA_COMMENTS_BLOCK=1` | la puerta de comentarios frena el HEAD o dice que no midió, y un escape queda en el recibo. Sin esa variable solo avisa |
-| ningún push de un repositorio vigilado pasa el techo de tamaño | hook | la puerta de tamaño frena el HEAD, y un escape queda en el recibo |
-| un push de un repositorio vigilado pasa su propio linter | hook | la puerta de lint frena el HEAD o dice que no midió, y un escape queda en el recibo |
-| una página tocada hoy cumple las reglas de escritura | hook | el gate de formato frena el cierre, y una regla se apaga en la config |
-| ninguna sesión cierra diciendo que un PR está listo para mergear mientras su CI no terminó, un revisor escribió antes del último push o el PR choca | hook | el gate de afirmaciones frena el cierre con lo que falta, y un cierre que no pudo medir queda en el recibo. Una afirmación que no sabe leer, o una hecha en un mensaje anterior, queda fuera |
-| el bloque canónico coincide con toda copia registrada | agente | la sincronía reporta la deriva al arrancar y nunca frena |
-| los cinco pasos corren para código con lógica | agente | la skill los ordena, y el transcript muestra si corrieron |
-| un hallazgo se reproduce antes de repetirse como hecho | agente | el transcript |
-| una cifra se mide por una segunda vía | agente | `blind-replica.sh` arma el brief y lee el veredicto, y no juzga su verdad |
-| el resultado se miró en la superficie que ve una persona | persona | el paso 3, y nadie más puede hacerlo |
-| la condición de salida se cumple donde cayó el trabajo | evidencia externa | el paso 5, sobre la fuente real |
-| las puertas reducen los defectos escapados | evidencia externa | el recibo cuenta frenos, no si cada freno tenía razón |
+Diecisiete piezas tienen `--selftest`. Las tres puertas de push están cubiertas por 127 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 99 más sobre lo que reporta una puerta cuando no midió. `tests/skills-controls.sh` suma 45 sobre el texto de las skills y del método, veintiséis de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/runner-controls.sh` suma 28 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. La suite del gate de formato, de 47 casos, vive en `hooks/format-gate.sh`. Todo corre en Ubuntu, macOS y Windows en cada push, y la insignia de arriba es esa corrida.
 
 ## Configurar
 
-Variables de entorno, todas opcionales. La tabla del `README.md` en inglés las lista con su default; las claves son las mismas. Las tres puertas de push tienen un escape declarado, `PRISMA_COMMENTS_OK=1`, `PRISMA_SIZE_OK=1`, `PRISMA_LINT_OK=1`, puesto delante del comando, y el gate de trampas de shell tiene `PRISMA_SHELL_TRAPS_OK=1` de la misma forma. El gate del bloque para pegar tiene `PRISMA_PASTE_OK=1`, en una línea propia del mensaje y fuera del bloque, porque adentro se pegaría. El gate de lecturas de secretos tiene `PRISMA_SECRET_READS_OK=1` al inicio del comando, y con él los archivos de secretos se quedan en la búsqueda. El porqué va en la descripción del cambio. Un escape que se usa por defecto no es una puerta. El gate de índice no tiene escape, leer el índice es el arreglo. El de formato tampoco; una regla que no quieres se apaga en su config.
+Todo ajuste es opcional. Aquí van tres, y [la referencia](docs/reference.md) lista el resto con cada escape. Las claves son las mismas en los dos idiomas.
 
-Ningún hook recibe de Claude Code la ventana de contexto del modelo. El aviso de tamaño asume 1M, o 200k con `CLAUDE_CODE_DISABLE_1M_CONTEXT`, así que si tu modelo tiene otra ventana pon su tamaño en tokens en `PRISMA_CONTEXT_WINDOW`, o el aviso se queda callado.
-
-**De dónde salen 200 y 400.** Son la política de este repositorio, y toman su forma de una sola fuente, [un caso de diez meses sobre 2.500 revisiones](https://static1.smartbear.co/support/media/resources/cc/book/code-review-cisco-case-study.pdf) en un solo grupo de producto de Cisco, hecho y escrito en 2006 por el proveedor de la herramienta de revisión que midió. Concluye que las líneas bajo revisión deben quedar bajo 200 y no pasar de 400.
-
-Léelo antes de confiar en los defaults. Sus conteos de defectos salen de una muestra de 300 de esas revisiones codificada a mano, no de las 2.500. Aparta una quinta parte de las revisiones por poco interesantes. Su propia nota al pie declara la premisa sobre la que se apoya todo, que la densidad real de defectos es constante entre cambios grandes y chicos. Su consejo resumido es más estrecho, entre 100 y 300 líneas por vez. Y nunca dice si sus líneas bajo revisión son las líneas que cuenta un diff, que es lo que esta puerta mide. Esa es la única afirmación que este repositorio hace sobre la literatura. Los números son tuyos para cambiarlos, y la puerta imprime la política y nunca el estudio.
-
-## El recibo
-
-Cada vez que una puerta frena algo, corrige un comando y lo deja correr, alguien la pasa con el escape donde iba a frenar, mide algo que no le pidieron frenar, o no puede medir, cae una línea en `~/.prisma-harness/receipts.log` con la fecha y hora, la puerta, el repositorio, y cuál de las cinco fue, y nada más. Una puerta de push deja esa línea solo cuando el comando parece un push, para que un parser roto no escriba una en cada comando Bash. Un repositorio sin linter no deja línea de la puerta de lint, porque no había nada que medir. Una puerta a la que le falta `receipt.sh` o `push-names-head.sh` imprime su `WARN` y no deja línea, porque lo que falta es justo el código que la escribe. Una puerta que no pudo medir no aprobó nada, así que el resumen cuenta cada tipo en su propia columna. El archivo nunca sale de tu máquina salvo que lo pegues, y los hooks y el comando de la terminal lo comparten a propósito.
-
-```
-sh hooks/receipt.sh --summary
-```
-
-Eso imprime una fila por puerta con frenos, correcciones, escapes y el primer y último día, lista para pegar en un chat. Muestra qué puertas cazan cosas en tu trabajo y cuáles nunca disparan. Cuenta frenos, no si cada freno tenía razón, y no ve lo que ninguna puerta cazó. `PRISMA_RECEIPT=0` lo apaga, `--path` dice dónde está el archivo, `--reset` lo vacía después de preguntar.
-
-## Lo que no se toca sin escribir la razón
-
-- **El bloque canónico en `docs/es/METHOD.md`.** Toda copia registrada se compara contra él; editarlo acá hace derivar todas las copias a propósito.
-- **Los códigos de salida de una puerta.** Como hook, `0` pasa y `2` frena; una puerta que no puede medir imprime un `WARN` y sale `0`. En la línea de comandos el gate de formato sale `1` con fallas. Una puerta que falla callada fabrica un veredicto. `hooks/blind-replica.sh` es un comando y no un hook, y sus códigos son propios, `0` el auditor confirmó, `5` refutó, `4` sin veredicto, `6` no hay auditor configurado y solo se imprimió el brief, `2` no se pudo leer el brief. `hooks/pr-ready.sh` también es un comando, `0` listo, `1` no listo, `3` no pudo medir, `2` no pudo leer los argumentos.
-- **Los selftests.** Cambias una puerta, reintroduces el defecto exacto por el que existe, la ves frenar, lo quitas, la ves pasar. El silencio no prueba nada.
-
-## Trampas conocidas
-
-- **Un hook registrado en esta sesión no corre en esta sesión.** La configuración se lee al arrancar. Prueba un hook nuevo en una sesión nueva.
-- **`hooks/hooks.json` y `skills/` se cargan por convención.** Nombrarlos otra vez en `plugin.json` hace que Claude Code rechace el plugin como duplicado, aunque la carga local con `--plugin-dir` no se queje.
-- **La puerta de comentarios salta los archivos cuya extensión no conoce**, y cuenta solo las líneas que tu diff agrega.
-- **El gate de índice vigila Write y Edit, no el shell.** Una página creada con `cat > pagina.md` o con una redirección nunca le llega, así que un agente que escribe por el shell le pasa por al lado. Solo un Read del índice que no dio error lo abre, porque Claude Code deja que un Write reemplace un archivo que nunca se leyó.
-- **El parser de comandos, `command-invokes.sh`, no es un parser de shell.** Respeta comillas, escapes, comentarios y redirecciones y nunca borra contenido, pero no resuelve expansiones, alias, `eval` ni globbing. Lee el cuerpo de un heredoc como comandos, así que un `git push` adentro de uno cuenta como push. Cuando queda una comilla sin cerrar devuelve la unión de las lecturas plausibles en vez de una sola. En los dos casos una puerta puede frenar un comando que no tenía que frenar, y el arreglo es partir el comando en dos. Es raro, y determinista cuando pasa.
-- **La trampa del `pkill` juzga un proceso por su carpeta de trabajo.** Un proceso que corre dentro de la carpeta de la sesión cuenta como propio, así que una sesión abierta en una carpeta padre de otra terminal no queda frenada si mata procesos de esa terminal. En macOS `killall` compara el nombre del proceso y el gate busca con `pgrep -x`, que también compara el primer argumento, así que puede frenar un `killall` que no habría alcanzado nada. Donde no hay `pgrep`, como en Git Bash de Windows, el gate no mide nada y deja pasar el comando con una línea de no medido en el recibo.
-- **El gate de trampas de shell conoce cuatro trampas, y lee la shell de `$SHELL`.** Corrige el comando con el campo `updatedInput` de un hook `PreToolUse`, y el recibo lo anota como `rewritten`. Un patrón o una palabra dentro de un heredoc, un comentario, un texto entre comillas, `[[ ]]`, `(( ))` o los patrones de un `case` queda como está, porque zsh no lo expande ahí. Una sustitución de comandos escrita con comillas invertidas también queda como está, porque el gate no lee adentro, así que una trampa ahí no se atrapa. Un heredoc termina solo en una línea igual a su delimitador, como en la shell. Las del `--include` y del `==` solo actúan en zsh, y un zsh con `nomatch` apagado nunca tiene la primera, así que ahí las comillas no hacían falta, y tampoco cambian lo que hace el comando. Un `=nombre` solo es la expansión que zsh quiere decir y queda como está. Una búsqueda lanzada con `xargs`, `eval`, `bash -c` o desde un script queda fuera, y también un `timeout` escrito dentro de un texto entre comillas.
-- **El gate de afirmaciones lee un mensaje, una frase a la vez.** Juzga el último mensaje del agente, y solo una frase que nombra el PR con un enlace de GitHub, con `dueño/repo#número`, o con `#número` dentro de un clon cuyo `origin` está en GitHub. Una lista de PRs bajo un título que dice que están listos los nombra en otras líneas y no se lee. Un no o un not en las tres palabras antes de la afirmación, dentro de su propia cláusula, la niega. Con `--at`, `pr-ready.sh` no ve el borrador ni el estado de merge del pasado y lo dice, lee cada revisión en el estado que tiene hoy, así que una descartada después de ese momento ya no cuenta, compara los PRs sobre las cabezas que tenían entonces pero sobre los archivos que tocan hoy, y lee la lista de workflows, la base del PR y si esa base está protegida como están hoy.
-- **En Windows, Git Bash reescribe una ruta que se le pasa a un programa nativo.** Un argumento con forma de ruta Unix se vuelve una de Windows, así que `jq --arg alguna_ruta /tmp/x` le llega a jq como `C:/.../tmp/x` mientras el JSON que lee sigue diciendo `/tmp/x`, y la comparación falla en silencio. Un hook de acá compara rutas en el shell y nunca le pasa una a jq como dato.
-- **Claude Code puede compactar solo una sesión larga que se queda quieta cerca de una hora.** `"idleCompaction": false` en tu configuración de Claude Code lo apaga.
-- **`--changed` en el gate de formato encuentra páginas modificadas hoy** por fecha de archivo, no por git.
-- **La puerta de tamaño mide HEAD**, no el ref que empujas. Si empujas otra rama desde `main`, imprime un `WARN` y no mide. Lee HEAD cuando corre el hook, antes del comando, así que un comando que cambia de rama o rehace el último commit antes de su push se mide sobre el HEAD del que partió.
-- **Las puertas de lint y de comentarios revisan exactamente lo que el push envía, o dicen que no lo hicieron.** Leen los commits, con los ajustes de diff de la configuración de git apagados. La de lint corre el linter sobre los archivos y la configuración del disco, así que solo mide cuando ningún archivo seguido tiene cambios sin commit, y si no, imprime un `WARN`. Cada git del comando tiene que ser uno que se sabe que no toca los commits, push, status, log, diff, show, rev-parse, merge-base, ls-files, ls-remote, describe, fetch, add, tag, branch, blame, shortlog, rev-list, cat-file o for-each-ref. Cualquier otro, o uno que la puerta no puede leer como uno con `-C`, hace que las dos impriman un `WARN` y no midan nada. Para que se mida, el push va en un comando propio. Ninguna puerta de push mide un push sin refspec cuando `push.default` es `matching` o `nothing`, cuando hay un refspec de push o un mirror configurado, o cuando el propio comando fija ajustes de push o de remoto. Un push que solo manda tags o borra una rama no lo mide ninguna de las tres.
-- **Lo que las puertas de push no ven.** Un commit o un cambio de rama al que el parser de comandos no llega, dentro de `$( )`, de comillas invertidas, de `eval`, de `xargs`, de `sh -c`, de un alias, de un envoltorio como `nice`, de una condición `if`, `while` o `until`, o de otro programa como `npm version`. Un `cd` que no va al inicio del comando, así que una puerta puede leer el repositorio en el que está la sesión. `gh pr create --head` y `gh pr ready` con un número se leen como el HEAD local. Los tags que salen junto con una rama. Un fetch hacia la rama actual con `--update-head-ok`, y una opción de git que corre otro programa, como `--upload-pack`. Los replace refs, los archivos marcados skip-worktree o assume-unchanged, un archivo sin seguimiento o ignorado que el linter lee, y los finales de línea que `core.autocrlf` reescribe en el disco.
+| Variable | Default | Qué hace |
+|---|---|---|
+| `PRISMA_VOICE` | 1 | en 0 deja de dar las reglas de escritura que PRISMA pone en cada sesión |
+| `PRISMA_COMMENTS_BLOCK` | 0 | en 1 la puerta de comentarios frena el push en vez de avisar |
+| `PRISMA_LAUNCH_COMMANDS` | vacío | un alias tuyo para `claude`, para que el gate de la tarjeta de sesión lo lea |
 
 ## Dónde se ubica
 
-Quita el modelo de un sistema de agentes y lo que queda es el harness, las herramientas, los permisos, el estado y los evaluadores que lo rodean. Prisma Harness vive en esa capa. No es un loop, no reintenta el trabajo hasta que algo pase, y no es un grafo, no decide qué paso corre después. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 traen sus propias skills, que descienden de [las skills de ingeniería de Matt Pocock](https://github.com/mattpocock/skills), cuyo flujo termina en el commit. Los pasos 3, 4 y 5 son la parte por la que existe este harness.
+Prisma Harness vive en la capa del harness, las herramientas, los permisos, el estado y los evaluadores que rodean a un modelo. No es un loop ni un grafo. Le da al loop su evidencia y al grafo sus puertas, y solo habla cuando una puerta falla. Los pasos 1 y 2 traen sus propias skills, que descienden de [las skills de ingeniería de Matt Pocock](https://github.com/mattpocock/skills), cuyo flujo termina en el commit. Los pasos 3, 4 y 5 son la parte por la que existe este harness.
 
-## Lo que Prisma Harness se niega a ser
-
-- **No es un framework de evals.** Sin datasets, sin puntajes, sin dashboards. Cinco puertas con nombre, cada una con el caso que la paga.
-- **No es un segundo modelo vigilando al primero.** Corre con un solo modelo y dice en voz alta lo que eso cuesta.
-- **No es un revisor de gusto.** El gate de formato lee cómo está escrita una página; nada acá califica la calidad del código.
-- **No es silencioso.** Una puerta que no puede medir imprime un aviso. El silencio nunca significa limpio.
-
-## Dónde está el resto
-
-Detrás de cada regla del método hay una falla fechada. Este repositorio trae las reglas; la historia se queda con su autor. Las contribuciones entran con la misma regla que el método se aplica a sí mismo. Un control nuevo entra solo si da rojo sobre un caso real.
-
-Licencia MIT.
+Detrás de cada regla del método hay una falla fechada. Este repositorio trae las reglas, y la historia se queda con su autor. Las contribuciones entran con la regla que el método se aplica a sí mismo. Un control nuevo entra solo si da rojo sobre un caso real. Licencia MIT.

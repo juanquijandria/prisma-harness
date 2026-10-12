@@ -36,7 +36,7 @@ GATE_OUT=$(PRISMA_DOCS_ROOT="$ROOT" PRISMA_FORMAT_CONFIG="$ROOT/there-is-no-form
 printf '%s\n' "$GATE_OUT" | tail -1
 printf '%s' "$GATE_OUT" | grep -q 'PASS: 0 blocking, 0 warnings' || { printf 'FAIL the repo pages do not pass the rules this repo ships\n'; failed=$((failed+1)); }
 printf '  %s pages, the ones this repo publishes and not every file under it\n' "$#"
-printf '  three rules are off for this check, file names and the H1 because the repo root uses uppercase names and an HTML title, and the line ceiling because both READMEs are longer than the 150 lines this repo proposes\n'
+printf '  three rules are off for this check, file names and the H1 because the repo root uses uppercase names and an HTML title, and the line ceiling because docs/reference.md, which holds what the READMEs leave out, is longer than the 150 lines this repo proposes\n'
 
 printf '\n##### push gate controls\n'
 PUSH=$(mktemp)
