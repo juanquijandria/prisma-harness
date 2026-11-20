@@ -1,0 +1,31 @@
+name: probe
+on: push
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: A link to sleep under another name
+        shell: bash
+        run: |
+          grep PRETTY_NAME /etc/os-release
+          ls -l "$(command -v sleep)"; readlink -f "$(command -v sleep)"
+          sleep --version | head -1
+          pgrep --version; command -v lsof || echo "lsof MISSING"
+          d=$(mktemp -d); ln -s "$(command -v sleep)" "$d/prisma-probe-name"
+          (cd "$d" && exec ./prisma-probe-name 20) & pid=$!
+          sleep 1
+          if kill -0 "$pid" 2>/dev/null; then echo "LINKED SLEEP ALIVE"; else wait "$pid"; echo "LINKED SLEEP DIED rc=$?"; fi
+          pgrep -f prisma-probe-name || echo "pgrep finds nothing"
+          cp "$(readlink -f "$(command -v sleep)")" "$d/prisma-copy-name" && (cd "$d" && exec ./prisma-copy-name 20) & cpid=$!
+          sleep 1
+          if kill -0 "$cpid" 2>/dev/null; then echo "COPIED SLEEP ALIVE"; else wait "$cpid"; echo "COPIED SLEEP DIED rc=$?"; fi
+          (cd "$d" && exec -a prisma-argv-name sleep 20) & apid=$!
+          sleep 1
+          if kill -0 "$apid" 2>/dev/null; then echo "RENAMED ARGV SLEEP ALIVE"; else wait "$apid"; echo "RENAMED ARGV SLEEP DIED rc=$?"; fi
+          (cd "$d" && exec python3 -c 'import sys,time; time.sleep(float(sys.argv[1]))' 20 prisma-python-name) & ppid=$!
+          sleep 1
+          kill -0 "$ppid" && echo "PYTHON SLEEPER ALIVE"; pgrep -f prisma-python-name | head -2
