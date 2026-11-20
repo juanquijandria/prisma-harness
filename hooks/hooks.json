@@ -75,6 +75,16 @@
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/destructive-git.sh\""
           }
         ]
+      },
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/review-reads-standards.sh\"",
+            "timeout": 30
+          }
+        ]
       }
     ],
     "SubagentStop": [

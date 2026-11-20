@@ -44,9 +44,24 @@ subagent_stop() {
     | PRISMA_JQ="${JQ_FOR_TEST-$JQ}" sh "$GATE" 2>"$repo/stderr.txt"
 }
 
+handback_call() {
+  "$JQ" -nc --arg id "$1" '{type: "assistant", message: {content: [{type: "tool_use", id: $id, name: "SubagentHandback", input: {message: "the report"}}]}}' >> "$transcript"
+}
+
+gate_feedback() {
+  "$JQ" -nc --arg id "$1" --arg text "PreToolUse:SubagentHandback hook error: $GATE_SIGNATURE: this review has not opened every source" \
+    '{type: "user", message: {content: [{type: "tool_result", tool_use_id: $id, is_error: true, content: $text}]}}' >> "$transcript"
+}
+
+handback_attempt() {
+  "$JQ" -nc --arg parent "$repo/parent.jsonl" --arg cwd "$repo" --arg tool "${TOOL_FOR_TEST:-SubagentHandback}" \
+    '{hook_event_name: "PreToolUse", tool_name: $tool, tool_input: {message: "the report"}, agent_type: "general-purpose", agent_id: "a1", transcript_path: $parent, cwd: $cwd}' \
+    | PRISMA_JQ="$JQ" sh "$GATE" 2>"$repo/stderr.txt"
+}
+
 verdict() {
   : > "$PRISMA_RECEIPT_FILE"
-  subagent_stop >/dev/null; rc=$?
+  "${EVENT_FOR_TEST:-subagent_stop}" >/dev/null; rc=$?
   outcome=$(cut -f4 "$PRISMA_RECEIPT_FILE" | tr '\n' ' ' | sed 's/ $//')
   printf '%s %s' "$rc" "${outcome:-silent}"
 }
@@ -180,6 +195,24 @@ selftest_instructions_already_in_context() {
   rm -rf "$repo" "$elsewhere"
 }
 
+selftest_reports_handed_back_through_a_tool() {
+  new_repo
+  mkdir -p "$repo/parent/subagents"; transcript="$repo/parent/subagents/agent-a1.jsonl"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  expect "41 the real case, a reviewer about to hand back a report without opening the rules, is held before the report leaves" "$(EVENT_FOR_TEST=handback_attempt verdict)" "2 blocked"
+  expect "42 the message names the source" "$(names_in_stderr "rules/code-rules.md")" "1"
+  handback_call tu_h1; gate_feedback tu_h1
+  expect "43 a reviewer held once at the hand back is let go the second time, and the receipt says warned" "$(EVENT_FOR_TEST=handback_attempt verdict)" "0 warned"
+  handback_call tu_h2
+  expect "44 the stop that follows a hand back is not judged again" "$(verdict)" "0 silent"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  read_call tu_1 "$repo/rules/code-rules.md"
+  expect "45 a reviewer that opened the rules hands back without a receipt line" "$(EVENT_FOR_TEST=handback_attempt verdict)" "0 silent"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  expect "46 another tool of the same reviewer is not a hand back" "$(TOOL_FOR_TEST=Read EVENT_FOR_TEST=handback_attempt verdict)" "0 silent"
+  rm -rf "$repo"
+}
+
 selftest() {
   ok=1; cases=0
   [ -n "$JQ" ] || { printf 'SKIP the review reads gate needs jq to build its fixtures\n'; printf 'SELFTEST OK: 1/1\n'; return 0; }
@@ -189,6 +222,7 @@ selftest() {
   selftest_repository_sources
   selftest_never_holds_twice_and_fails_open
   selftest_instructions_already_in_context
+  selftest_reports_handed_back_through_a_tool
   [ "$ok" = "1" ] && [ "$cases" = "$SELFTEST_CASES" ] && { printf 'SELFTEST OK: %s/%s\n' "$cases" "$SELFTEST_CASES"; return 0; }
   printf 'SELFTEST FAILED, %s cases ran and %s were declared\n' "$cases" "$SELFTEST_CASES"; return 1
 }

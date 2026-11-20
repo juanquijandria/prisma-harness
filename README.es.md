@@ -107,7 +107,7 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 | `hooks/shell-traps.sh` | pone comillas a dos trampas de zsh, y frena un `timeout` que no está instalado y un `pkill` que alcanza otra carpeta | `PreToolUse` en Bash |
 | `hooks/secret-reads.sh` | deja las líneas de un archivo de secretos fuera de la consola y fuera de las búsquedas | `PreToolUse` en Bash |
 | `hooks/destructive-git.sh` | pone un push forzado frente a la persona, y frena un borrado forzado de rama o un reset duro hasta que se declare un escape | `PreToolUse` en Bash |
-| `hooks/review-reads-standards.sh` | retiene una vez a una revisión de fidelidad que no abrió una fuente de estándares que recibió o una guía en la raíz del repositorio | `SubagentStop` |
+| `hooks/review-reads-standards.sh` | retiene una vez a una revisión de fidelidad que no abrió una fuente de estándares que recibió o una guía en la raíz del repositorio | `SubagentStop`, y `PreToolUse` en la entrega de un informe |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy | `Stop` |
 | `hooks/claim-ready-gate.sh` | frena un mensaje que da un PR por listo cuando `pr-ready.sh` dice que no lo está | `Stop` |
 | `hooks/paste-block-gate.sh` | frena un bloque para pegar que todavía trae un hueco por rellenar | `Stop` |

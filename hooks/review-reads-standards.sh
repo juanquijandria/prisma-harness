@@ -9,6 +9,9 @@ REVIEW_SKILL="prisma-fidelity-review"
 REVIEW_SKILL_INVOKED="$REVIEW_SKILL([^/]|\$)"
 TRANSCRIPT_FIELD='s/.*"agent_transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 HOOK_BLOCKS=2
+GATE_SIGNATURE="PRISMA review reads gate"
+HANDBACK_TOOL="SubagentHandback"
+TOOL_EVENT="PreToolUse"
 STANDARDS_LABEL='standards|est(a|á)ndares'
 TOKEN_SEPARATORS=' ,;()`"'"'"
 REPOSITORY_SOURCE_NAMES="CONTRIBUTING.md CODING_STANDARDS.md STYLE.md STYLEGUIDE.md CONVENTIONS.md"
@@ -17,7 +20,7 @@ INSTRUCTIONS_NAMES="CLAUDE.md CLAUDE.local.md"
 PERSON_INSTRUCTIONS_FOLDER=".claude"
 AGENT_TYPES_WITHOUT_INSTRUCTIONS="Explore Plan"
 CONTENT_PRINTERS='cat|sed|head|tail|nl|awk|less|more|bat|grep|rg'
-SELFTEST_CASES=40
+SELFTEST_CASES=46
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 
@@ -30,6 +33,11 @@ READ_PATHS_JQ='[inputs] as $lines
   | .input.file_path // empty'
 SHELL_SEGMENTS_JQ='inputs | select(.type == "assistant") | .message.content | arrays | .[]
   | select(.type == "tool_use" and .name == "Bash") | .input.command // empty | splits("&&|[;\n]")'
+
+HANDBACK_STATE_JQ='[inputs] as $lines
+  | ([$lines[] | select(.type == "assistant") | .message.content | arrays | .[] | select(.type == "tool_use" and .name == $tool)] | length) as $calls
+  | ([$lines[] | select(.type == "user") | .message.content | arrays | .[] | select(.type == "tool_result") | .content | tostring | select(contains($signature))] | length) as $held
+  | "\($calls) \($held)"'
 
 not_measured() {
   echo "WARN: the review reads gate did not measure, $1." >&2
@@ -115,13 +123,34 @@ without_jq() {
   not_measured "jq is missing"
 }
 
+field() { printf '%s' "$payload" | "$JQ" -r "$1 // empty" 2>/dev/null; }
+
+locate_the_reviewer() {
+  working_dir=$(field .cwd)
+  agent_type=$(field .agent_type)
+  event=$(field .hook_event_name)
+  agent_transcript=$(field .agent_transcript_path)
+  [ "$event" = "$TOOL_EVENT" ] || return 0
+  [ "$(field .tool_name)" = "$HANDBACK_TOOL" ] || exit 0
+  parent_transcript=$(field .transcript_path)
+  agent_transcript="${parent_transcript%.jsonl}/subagents/agent-$(field .agent_id).jsonl"
+}
+
+held_before() {
+  handback_state=$("$JQ" -rn --arg tool "$HANDBACK_TOOL" --arg signature "$GATE_SIGNATURE" "$HANDBACK_STATE_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not read how the reviewer ends"
+  if [ "$event" = "$TOOL_EVENT" ]; then
+    [ "${handback_state#* }" != "0" ]
+  else
+    [ "${handback_state% *}" = "0" ] || exit 0
+    [ "$(field .stop_hook_active)" = "true" ]
+  fi
+}
+
 run_gate() {
   payload=$(cat)
   [ -n "$JQ" ] || without_jq
   [ -n "$payload" ] || not_measured "the stop event came empty"
-  working_dir=$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)
-  agent_type=$(printf '%s' "$payload" | "$JQ" -r '.agent_type // empty' 2>/dev/null)
-  agent_transcript=$(printf '%s' "$payload" | "$JQ" -r '.agent_transcript_path // empty' 2>/dev/null)
+  locate_the_reviewer
   [ -f "$agent_transcript" ] || not_measured "the transcript of the subagent is not there"
   prompt=$("$JQ" -rn "$FIRST_PROMPT_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not read the transcript of the subagent"
   printf '%s' "$prompt" | grep -qE "$REVIEW_SKILL_INVOKED" || exit 0
@@ -131,12 +160,12 @@ run_gate() {
     [ -n "$(opened "$source")" ] || printf -- '- %s\n' "$source"
   done)
   [ -n "$missing" ] || exit 0
-  if [ "$(printf '%s' "$payload" | "$JQ" -r '.stop_hook_active // false' 2>/dev/null)" = "true" ]; then
+  if held_before; then
     receipt_append "$GATE_NAME" "$working_dir" warned
     exit 0
   fi
   receipt_append "$GATE_NAME" "$working_dir" blocked
-  printf 'PRISMA review reads gate: this review has not opened every source that documents how code is written.\n%s\nOpen each one, redo the standards axis against it, and list the sources you read at the top of the Standards section.\n' "$missing" >&2
+  printf '%s: this review has not opened every source that documents how code is written.\n%s\nOpen each one, redo the standards axis against it, and list the sources you read at the top of the Standards section.\n' "$GATE_SIGNATURE" "$missing" >&2
   exit "$HOOK_BLOCKS"
 }
 
