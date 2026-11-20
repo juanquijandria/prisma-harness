@@ -213,6 +213,26 @@ selftest_reports_handed_back_through_a_tool() {
   rm -rf "$repo"
 }
 
+child_of() {
+  "$JQ" -nc --arg parent "$1" '{agentType: "general-purpose", parentAgentId: $parent}' > "$repo/parent/subagents/agent-$2.meta.json"
+  "$JQ" -nc --arg path "$3" '{type: "assistant", message: {content: [{type: "tool_use", id: "tu_child", name: "Read", input: {file_path: $path}}]}}' > "$repo/parent/subagents/agent-$2.jsonl"
+}
+
+selftest_axes_run_by_subagents() {
+  new_repo
+  mkdir -p "$repo/parent/subagents"; transcript="$repo/parent/subagents/agent-a1.jsonl"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  child_of a1 b2 "$repo/rules/code-rules.md"
+  expect "47 the real case, a reviewer whose standards axis ran in a subagent that opened the rules, passes" "$(verdict)" "0 silent"
+  child_of zz b2 "$repo/rules/code-rules.md"
+  expect "48 what the subagent of another agent opened does not count" "$(verdict)" "2 blocked"
+  child_of a1 b2 "$repo/CLAUDE.md"; child_of b2 c3 "$repo/rules/code-rules.md"
+  expect "49 what a subagent of the subagent opened counts" "$(verdict)" "0 silent"
+  child_of a1 b2 "$repo/CLAUDE.md"; rm -f "$repo/parent/subagents/agent-c3."*
+  expect "50 a subagent that opened another file does not count" "$(verdict)" "2 blocked"
+  rm -rf "$repo"
+}
+
 selftest() {
   ok=1; cases=0
   [ -n "$JQ" ] || { printf 'SKIP the review reads gate needs jq to build its fixtures\n'; printf 'SELFTEST OK: 1/1\n'; return 0; }
@@ -223,6 +243,7 @@ selftest() {
   selftest_never_holds_twice_and_fails_open
   selftest_instructions_already_in_context
   selftest_reports_handed_back_through_a_tool
+  selftest_axes_run_by_subagents
   [ "$ok" = "1" ] && [ "$cases" = "$SELFTEST_CASES" ] && { printf 'SELFTEST OK: %s/%s\n' "$cases" "$SELFTEST_CASES"; return 0; }
   printf 'SELFTEST FAILED, %s cases ran and %s were declared\n' "$cases" "$SELFTEST_CASES"; return 1
 }

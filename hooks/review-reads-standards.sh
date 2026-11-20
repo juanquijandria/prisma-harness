@@ -11,6 +11,10 @@ TRANSCRIPT_FIELD='s/.*"agent_transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)
 HOOK_BLOCKS=2
 GATE_SIGNATURE="PRISMA review reads gate"
 HANDBACK_TOOL="SubagentHandback"
+TRANSCRIPT_PREFIX="agent-"
+TRANSCRIPT_SUFFIX=".jsonl"
+META_SUFFIX=".meta.json"
+FAMILY_DEPTH=3
 TOOL_EVENT="PreToolUse"
 STANDARDS_LABEL='standards|est(a|á)ndares'
 TOKEN_SEPARATORS=' ,;()`"'"'"
@@ -20,7 +24,7 @@ INSTRUCTIONS_NAMES="CLAUDE.md CLAUDE.local.md"
 PERSON_INSTRUCTIONS_FOLDER=".claude"
 AGENT_TYPES_WITHOUT_INSTRUCTIONS="Explore Plan"
 CONTENT_PRINTERS='cat|sed|head|tail|nl|awk|less|more|bat|grep|rg'
-SELFTEST_CASES=46
+SELFTEST_CASES=50
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 
@@ -123,6 +127,27 @@ without_jq() {
   not_measured "jq is missing"
 }
 
+children_of() {
+  ls "$subagents_folder" 2>/dev/null | grep -q -- "$META_SUFFIX\$" || return 0
+  "$JQ" -r --arg parents "$1" 'select(.parentAgentId as $parent | $parents | split(" ") | index($parent)) | input_filename' "$subagents_folder/$TRANSCRIPT_PREFIX"*"$META_SUFFIX" 2>/dev/null \
+    | while IFS= read -r meta; do child=$(basename "$meta" "$META_SUFFIX"); printf '%s\n' "${child#"$TRANSCRIPT_PREFIX"}"; done
+}
+
+load_the_family() {
+  subagents_folder=$(dirname "$agent_transcript")
+  generation=$(basename "$agent_transcript" "$TRANSCRIPT_SUFFIX"); generation=${generation#"$TRANSCRIPT_PREFIX"}
+  set -- "$agent_transcript"; depth=0
+  while [ -n "$generation" ] && [ "$depth" -lt "$FAMILY_DEPTH" ]; do
+    generation=$(children_of "$(printf '%s' "$generation" | tr '\n' ' ')")
+    for member in $generation; do
+      [ -f "$subagents_folder/$TRANSCRIPT_PREFIX$member$TRANSCRIPT_SUFFIX" ] && set -- "$@" "$subagents_folder/$TRANSCRIPT_PREFIX$member$TRANSCRIPT_SUFFIX"
+    done
+    depth=$((depth+1))
+  done
+  read_paths=$("$JQ" -rn "$READ_PATHS_JQ" "$@" 2>/dev/null) || not_measured "jq could not list what the reviewer read"
+  shell_segments=$("$JQ" -rn "$SHELL_SEGMENTS_JQ" "$@" 2>/dev/null) || not_measured "jq could not list what the reviewer ran"
+}
+
 field() { printf '%s' "$payload" | "$JQ" -r "$1 // empty" 2>/dev/null; }
 
 locate_the_reviewer() {
@@ -154,8 +179,7 @@ run_gate() {
   [ -f "$agent_transcript" ] || not_measured "the transcript of the subagent is not there"
   prompt=$("$JQ" -rn "$FIRST_PROMPT_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not read the transcript of the subagent"
   printf '%s' "$prompt" | grep -qE "$REVIEW_SKILL_INVOKED" || exit 0
-  read_paths=$("$JQ" -rn "$READ_PATHS_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not list what the reviewer read"
-  shell_segments=$("$JQ" -rn "$SHELL_SEGMENTS_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not list what the reviewer ran"
+  load_the_family
   missing=$({ named_sources; repository_sources; } | sort -u | while IFS= read -r source; do
     [ -n "$(opened "$source")" ] || printf -- '- %s\n' "$source"
   done)
