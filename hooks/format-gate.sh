@@ -5,6 +5,8 @@ if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-
 HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
 DOCS_ROOT="${PRISMA_DOCS_ROOT:-${CLAUDE_PROJECT_DIR:-$PWD}}"
 DOCS_DIR="${PRISMA_DOCS_DIR:-wiki}"
+PAGE_SUFFIX=".md"
+INDEX_FILE="${PRISMA_INDEX_FILE:-index.md}"
 CONFIG_FILE="${PRISMA_FORMAT_CONFIG:-$DOCS_ROOT/.prisma-format.conf}"
 DATA_DIR="${CLAUDE_PLUGIN_DATA:-$HOME/.prisma-harness}"
 BASELINE_FILE="$DATA_DIR/format-debt-baseline.txt"
@@ -62,8 +64,16 @@ fi
 [ -r "$HOOKS_DIR/rate-rule.sh" ] || cannot_measure "the format gate did not run, rate-rule.sh is missing."
 . "$HOOKS_DIR/rate-rule.sh"
 
+inside_the_index_folder() {
+  index_folder=$(cd "$DOCS_ROOT/${INDEX_FILE%"$PAGE_SUFFIX"}" 2>/dev/null && pwd -P) || return 1
+  page_folder=$(cd "$(dirname "$1")" 2>/dev/null && pwd -P) || return 1
+  case "$page_folder/" in "$index_folder"/*) return 0 ;; esac
+  return 1
+}
+
 exempt() {
   name=$(basename "$1")
+  inside_the_index_folder "$1" && return 0
   for n in $EXEMPT_NAMES; do [ "$name" = "$n" ] && return 0; done
   case "$name" in *.excalidraw.md) return 0 ;; esac
   for d in $EXEMPT_DIRS; do case "$1" in */"$d"/*) return 0 ;; esac; done

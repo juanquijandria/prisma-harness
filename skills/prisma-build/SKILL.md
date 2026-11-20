@@ -41,7 +41,7 @@ When a later gate reports a defect the tests did not catch, fix the test first, 
 
 The fidelity reviewer is one of the five gates named in `METHOD.md`, and this is where it runs. Fidelity means the code does what the plan record says, no more and no less, and nothing the record put out of scope.
 
-Spawn a fresh subagent whose whole prompt is the invocation of `prisma-fidelity-review` with four things, the fixed point the diff is measured from, the path of the plan record, the files that document this repository's standards, and the fact that the work is not committed yet, since the commit comes after the review. It does not receive your account of what you built, your test output, or this conversation, because a reviewer that receives the builder's framing inherits the builder's premise.
+Spawn a fresh subagent whose whole prompt is the invocation of `prisma-fidelity-review` with four things, the fixed point the diff is measured from, the path of the plan record, the files that document this repository's standards, on one line that starts with `Standards:`, and the fact that the work is not committed yet, since the commit comes after the review. It does not receive your account of what you built, your test output, or this conversation, because a reviewer that receives the builder's framing inherits the builder's premise.
 
 Every finding it returns is a hypothesis until you reproduce it, by reading the hunk it quotes and running the test it names. A confirmed absence is built, red first. A confirmed extra is removed, not justified. A finding that dies gets its cause of death written down next to it.
 

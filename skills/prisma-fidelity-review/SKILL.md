@@ -42,7 +42,9 @@ If none exists, the fidelity axis reports that there is no record and fidelity w
 
 ## Find the standards sources
 
-Anything the repository documents about how code is written, a coding standards file, a contributing guide, the project instructions file, the linter configuration. The standards axis reads those and the smells baseline below, which holds even when the repository documents nothing. Two rules bind it. A documented repository standard always wins over a smell, and where the repository endorses something a smell would flag, the smell is dropped. Anything the linter or the type checker already enforces is skipped, since the merge gate measures it.
+Anything the repository documents about how code is written, a coding standards file, a contributing guide, the project instructions file, the linter configuration. Do not stop at the list the caller passed. Search the repository for every file that documents how code is written, since a contributing guide the instructions file never links is still a standard, and open each one before the standards axis starts. A source that was named and never opened is a source that was not read. `hooks/review-reads-standards.sh` holds this review once at its end when a source the caller named or a guide at the root of the repository was not opened, and the instructions file of the folder the session works in counts as opened, because you start with it. Open the Standards section with the list of the sources you read.
+
+The standards axis reads those and the smells baseline below, which holds even when the repository documents nothing. Two rules bind it. A documented repository standard always wins over a smell, and where the repository endorses something a smell would flag, the smell is dropped. Anything the linter or the type checker already enforces is skipped, since the merge gate measures it.
 
 ## The smells baseline
 
