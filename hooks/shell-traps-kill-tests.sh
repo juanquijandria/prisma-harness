@@ -10,14 +10,23 @@ run_without_pgrep() {
   echo "$?"
 }
 
+start_named_probe() {
+  program="$1"; shift
+  rm -f "$other_dir/$KILL_PROBE_NAME"
+  ln -s "$program" "$other_dir/$KILL_PROBE_NAME"
+  (cd "$other_dir" && exec "./$KILL_PROBE_NAME" "$@") 2>/dev/null &
+  foreign_pid=$!
+  sleep "$PROBE_START_SECONDS"
+}
+
 selftest_kills() {
   other_dir=$(mktemp -d); own_dir=$(mktemp -d)
-  ln -s "$(command -v sleep)" "$other_dir/$KILL_PROBE_NAME"
-  (cd "$other_dir" && exec "./$KILL_PROBE_NAME" "$KILL_PROBE_SECONDS") &
-  foreign_pid=$!
+  start_named_probe "$(command -v sleep)" "$KILL_PROBE_SECONDS"
+  kill -0 "$foreign_pid" 2>/dev/null || start_named_probe "$KILL_PYTHON" -c "$KILL_SLEEPER" "$KILL_PROBE_SECONDS"
   (cd "$other_dir" && exec "$KILL_PYTHON" -c "$KILL_SLEEPER" "$KILL_PROBE_SECONDS" "$REDIRECTION") &
   redirection_pid=$!
   sleep "$PROBE_START_SECONDS"
+  expect "105 the process the cases below aim at is running under its own name" "$(kill -0 "$foreign_pid" 2>/dev/null; echo "$?")" 0
   expect_measured "36 pkill whose pattern reaches a process in another folder blocks" "$(run_payload_in "pkill -f $KILL_PROBE_NAME" "$own_dir")" 2
   expect_measured "37 killall of a name that runs in another folder blocks" "$(run_payload_in "killall $KILL_PROBE_NAME" "$own_dir")" 2
   expect_measured "72 a killall of another long name that shares the first 15 letters passes" "$(run_payload_in "killall $KILL_PROBE_NAME-other" "$own_dir")" 0
