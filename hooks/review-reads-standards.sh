@@ -52,7 +52,7 @@ not_measured() {
 absolute_path() {
   case "$1" in
     "~/"*) printf '%s' "$HOME/${1#\~/}" ;;
-    /*) printf '%s' "$1" ;;
+    /*|[A-Za-z]:[/\\]*) printf '%s' "$1" ;;
     *) printf '%s' "$working_dir/$1" ;;
   esac
 }
@@ -107,8 +107,9 @@ already_in_context() {
   above="$working_dir"
   while [ -n "$above" ] && [ -d "$above" ]; do
     [ "$folder" -ef "$above" ] && return 0
-    [ "$above" = "/" ] && break
-    above=$(dirname "$above")
+    parent_folder=$(dirname "$above")
+    [ "$parent_folder" = "$above" ] && break
+    above="$parent_folder"
   done
   return 1
 }

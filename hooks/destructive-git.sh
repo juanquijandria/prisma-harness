@@ -96,7 +96,7 @@ folder_of() {
   case "$named" in
     "~") named="$HOME" ;;
     "~/"*) named="$HOME/${named#\~/}" ;;
-    /*) ;;
+    /*|[A-Za-z]:[/\\]*) ;;
     *) named="$working_dir/$named" ;;
   esac
   [ -d "$named" ] && printf '%s' "$named"
