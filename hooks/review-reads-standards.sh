@@ -131,7 +131,7 @@ without_jq() {
 children_of() {
   ls "$subagents_folder" 2>/dev/null | grep -q -- "$META_SUFFIX\$" || return 0
   "$JQ" -r --arg parents "$1" 'select(.parentAgentId as $parent | $parents | split(" ") | index($parent)) | input_filename' "$subagents_folder/$TRANSCRIPT_PREFIX"*"$META_SUFFIX" 2>/dev/null \
-    | while IFS= read -r meta; do child=$(basename "$meta" "$META_SUFFIX"); printf '%s\n' "${child#"$TRANSCRIPT_PREFIX"}"; done
+    | tr -d '\r' | tr '\\' '/' | while IFS= read -r meta; do child=$(basename "$meta" "$META_SUFFIX"); printf '%s\n' "${child#"$TRANSCRIPT_PREFIX"}"; done
 }
 
 load_the_family() {
