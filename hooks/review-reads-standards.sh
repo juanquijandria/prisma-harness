@@ -1,0 +1,202 @@
+#!/bin/sh
+# Prisma Harness. Documented in README.md, section "What is inside".
+if [ "${1:-}" = "--selftest" ]; then . "$(cd "$(dirname "$0")" && pwd)/selftest-env.sh"; fi
+
+HOOKS_DIR="${PRISMA_HOOKS_DIR:-$(cd "$(dirname "$0")" 2>/dev/null && pwd)}"
+JQ="${PRISMA_JQ-$(command -v jq)}"
+GATE_NAME="review-reads-gate"
+REVIEW_SKILL="prisma-fidelity-review"
+REVIEW_SKILL_INVOKED="$REVIEW_SKILL([^/]|\$)"
+TRANSCRIPT_FIELD='s/.*"agent_transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+HOOK_BLOCKS=2
+GATE_SIGNATURE="PRISMA review reads gate"
+HANDBACK_TOOL="SubagentHandback"
+TRANSCRIPT_PREFIX="agent-"
+TRANSCRIPT_SUFFIX=".jsonl"
+META_SUFFIX=".meta.json"
+FAMILY_DEPTH=3
+TOOL_EVENT="PreToolUse"
+STANDARDS_LABEL='standards|est(a|á)ndares'
+TOKEN_SEPARATORS=' ,;()`"'"'"
+REPOSITORY_SOURCE_NAMES="CONTRIBUTING.md CODING_STANDARDS.md STYLE.md STYLEGUIDE.md CONVENTIONS.md"
+PAGE_EXTENSIONS="md mdx txt rst adoc"
+INSTRUCTIONS_NAMES="CLAUDE.md CLAUDE.local.md"
+PERSON_INSTRUCTIONS_FOLDER=".claude"
+AGENT_TYPES_WITHOUT_INSTRUCTIONS="Explore Plan"
+CONTENT_PRINTERS='cat|sed|head|tail|nl|awk|less|more|bat|grep|rg'
+SELFTEST_CASES=50
+PRISMA_RECEIPT_SOURCED=1
+. "$HOOKS_DIR/receipt.sh"
+
+FIRST_PROMPT_JQ='first(inputs | select(.type == "user") | .message.content
+  | if type == "string" then . else (map(select(.type == "text") | .text) | join("\n")) end)'
+READ_PATHS_JQ='[inputs] as $lines
+  | [$lines[] | select(.type == "user") | .message.content | arrays | .[] | select(.type == "tool_result" and .is_error == true) | .tool_use_id] as $errored
+  | $lines[] | select(.type == "assistant") | .message.content | arrays | .[]
+  | select(.type == "tool_use" and .name == "Read") | select(.id as $id | $errored | index($id) | not)
+  | .input.file_path // empty'
+SHELL_SEGMENTS_JQ='inputs | select(.type == "assistant") | .message.content | arrays | .[]
+  | select(.type == "tool_use" and .name == "Bash") | .input.command // empty | splits("&&|[;\n]")'
+
+HANDBACK_STATE_JQ='[inputs] as $lines
+  | ([$lines[] | select(.type == "assistant") | .message.content | arrays | .[] | select(.type == "tool_use" and .name == $tool)] | length) as $calls
+  | ([$lines[] | select(.type == "user") | .message.content | arrays | .[] | select(.type == "tool_result") | .content | tostring | select(contains($signature))] | length) as $held
+  | "\($calls) \($held)"'
+
+not_measured() {
+  echo "WARN: the review reads gate did not measure, $1." >&2
+  receipt_append "$GATE_NAME" "$working_dir" not-measured
+  exit 0
+}
+
+absolute_path() {
+  case "$1" in
+    "~/"*) printf '%s' "$HOME/${1#\~/}" ;;
+    /*|[A-Za-z]:[/\\]*) printf '%s' "$1" ;;
+    *) printf '%s' "$working_dir/$1" ;;
+  esac
+}
+
+path_tokens() {
+  tr "$TOKEN_SEPARATORS" '\n' | sed 's/[.:]*$//' | while IFS= read -r token; do
+    case "$token" in */*|*.*) absolute_path "$token"; printf '\n' ;; esac
+  done
+}
+
+is_a_page() {
+  for extension in $PAGE_EXTENSIONS; do case "$1" in *."$extension") return 0 ;; esac; done
+  return 1
+}
+
+named_sources() {
+  printf '%s' "$prompt" | "$JQ" -Rrs --arg label "$STANDARDS_LABEL" 'split("\n")[] | select(test($label; "i")) | .[(match($label; "i").offset):]' 2>/dev/null \
+    | path_tokens | while IFS= read -r candidate; do
+      is_a_page "$candidate" && [ -f "$candidate" ] && printf '%s\n' "$candidate"
+    done
+}
+
+named_folders() {
+  printf '%s\n' "$working_dir"
+  printf '%s\n' "$prompt" | path_tokens | while IFS= read -r candidate; do
+    if [ -d "$candidate" ]; then printf '%s\n' "$candidate"; elif [ -f "$candidate" ]; then dirname "$candidate"; fi
+  done
+}
+
+repository_sources() {
+  named_folders | while IFS= read -r folder; do
+    [ -d "$folder" ] && git -C "$folder" rev-parse --show-toplevel 2>/dev/null
+  done | sort -u | while IFS= read -r top; do
+    for name in $REPOSITORY_SOURCE_NAMES; do find "$top" -maxdepth 1 -type f -iname "$name" 2>/dev/null; done
+  done
+}
+
+printed_in_the_shell() {
+  file_name=$(basename "$1")
+  printf '%s\n' "$shell_segments" | grep -F -- "$file_name" | while IFS= read -r segment; do
+    printf '%s' "${segment%%"$file_name"*}" | grep -qE "(^|[^[:alnum:]_-])($CONTENT_PRINTERS)([^[:alnum:]_-]|\$)" && { printf 'yes'; break; }
+  done | grep -q yes
+}
+
+already_in_context() {
+  for bare in $AGENT_TYPES_WITHOUT_INSTRUCTIONS; do [ "$agent_type" = "$bare" ] && return 1; done
+  is_instructions_file=no
+  for name in $INSTRUCTIONS_NAMES; do [ "$(basename "$1")" = "$name" ] && is_instructions_file=yes; done
+  [ "$is_instructions_file" = "yes" ] || return 1
+  folder=$(dirname "$1")
+  [ "$folder" -ef "$HOME/$PERSON_INSTRUCTIONS_FOLDER" ] && return 0
+  above="$working_dir"
+  while [ -n "$above" ] && [ -d "$above" ]; do
+    [ "$folder" -ef "$above" ] && return 0
+    parent_folder=$(dirname "$above")
+    [ "$parent_folder" = "$above" ] && break
+    above="$parent_folder"
+  done
+  return 1
+}
+
+opened() {
+  already_in_context "$1" && { printf 'yes'; return; }
+  printed_in_the_shell "$1" && { printf 'yes'; return; }
+  printf '%s\n' "$read_paths" | while IFS= read -r read_path; do
+    [ -n "$read_path" ] && [ "$(absolute_path "$read_path")" -ef "$1" ] && { printf 'yes'; break; }
+  done
+}
+
+without_jq() {
+  guessed=$(printf '%s' "$payload" | sed -n "$TRANSCRIPT_FIELD")
+  [ -f "$guessed" ] && head -1 "$guessed" | grep -qE "$REVIEW_SKILL_INVOKED" || exit 0
+  not_measured "jq is missing"
+}
+
+children_of() {
+  ls "$subagents_folder" 2>/dev/null | grep -q -- "$META_SUFFIX\$" || return 0
+  "$JQ" -r --arg parents "$1" 'select(.parentAgentId as $parent | $parents | split(" ") | index($parent)) | input_filename' "$subagents_folder/$TRANSCRIPT_PREFIX"*"$META_SUFFIX" 2>/dev/null \
+    | tr -d '\r' | tr '\\' '/' | while IFS= read -r meta; do child=$(basename "$meta" "$META_SUFFIX"); printf '%s\n' "${child#"$TRANSCRIPT_PREFIX"}"; done
+}
+
+load_the_family() {
+  subagents_folder=$(dirname "$agent_transcript")
+  generation=$(basename "$agent_transcript" "$TRANSCRIPT_SUFFIX"); generation=${generation#"$TRANSCRIPT_PREFIX"}
+  set -- "$agent_transcript"; depth=0
+  while [ -n "$generation" ] && [ "$depth" -lt "$FAMILY_DEPTH" ]; do
+    generation=$(children_of "$(printf '%s' "$generation" | tr '\n' ' ')")
+    for member in $generation; do
+      [ -f "$subagents_folder/$TRANSCRIPT_PREFIX$member$TRANSCRIPT_SUFFIX" ] && set -- "$@" "$subagents_folder/$TRANSCRIPT_PREFIX$member$TRANSCRIPT_SUFFIX"
+    done
+    depth=$((depth+1))
+  done
+  read_paths=$("$JQ" -rn "$READ_PATHS_JQ" "$@" 2>/dev/null) || not_measured "jq could not list what the reviewer read"
+  shell_segments=$("$JQ" -rn "$SHELL_SEGMENTS_JQ" "$@" 2>/dev/null) || not_measured "jq could not list what the reviewer ran"
+}
+
+field() { printf '%s' "$payload" | "$JQ" -r "$1 // empty" 2>/dev/null; }
+
+locate_the_reviewer() {
+  working_dir=$(field .cwd)
+  agent_type=$(field .agent_type)
+  event=$(field .hook_event_name)
+  agent_transcript=$(field .agent_transcript_path)
+  [ "$event" = "$TOOL_EVENT" ] || return 0
+  [ "$(field .tool_name)" = "$HANDBACK_TOOL" ] || exit 0
+  parent_transcript=$(field .transcript_path)
+  agent_transcript="${parent_transcript%.jsonl}/subagents/agent-$(field .agent_id).jsonl"
+}
+
+held_before() {
+  handback_state=$("$JQ" -rn --arg tool "$HANDBACK_TOOL" --arg signature "$GATE_SIGNATURE" "$HANDBACK_STATE_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not read how the reviewer ends"
+  if [ "$event" = "$TOOL_EVENT" ]; then
+    [ "${handback_state#* }" != "0" ]
+  else
+    [ "${handback_state% *}" = "0" ] || exit 0
+    [ "$(field .stop_hook_active)" = "true" ]
+  fi
+}
+
+run_gate() {
+  payload=$(cat)
+  [ -n "$JQ" ] || without_jq
+  [ -n "$payload" ] || not_measured "the stop event came empty"
+  locate_the_reviewer
+  [ -f "$agent_transcript" ] || not_measured "the transcript of the subagent is not there"
+  prompt=$("$JQ" -rn "$FIRST_PROMPT_JQ" "$agent_transcript" 2>/dev/null) || not_measured "jq could not read the transcript of the subagent"
+  printf '%s' "$prompt" | grep -qE "$REVIEW_SKILL_INVOKED" || exit 0
+  load_the_family
+  missing=$({ named_sources; repository_sources; } | sort -u | while IFS= read -r source; do
+    [ -n "$(opened "$source")" ] || printf -- '- %s\n' "$source"
+  done)
+  [ -n "$missing" ] || exit 0
+  if held_before; then
+    receipt_append "$GATE_NAME" "$working_dir" warned
+    exit 0
+  fi
+  receipt_append "$GATE_NAME" "$working_dir" blocked
+  printf '%s: this review has not opened every source that documents how code is written.\n%s\nOpen each one, redo the standards axis against it, and list the sources you read at the top of the Standards section.\n' "$GATE_SIGNATURE" "$missing" >&2
+  exit "$HOOK_BLOCKS"
+}
+
+if [ "${1:-}" = "--selftest" ]; then
+  GATE="$HOOKS_DIR/review-reads-standards.sh"
+  . "$HOOKS_DIR/review-reads-standards-tests.sh"
+  selftest; exit $?
+fi
+run_gate

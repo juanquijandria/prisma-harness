@@ -190,6 +190,18 @@ EOX
   sed 's/Nothing else./See the diagram [[sketch.excalidraw]] next door./' "$GOOD" > "$T/wiki/dotted-name.md"
   stay_quiet "link to a page with a dot in its name" "$T/wiki/dotted-name.md"
 
+  mkdir -p "$T/index" "$T/wiki/index" "$T/catalog"
+  sed 's/Nothing else./A list of pages — one line each, with no footer./; /^Sources:/d; /^\*\*Sources/d' "$GOOD" > "$T/index/personal-notes.md"
+  stay_quiet "a sub-index inside the folder named after the index, at the docs root" "$T/index/personal-notes.md"
+  stay_quiet "the same sub-index reached through a path that is not normalised" "$T/./index/personal-notes.md"
+  cp "$T/index/personal-notes.md" "$T/wiki/index/personal-notes.md"
+  break_it "a folder named index below the docs folder is still a page" "$T/wiki/index/personal-notes.md"
+  cp "$T/index/personal-notes.md" "$T/catalog/personal-notes.md"
+  break_it "a folder at the docs root that is not named after the index is still a page" "$T/catalog/personal-notes.md"
+  INDEX_FILE=catalog.md
+  stay_quiet "the folder follows the name the index file was given" "$T/catalog/personal-notes.md"
+  INDEX_FILE=index.md
+
   printf '\n=== rules switched off by config must stay QUIET ===\n'
   RULE_VOSEO=0
   stay_quiet "voseo with RULE_VOSEO=0" "$T/wiki/voseo.md"

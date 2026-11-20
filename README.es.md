@@ -106,6 +106,8 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 | `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | las puertas de push, líneas de comentario en el diff, un tamaño que avisa sobre 200 líneas cambiadas y frena sobre 400, y el linter del propio repositorio, `php-cs-fixer` o `eslint` | `PreToolUse` en Bash |
 | `hooks/shell-traps.sh` | pone comillas a dos trampas de zsh, y frena un `timeout` que no está instalado y un `pkill` que alcanza otra carpeta | `PreToolUse` en Bash |
 | `hooks/secret-reads.sh` | deja las líneas de un archivo de secretos fuera de la consola y fuera de las búsquedas | `PreToolUse` en Bash |
+| `hooks/destructive-git.sh` | pone un push forzado frente a la persona, y frena un borrado forzado de rama o un reset duro hasta que se declare un escape | `PreToolUse` en Bash |
+| `hooks/review-reads-standards.sh` | retiene una vez a una revisión de fidelidad que no abrió una fuente de estándares que recibió o una guía en la raíz del repositorio | `SubagentStop`, y `PreToolUse` en la entrega de un informe |
 | `hooks/format-gate.sh` | el gate de formato sobre las páginas tocadas hoy | `Stop` |
 | `hooks/claim-ready-gate.sh` | frena un mensaje que da un PR por listo cuando `pr-ready.sh` dice que no lo está | `Stop` |
 | `hooks/paste-block-gate.sh` | frena un bloque para pegar que todavía trae un hueco por rellenar | `Stop` |
@@ -114,14 +116,14 @@ Los requisitos son `jq`, `python3` o `python`, `git`, `awk`, `cmp`, `bash`, `mkt
 | `hooks/session-size.sh` | avisa una vez, pasado el 80% de la ventana de contexto, que conviene compactar | `UserPromptSubmit` |
 | `hooks/notes-machinery.sh` | marca maquinaria de código dentro de un árbol pensado para notas | `SessionStart` y `Stop` |
 | `hooks/pr-ready.sh`, `blind-replica.sh` | si un PR está listo para mergear, y el brief de la réplica ciega | los llamas tú |
-| `hooks/receipt.sh` | una línea local por freno, corrección, escape o hueco | lo escriben las puertas, lo lees tú |
+| `hooks/receipt.sh` | una línea local por freno, corrección, escape, pregunta o hueco | lo escriben las puertas, lo lees tú |
 | los demás archivos de `hooks/` | los ayudantes que comparten las puertas, y las pruebas que corre cada una | los llaman las puertas |
 
 Cada pieza completa, su escape y lo que no caza están en [la referencia](docs/reference.md), en inglés.
 
 ## Cómo se prueba
 
-Diecisiete piezas tienen `--selftest`. Las tres puertas de push están cubiertas por 127 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 99 más sobre lo que reporta una puerta cuando no midió. `tests/skills-controls.sh` suma 45 sobre el texto de las skills y del método, veintiséis de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/runner-controls.sh` suma 28 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. La suite del gate de formato, de 47 casos, vive en `hooks/format-gate.sh`. Todo corre en Ubuntu, macOS y Windows en cada push, y la insignia de arriba es esa corrida.
+Diecinueve piezas tienen `--selftest`. Las tres puertas de push están cubiertas por 127 controles contra un repositorio de prueba en `tests/push-gates-controls.sh`. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` y `tests/page-gates-receipts.sh` suman 99 más sobre lo que reporta una puerta cuando no midió. `tests/skills-controls.sh` suma 45 sobre el texto de las skills y del método, veintiséis de ellos sobre copias mutadas que tienen que ponerse rojas. `tests/skills-review-controls.sh` suma 5 sobre lo que dicen las skills de las fuentes de estándares de una revisión. `tests/runner-controls.sh` suma 30 sobre la suite misma, corridos desde afuera porque un corredor no puede correrse a sí mismo. La suite del gate de formato, de 52 casos, vive en `hooks/format-gate.sh`. Todo corre en Ubuntu, macOS y Windows en cada push, y la insignia de arriba es esa corrida.
 
 ## Configurar
 
