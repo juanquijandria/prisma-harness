@@ -5,27 +5,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, ubuntu-latest]
+        os: [ubuntu-24.04, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - name: A link to sleep under another name
+      - name: Ways to run a sleeper under a long name of our own
         shell: bash
         run: |
-          grep PRETTY_NAME /etc/os-release
-          ls -l "$(command -v sleep)"; readlink -f "$(command -v sleep)"
-          sleep --version | head -1
-          pgrep --version; command -v lsof || echo "lsof MISSING"
-          d=$(mktemp -d); ln -s "$(command -v sleep)" "$d/prisma-probe-name"
-          (cd "$d" && exec ./prisma-probe-name 20) & pid=$!
-          sleep 1
-          if kill -0 "$pid" 2>/dev/null; then echo "LINKED SLEEP ALIVE"; else wait "$pid"; echo "LINKED SLEEP DIED rc=$?"; fi
-          pgrep -f prisma-probe-name || echo "pgrep finds nothing"
-          cp "$(readlink -f "$(command -v sleep)")" "$d/prisma-copy-name" && (cd "$d" && exec ./prisma-copy-name 20) & cpid=$!
-          sleep 1
-          if kill -0 "$cpid" 2>/dev/null; then echo "COPIED SLEEP ALIVE"; else wait "$cpid"; echo "COPIED SLEEP DIED rc=$?"; fi
-          (cd "$d" && exec -a prisma-argv-name sleep 20) & apid=$!
-          sleep 1
-          if kill -0 "$apid" 2>/dev/null; then echo "RENAMED ARGV SLEEP ALIVE"; else wait "$apid"; echo "RENAMED ARGV SLEEP DIED rc=$?"; fi
-          (cd "$d" && exec python3 -c 'import sys,time; time.sleep(float(sys.argv[1]))' 20 prisma-python-name) & ppid=$!
-          sleep 1
-          kill -0 "$ppid" && echo "PYTHON SLEEPER ALIVE"; pgrep -f prisma-python-name | head -2
+          set +e
+          name=prisma-kill-probe-long-name
+          d=$(mktemp -d); cd "$d"
+          report() { sleep 1; if kill -0 "$2" 2>/dev/null; then echo "$1 ALIVE pgrep-f=$(pgrep -f "$name" | grep -c "^$2$") pgrep-x15=$(pgrep -x "${name:0:15}" | grep -c "^$2$") pgrep-x=$(pgrep -x "$name" | grep -c "^$2$") killall=$(killall -0 "$name" 2>/dev/null && echo yes || echo no)"; kill "$2"; wait "$2" 2>/dev/null; else echo "$1 DIED"; fi; }
+          ln -s "$(command -v sleep)" "$name"; ./"$name" 20 2>/dev/null & report LINK $!; rm -f "$name"
+          cp "$(command -v sleep)" "$name"; ./"$name" 20 2>/dev/null & report COPY $!; rm -f "$name"
+          ln -s "$(command -v python3)" "$name"; ./"$name" -c 'import time; time.sleep(20)' 2>/dev/null & report PYTHON-LINK $!; rm -f "$name"
+          printf '#!/bin/sh\nexec sleep 20\n' > "$name"; chmod +x "$name"; ./"$name" 2>/dev/null & report SCRIPT-EXEC $!; rm -f "$name"
+          printf '#!/bin/sh\nwhile :; do sleep 1; done\n' > "$name"; chmod +x "$name"; ./"$name" 2>/dev/null & report SCRIPT-LOOP $!; rm -f "$name"
+          printf '#!/usr/bin/env python3\nimport time\ntime.sleep(20)\n' > "$name"; chmod +x "$name"; ./"$name" 2>/dev/null & report PYTHON-SCRIPT $!; rm -f "$name"
+          exit 0
