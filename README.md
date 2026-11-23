@@ -106,6 +106,8 @@ Requirements are `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mkte
 | `hooks/pre-push-comments.sh`, `pre-push-size.sh`, `pre-push-lint.sh` | the push gates, comment lines in the diff, a size that warns over 200 changed lines and blocks over 400, and the repository's own linter, `php-cs-fixer` or `eslint` | `PreToolUse` on Bash |
 | `hooks/shell-traps.sh` | quotes two zsh traps, and blocks a missing `timeout` and a `pkill` that reaches another folder | `PreToolUse` on Bash |
 | `hooks/secret-reads.sh` | keeps the lines of a secrets file out of the console and out of searches | `PreToolUse` on Bash |
+| `hooks/destructive-git.sh` | puts a forced push in front of the person, and blocks a forced branch deletion or a hard reset until an escape is declared | `PreToolUse` on Bash |
+| `hooks/review-reads-standards.sh` | holds a fidelity review once when it has not opened a standards source it was given or a guide at the root of the repository | `SubagentStop`, and `PreToolUse` on the hand back of a report |
 | `hooks/format-gate.sh` | the format gate over the pages touched today | `Stop` |
 | `hooks/claim-ready-gate.sh` | stops a message that calls a PR ready when `pr-ready.sh` says it is not | `Stop` |
 | `hooks/paste-block-gate.sh` | stops a block meant to be pasted that still has a hole to fill | `Stop` |
@@ -114,14 +116,14 @@ Requirements are `jq`, `python3` or `python`, `git`, `awk`, `cmp`, `bash`, `mkte
 | `hooks/session-size.sh` | says once, past 80% of the context window, to compact | `UserPromptSubmit` |
 | `hooks/notes-machinery.sh` | flags code machinery inside a tree meant for notes | `SessionStart` and `Stop` |
 | `hooks/pr-ready.sh`, `blind-replica.sh` | whether a PR is ready to merge, and the brief of the blind replica | you call them |
-| `hooks/receipt.sh` | one local line per block, rewrite, escape or gap | the gates write it, you read it |
+| `hooks/receipt.sh` | one local line per block, rewrite, escape, question or gap | the gates write it, you read it |
 | the other files under `hooks/` | the helpers the gates share, and the tests each gate runs | called by the gates |
 
 Each piece in full, its escape and what it does not catch are in [the reference](docs/reference.md).
 
 ## How it is tested
 
-Seventeen pieces have a `--selftest`. The three push gates are covered by 127 controls against a fixture repo in `tests/push-gates-controls.sh`. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` and `tests/page-gates-receipts.sh` add 99 more on what a gate reports when it did not measure. `tests/skills-controls.sh` adds 45 over the text of the skills and the method, twenty-six of them on mutated copies that must go red. `tests/runner-controls.sh` adds 28 over the suite itself, run from outside it because a runner cannot run itself. The format gate suite, 47 cases, lives in `hooks/format-gate.sh`. All of it runs on Ubuntu, macOS and Windows on every push, and the badge at the top is that run.
+Nineteen pieces have a `--selftest`. The three push gates are covered by 127 controls against a fixture repo in `tests/push-gates-controls.sh`. `tests/push-gates-never-fabricate.sh`, `tests/page-gates-never-fabricate.sh` and `tests/page-gates-receipts.sh` add 99 more on what a gate reports when it did not measure. `tests/skills-controls.sh` adds 45 over the text of the skills and the method, twenty-six of them on mutated copies that must go red. `tests/skills-review-controls.sh` adds 5 on what the skills say about the standards sources of a review. `tests/runner-controls.sh` adds 30 over the suite itself, run from outside it because a runner cannot run itself. The format gate suite, 52 cases, lives in `hooks/format-gate.sh`. All of it runs on Ubuntu, macOS and Windows on every push, and the badge at the top is that run.
 
 ## Configure
 

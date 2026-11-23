@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/tests/shipped.sh"
 failed=0
 OUT=$(mktemp)
-for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-size session-deps command-invokes escape-declared receipt notes-machinery shell-traps secret-reads pr-ready claim-ready-gate paste-block-gate handoff-card-gate; do
+for hook in gate-read-index format-gate check-canonical-sync blind-replica session-voice session-size session-deps command-invokes escape-declared receipt notes-machinery shell-traps secret-reads pr-ready claim-ready-gate paste-block-gate handoff-card-gate review-reads-standards destructive-git; do
   printf '\n##### %s\n' "$hook"
   if sh "$HOOKS/$hook.sh" --selftest > "$OUT" 2>&1; then :; else failed=$((failed+1)); fi
   cat "$OUT"
@@ -70,6 +70,17 @@ if [ -n "$sk_declared" ] && [ "$sk_declared" != "$sk_ran" ]; then
   failed=$((failed+1))
 fi
 rm -f "$SK"
+printf '\n##### skills review controls\n'
+SR=$(mktemp)
+if /bin/sh "$(dirname "$0")/skills-review-controls.sh" > "$SR" 2>&1; then :; else failed=$((failed+1)); fi
+cat "$SR"
+sr_declared=$(sed -n 's/.*SELFTEST OK: \([0-9][0-9]*\)\/[0-9][0-9]*.*/\1/p' "$SR" | tail -1)
+sr_ran=$(grep -cE '^ *(PASS|SKIP)' "$SR")
+if [ "$sr_declared" != "$sr_ran" ]; then
+  printf 'FAIL skills-review-controls says %s cases and printed %s PASS or SKIP lines\n' "$sr_declared" "$sr_ran"
+  failed=$((failed+1))
+fi
+rm -f "$SR"
 printf '\n##### the counts these pages publish\n'
 while IFS='|' read -r label number anchor; do
   [ -n "$label" ] || continue
@@ -83,6 +94,7 @@ done <<COUNTS
 the push gate controls|$push_gate_cases|tests/push-gates-controls.sh
 the never-fabricate suites|$never_fabricate_cases|tests/page-gates-never-fabricate.sh
 the skills controls|$sk_ran|tests/skills-controls.sh
+the skills review controls|$sr_ran|tests/skills-review-controls.sh
 the format gate suite|$format_gate_cases|hooks/format-gate.sh
 COUNTS
 
