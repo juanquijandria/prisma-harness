@@ -41,6 +41,8 @@ selftest_kills() {
   expect_measured "68 a pkill with a redirection still blocks a process in another folder" "$(run_payload_in "pkill -f $KILL_PROBE_NAME $REDIRECTION" "$own_dir") $(run_payload_in "pkill -f $KILL_PROBE_NAME > out.log" "$own_dir") $(run_payload_in "killall $KILL_OWN_NAME $REDIRECTION; pkill -f $KILL_PROBE_NAME 2>&1" "$own_dir")" "2 2 2"
   expect_measured "69 a redirection is not a pattern, so it never reaches a process whose command line holds it" "$(run_payload_in "pkill -f no-such-process-$KILL_PROBE_SECONDS $REDIRECTION" "$own_dir")" 0
   expect_measured "74 a redirection glued to the pattern is not part of it" "$(run_payload_in "pkill -f $KILL_PROBE_NAME>/dev/null" "$own_dir")" 2
+  expect_measured "106 the real case, a pkill whose pattern is on the next line after a backslash, still blocks" "$(run_payload_in "pkill \\
+  -f $KILL_PROBE_NAME" "$own_dir")" 2
   expect_measured "75 a quoted pattern that holds a > stays a pattern" "$(run_payload_in "pkill -f '$KILL_PROBE_SECONDS $REDIRECTION'" "$own_dir")" 2
   expect_measured "80 a pattern that is only a quoted > is a pattern, so it still reaches a process whose command line holds it" "$(run_payload_in "pkill -f '>'" "$own_dir")" 2
   expect_measured "81 an escaped > is a pattern too" "$(run_payload_in "pkill -f \\>" "$own_dir")" 2

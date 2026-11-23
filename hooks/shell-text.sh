@@ -8,6 +8,7 @@ BACKTICK = "\x60"
 SKIPPED_SPANS = QUOTES + BACKTICK
 BACKSLASH = "\\"
 NEWLINE = "\n"
+LINE_CONTINUATION = BACKSLASH + NEWLINE
 COMMENT = "#"
 HEREDOC_START = "<"
 ARITHMETIC_OPEN = "(("
@@ -89,6 +90,9 @@ def without_comments(command, drop_bodies):
         heredoc = heredoc_at(command, index) if character == HEREDOC_START else None
         if character in SKIPPED_SPANS:
             index = quoted_end(command, index)
+        elif command.startswith(LINE_CONTINUATION, index):
+            index += len(LINE_CONTINUATION)
+            continue
         elif character == BACKSLASH:
             index += 2
         elif command.startswith(ARITHMETIC_OPEN, index):

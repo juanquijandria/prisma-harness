@@ -31,8 +31,7 @@ HOOK_BLOCKS=2
 PYTHON="${PRISMA_PYTHON-$(command -v python3 || command -v python)}"
 SHELL_TEXT="$HOOKS_DIR/shell-text.sh"
 WITHOUT_HEREDOC_BODIES='import sys
-LINE_CONTINUATION = chr(92) + chr(10)
-sys.stdout.write(without_comments(sys.stdin.read(), True).replace(LINE_CONTINUATION, " "))'
+sys.stdout.write(without_comments(sys.stdin.read(), True))'
 TREE_FLAGS="--git-dir --work-tree"
 TREE_NAMED_ELSEWHERE='(^|[^[:alnum:]_])(pushd|popd)([^[:alnum:]_]|$)|GIT_DIR=|GIT_WORK_TREE='
 COMMAND_INSIDE_A_COMMAND='(^|[;&|({[:space:]])((sh|bash|zsh|dash|ksh)[[:space:]]+(-[A-Za-z]+[[:space:]]+)*-[A-Za-z]*c([[:space:]]|$)|eval[[:space:]]|xargs[[:space:]]|env[[:space:]]+([^;&|]*[[:space:]])?-C[[:space:]])|`'
