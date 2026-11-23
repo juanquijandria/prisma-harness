@@ -35,6 +35,10 @@ skip() {
 
 selftest_direct_reads() {
   expect "1 cat of a .env blocks" "$(run_gate 'cat .env')" "2"
+  expect "86 the real case, a cat whose .env is on the next line after a backslash, blocks" "$(run_gate "cat \\
+  .env")" "2"
+  expect "87 a text in single quotes that holds a backslash, a new line and a .env is not a read" "$(run_gate "echo 'cat \\
+  .env'")" "0"
   expect "2 cat of a .env.example passes" "$(run_gate 'cat .env.example')" "0"
   expect "3 sed on a .env.stg under a folder blocks" "$(run_gate 'sed -n 1,5p config/.env.stg')" "2"
   expect "4 head of a name that ends in .env blocks" "$(run_gate 'head -3 deploy/prod.env')" "2"

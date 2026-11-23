@@ -79,5 +79,24 @@ case_check "39 a # that counts or measures a parameter is not a comment" "$(prin
 lonely_dir=$(mktemp -d); cp "$SELF" "$lonely_dir/"
 case_check "40 without shell-text.sh beside it the parser says it could not parse" "$(printf 'ls' | sh "$lonely_dir/$(basename "$SELF")" git push 2>/dev/null; echo "exit=$?")" "exit=3"
 rm -rf "$lonely_dir"
-[ "$ok" = "1" ] && echo "SELFTEST OK: 40/40" && exit 0
+continued="git reset \\
+  --hard origin/main"
+case_check "41 the real case, a command continued on the next line with a backslash, keeps its arguments" "$(printf '%s' "$continued" | "$SELF" git reset)" "git reset --hard origin/main"
+split_word="git pu\\
+sh origin main"
+case_check "42 a word cut by a continuation is one word, as the shell reads it" "$(printf '%s' "$split_word" | "$SELF" git push)" "git push origin main"
+single_quoted="echo 'a \\
+git push --force' && ls"
+case_check "43 inside single quotes a backslash and a new line are text, so nothing is joined and nothing is found" "$(printf '%s' "$single_quoted" | "$SELF" git push; echo "exit=$?")" "exit=0"
+body_with_backslash="cat > notes.md <<'PAGE'
+a line that ends in a backslash \\
+git push --force
+PAGE
+git status"
+case_check "44 a heredoc body that ends a line in a backslash does not swallow the command after it" "$(printf '%s' "$body_with_backslash" | "$SELF" git status)" "git status"
+several_lines="cd /tmp/x &&
+git status &&
+git log"
+case_check "45 a command on several lines joined by && is still three commands" "$(printf '%s' "$several_lines" | "$SELF" git | tr '\n' '|')" "git status|git log|"
+[ "$ok" = "1" ] && echo "SELFTEST OK: 45/45" && exit 0
 echo "SELFTEST FAILED"; exit 1
