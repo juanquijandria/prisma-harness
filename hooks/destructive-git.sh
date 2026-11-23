@@ -11,7 +11,7 @@ GIT_LOOKING_COMMAND='(^|[^[:alnum:]_-])git([^[:alnum:]_-]|$)'
 TIMEOUT_WRAPPER='(^|[;&|({[:space:]])timeout[[:space:]]+(-[^[:space:]]+[[:space:]]+([0-9.]+[smhd]?[[:space:]]+)?)*[0-9.]+[smhd]?[[:space:]]+'
 PARSER_FAILED=3
 PARSER_WARNING="the command parser could not read the command"
-FORCE_FLAGS="--force --force-with-lease --force-if-includes"
+FORCE_FLAGS="--force --force-with-lease --force-if-includes --mirror"
 SHORT_FORCE_CLUSTER='^-[A-Za-z]*f[A-Za-z]*$'
 FORCED_REFSPEC='^[+]'
 HARD_FLAG="--hard"
@@ -20,9 +20,18 @@ FORCED_DELETE_CLUSTER='^-[A-Za-z]*D[A-Za-z]*$'
 SHORT_CLUSTER='^-[A-Za-z]+$'
 LEADING_FOLDER_CHANGE='^[[:space:]]*cd[[:space:]]'
 HOOK_BLOCKS=2
+PYTHON="${PRISMA_PYTHON-$(command -v python3 || command -v python)}"
+SHELL_TEXT="$HOOKS_DIR/shell-text.sh"
+WITHOUT_HEREDOC_BODIES='import sys
+sys.stdout.write(without_comments(sys.stdin.read(), True))'
+TREE_FLAGS="--git-dir --work-tree"
+TREE_NAMED_ELSEWHERE='(^|[^[:alnum:]_])(pushd|popd)([^[:alnum:]_]|$)|GIT_DIR=|GIT_WORK_TREE='
+COMMAND_INSIDE_A_COMMAND='(^|[;&|({[:space:]])((sh|bash|zsh|dash|ksh)[[:space:]]+(-[A-Za-z]+[[:space:]]+)*-[A-Za-z]*c([[:space:]]|$)|eval[[:space:]]|xargs[[:space:]]|env[[:space:]]+([^;&|]*[[:space:]])?-C[[:space:]])|`'
+DESTRUCTIVE_TEXT='git([[:space:]]+[^;&|]*)?[[:space:]](push[[:space:]]([^;&|]*[[:space:]])?(--force|--mirror|-[A-Za-z]*f[A-Za-z]*|[+][^[:space:]])|reset[[:space:]]([^;&|]*[[:space:]])?--hard|branch[[:space:]]([^;&|]*[[:space:]])?(-[A-Za-z]*D|--delete[[:space:]]([^;&|]*[[:space:]])?--force|-d[[:space:]]+-f))'
+INSIDE_FINDING="- a command handed to another command as text, which this gate cannot read word by word"
 DELETE_FLAGS="-d --delete"
 BRANCH_FORCE_FLAGS="-f --force"
-SELFTEST_CASES=43
+SELFTEST_CASES=62
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -41,7 +50,7 @@ is_one_of() {
 }
 
 matching() {
-  found=$(printf '%s' "$command_text" | sed -E "s/$TIMEOUT_WRAPPER/\\1/g" | "$INVOKES" git "$1" 2>/dev/null); rc=$?
+  found=$(printf '%s' "$scanned_text" | sed -E "s/$TIMEOUT_WRAPPER/\\1/g" | "$INVOKES" git "$1" 2>/dev/null); rc=$?
   [ "$rc" = "$PARSER_FAILED" ] && return 1
   printf '%s\n' "$found" | while IFS= read -r segment; do
     [ -n "$segment" ] && "$2" "$segment" && printf -- '- %s\n' "$segment"
@@ -80,14 +89,20 @@ is_forced_deletion() {
 }
 
 folder_of() {
+  printf '%s' "$scanned_text" | grep -qE "$TREE_NAMED_ELSEWHERE" && return 1
   set -f; set -- $1; set +f
-  named=""
+  named=""; folders_named=0
+  for token in "$@"; do
+    [ "$token" = "$FOLDER_FLAG" ] && folders_named=$((folders_named+1))
+    for flag in $TREE_FLAGS; do case "$token" in "$flag"|"$flag"=*) return 1 ;; esac; done
+  done
+  [ "$folders_named" -gt 1 ] && return 1
   while [ "$#" -gt 1 ]; do
     [ "$1" = "$FOLDER_FLAG" ] && { named="$2"; break; }
     shift
   done
   if [ -z "$named" ]; then
-    changes=$(printf '%s' "$command_text" | "$INVOKES" cd 2>/dev/null)
+    changes=$(printf '%s' "$scanned_text" | "$INVOKES" cd 2>/dev/null)
     [ "$(printf '%s\n' "$changes" | grep -c .)" -gt 1 ] && return 1
     [ -z "$changes" ] || printf '%s' "$command_text" | grep -qE "$LEADING_FOLDER_CHANGE" || return 1
     named=${changes#cd }
@@ -111,9 +126,12 @@ may_lose_uncommitted_work() {
 
 ask_the_person() {
   receipt_append "$GATE_NAME" "$working_dir" asked
-  "$JQ" -n --arg reason "PRISMA destructive git gate: this command rewrites a remote or discards work that no commit holds, and that is confirmed by the person every time.
+  when_a_reset_asks=""
+  [ -n "$2" ] && when_a_reset_asks=" A hard reset asks when its tree has uncommitted changes or cannot be measured, and naming the folder literally with git $FOLDER_FLAG lets it be measured."
+  "$JQ" -n --arg reason "PRISMA destructive git gate: Enter accepts this command, so read it first.
+It rewrites a remote or discards work that no commit holds, and that is confirmed by the person every time.
 $1
-$ESCAPE does not skip this question. A hard reset asks when its tree has uncommitted changes or cannot be measured, and naming the folder literally with git $FOLDER_FLAG lets it be measured." \
+$ESCAPE does not skip this question.$when_a_reset_asks" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}'
   exit 0
 }
@@ -127,17 +145,24 @@ run_gate() {
   working_dir=$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)
   printf '%s' "$command_text" | grep -qE "$GIT_LOOKING_COMMAND" || exit 0
   [ -x "$INVOKES" ] || [ -r "$INVOKES" ] || not_measured "command-invokes.sh is missing"
+  [ -n "$PYTHON" ] && [ -r "$SHELL_TEXT" ] || not_measured "python or shell-text.sh is missing"
+  . "$SHELL_TEXT"
+  scanned_text=$(printf '%s' "$command_text" | "$PYTHON" -c "$SHELL_TEXT_CODE
+$WITHOUT_HEREDOC_BODIES" 2>/dev/null) || not_measured "$PARSER_WARNING"
   forced_pushes=$(matching push is_forced_push) || not_measured "$PARSER_WARNING"
   hard_resets=$(matching reset is_hard_reset) || not_measured "$PARSER_WARNING"
   to_block=$(matching branch is_forced_deletion) || not_measured "$PARSER_WARNING"
-  to_ask="$forced_pushes"
+  to_ask="$forced_pushes"; resets_to_ask=""
+  if printf '%s' "$scanned_text" | grep -qE "$COMMAND_INSIDE_A_COMMAND" && printf '%s' "$scanned_text" | grep -qE "$DESTRUCTIVE_TEXT"; then
+    to_ask=$(printf '%s\n%s' "$to_ask" "$INSIDE_FINDING")
+  fi
   while IFS= read -r finding; do
     [ -n "$finding" ] || continue
-    if may_lose_uncommitted_work "${finding#- }"; then to_ask=$(printf '%s\n%s' "$to_ask" "$finding"); else to_block=$(printf '%s\n%s' "$to_block" "$finding"); fi
+    if may_lose_uncommitted_work "${finding#- }"; then to_ask=$(printf '%s\n%s' "$to_ask" "$finding"); resets_to_ask=yes; else to_block=$(printf '%s\n%s' "$to_block" "$finding"); fi
   done <<RESETS
 $hard_resets
 RESETS
-  [ -n "$to_ask" ] && ask_the_person "$(printf '%s\n%s' "$to_ask" "$to_block" | grep .)"
+  [ -n "$to_ask" ] && ask_the_person "$(printf '%s\n%s' "$to_ask" "$to_block" | grep .)" "$resets_to_ask"
   [ -n "$to_block" ] || exit 0
   if escape_declared "$ESCAPE" "$command_text"; then
     receipt_append "$GATE_NAME" "$working_dir" escaped

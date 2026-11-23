@@ -103,6 +103,22 @@ selftest_what_counts_as_opening() {
   review_prompt "Standards: $repo/rules/code-rules.md"
   shell_call "wc -l $repo/rules/code-rules.md | head -1"
   expect "38 counting the rules and printing the count is not opening them" "$(verdict)" "2 blocked"
+  mkdir -p "$repo/other/folder"; cp "$repo/rules/code-rules.md" "$repo/other/folder/code-rules.md"; cp "$repo/rules/code-rules.md" "$repo/rules/code-rules.md.bak"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  shell_call "cat $repo/other/folder/code-rules.md"
+  expect "51 the real case, printing a file of the same name in another folder, is not opening the rules" "$(verdict)" "2 blocked"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  shell_call "cat $repo/rules/code-rules.md.bak"
+  expect "52 printing a copy whose name only starts the same is not opening the rules" "$(verdict)" "2 blocked"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  shell_call "cd $repo && sed -n 1,40p rules/code-rules.md"
+  expect "53 printing the rules by a path relative to their repository counts" "$(verdict)" "0 silent"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  shell_call "ls $repo/rules/code-rules.md; cat $repo/rules/code-rules.md | head -200"
+  expect "56 the real case, the rules printed in the second part of a command that names them twice, counts" "$(verdict)" "0 silent"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  shell_call "cat other/folder/code-rules.md"
+  expect "54 a relative path that ends in another folder does not count" "$(verdict)" "2 blocked"
   rm -rf "$repo"
 }
 
@@ -203,6 +219,11 @@ selftest_reports_handed_back_through_a_tool() {
   expect "42 the message names the source" "$(names_in_stderr "rules/code-rules.md")" "1"
   handback_call tu_h1; gate_feedback tu_h1
   expect "43 a reviewer held once at the hand back is let go the second time, and the receipt says warned" "$(EVENT_FOR_TEST=handback_attempt verdict)" "0 warned"
+  review_prompt "Standards: $repo/rules/code-rules.md"
+  read_call tu_gate "$repo/gate.sh"
+  "$JQ" -nc --arg text "GATE_SIGNATURE=\"$GATE_SIGNATURE\"" '{type: "user", message: {content: [{type: "tool_result", tool_use_id: "tu_gate", content: $text}]}}' >> "$transcript"
+  expect "55 the real case, a reviewer that read the text of the gate itself, is still held at its first hand back" "$(EVENT_FOR_TEST=handback_attempt verdict)" "2 blocked"
+  handback_call tu_h1; gate_feedback tu_h1
   handback_call tu_h2
   expect "44 the stop that follows a hand back is not judged again" "$(verdict)" "0 silent"
   review_prompt "Standards: $repo/rules/code-rules.md"

@@ -24,7 +24,7 @@ INSTRUCTIONS_NAMES="CLAUDE.md CLAUDE.local.md"
 PERSON_INSTRUCTIONS_FOLDER=".claude"
 AGENT_TYPES_WITHOUT_INSTRUCTIONS="Explore Plan"
 CONTENT_PRINTERS='cat|sed|head|tail|nl|awk|less|more|bat|grep|rg'
-SELFTEST_CASES=50
+SELFTEST_CASES=56
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 
@@ -40,7 +40,9 @@ SHELL_SEGMENTS_JQ='inputs | select(.type == "assistant") | .message.content | ar
 
 HANDBACK_STATE_JQ='[inputs] as $lines
   | ([$lines[] | select(.type == "assistant") | .message.content | arrays | .[] | select(.type == "tool_use" and .name == $tool)] | length) as $calls
-  | ([$lines[] | select(.type == "user") | .message.content | arrays | .[] | select(.type == "tool_result") | .content | tostring | select(contains($signature))] | length) as $held
+  | [$lines[] | select(.type == "assistant") | .message.content | arrays | .[] | select(.type == "tool_use" and .name == $tool) | .id] as $handbacks
+  | ([$lines[] | select(.type == "user") | .message.content | arrays | .[] | select(.type == "tool_result") | select(.tool_use_id as $id | $handbacks | index($id))
+      | .content | tostring | select(contains($signature))] | length) as $held
   | "\($calls) \($held)"'
 
 not_measured() {
@@ -90,10 +92,33 @@ repository_sources() {
   done
 }
 
+is_a_printer() {
+  program=$(basename "$1")
+  old_ifs=$IFS; IFS='|'
+  for printer in $CONTENT_PRINTERS; do [ "$program" = "$printer" ] && { IFS=$old_ifs; return 0; }; done
+  IFS=$old_ifs
+  return 1
+}
+
+names_the_source() {
+  word=$(printf '%s' "$1" | tr -d "\"'")
+  case "$word" in "$file_name"|*/"$file_name") ;; *) return 1 ;; esac
+  case "$word" in "~/"*|/*|[A-Za-z]:[/\\]*) [ "$(absolute_path "$word")" -ef "$2" ]; return ;; esac
+  relative=$(printf '%s' "$word" | sed -E 's#^(\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/|\.\.?/)+##')
+  case "$2" in */"$relative") return 0 ;; esac
+  return 1
+}
+
 printed_in_the_shell() {
-  file_name=$(basename "$1")
+  source_path="$1"; file_name=$(basename "$1")
   printf '%s\n' "$shell_segments" | grep -F -- "$file_name" | while IFS= read -r segment; do
-    printf '%s' "${segment%%"$file_name"*}" | grep -qE "(^|[^[:alnum:]_-])($CONTENT_PRINTERS)([^[:alnum:]_-]|\$)" && { printf 'yes'; break; }
+    printer_seen=no
+    set -f; set -- $segment; set +f
+    for word in "$@"; do
+      if is_a_printer "$word"; then printer_seen=yes
+      elif [ "$printer_seen" = "yes" ] && names_the_source "$word" "$source_path"; then printf 'yes'; break
+      fi
+    done
   done | grep -q yes
 }
 
@@ -149,7 +174,7 @@ load_the_family() {
   shell_segments=$("$JQ" -rn "$SHELL_SEGMENTS_JQ" "$@" 2>/dev/null) || not_measured "jq could not list what the reviewer ran"
 }
 
-field() { printf '%s' "$payload" | "$JQ" -r "$1 // empty" 2>/dev/null; }
+field() { printf '%s' "$payload" | "$JQ" -r "$1 // empty" 2>/dev/null | tr -d '\r'; }
 
 locate_the_reviewer() {
   working_dir=$(field .cwd)

@@ -49,12 +49,16 @@ selftest_forced_pushes() {
   expect "39 a forced push run under timeout asks" "$(verdict "timeout 30 git push --force origin main")" "$ASKS"
   expect "40 an ordinary push run under timeout passes" "$(verdict "timeout -k 5 30s git push origin main")" "$PASSES"
   pre_tool_use "git push --force origin main" | "$JQ" -r '.hookSpecificOutput.permissionDecisionReason' > "$scratch/reason.txt" 2>/dev/null
+  expect "44 the reason of a forced push says nothing of a hard reset" "$(grep -c "hard reset" "$scratch/reason.txt")" "0"
+  expect "45 the first line of the reason says that Enter accepts" "$(head -1 "$scratch/reason.txt" | grep -c "Enter accepts")" "1"
   expect "13 the reason shown to the person quotes the command" "$(grep -c -- "git push --force origin main" "$scratch/reason.txt")" "1"
 }
 
 selftest_hard_resets() {
   printf 'two\n' >> "$repo/tracked.txt"
   expect "14 the real case, a hard reset over uncommitted work, asks the person" "$(verdict "git reset --hard HEAD")" "$ASKS"
+  pre_tool_use "git reset --hard HEAD" | "$JQ" -r '.hookSpecificOutput.permissionDecisionReason' > "$scratch/reset-reason.txt" 2>/dev/null
+  expect "46 the reason of a hard reset says when a hard reset asks" "$(grep -c "A hard reset asks" "$scratch/reset-reason.txt")" "1"
   expect "15 the escape never turns it into a pass" "$(verdict "$ESCAPE git reset --hard HEAD")" "$ASKS"
   git -C "$repo" add tracked.txt
   expect "16 work that is staged and not committed asks too" "$(verdict "git reset --hard")" "$ASKS"
@@ -90,6 +94,38 @@ selftest_branch_deletions() {
   expect "34 a deletion next to a forced push asks, escape or not" "$(verdict "$ESCAPE git branch -D old && git push --force origin main")" "$ASKS"
 }
 
+selftest_trees_that_cannot_be_told() {
+  dirty=$(mktemp -d); git -C "$dirty" init -q; printf 'one\n' > "$dirty/kept.txt"; git -C "$dirty" add kept.txt
+  git -C "$dirty" -c user.name=selftest -c user.email=selftest@example.invalid commit -q -m "first"; printf 'two\n' >> "$dirty/kept.txt"
+  spare=$(mktemp -d); git -C "$spare" init -q
+  expect "47 the real case, a pushd into a tree with uncommitted work and the escape declared, asks" "$(verdict "$ESCAPE pushd $dirty && git reset --hard")" "$ASKS"
+  expect "48 two folders named with -C cannot be told apart, so it asks" "$(verdict "$ESCAPE git -C $spare -C $dirty reset --hard")" "$ASKS"
+  expect "49 a tree named with --git-dir and --work-tree asks" "$(verdict "$ESCAPE git --git-dir=$dirty/.git --work-tree=$dirty reset --hard")" "$ASKS"
+  expect "50 a tree named through the environment of git asks" "$(verdict "GIT_DIR=$dirty/.git GIT_WORK_TREE=$dirty $ESCAPE git reset --hard")" "$ASKS"
+  expect "51 a tree named with env -C asks" "$(verdict "$ESCAPE env -C $dirty git reset --hard")" "$ASKS"
+  rm -rf "$dirty" "$spare"
+}
+
+selftest_commands_inside_other_commands() {
+  expect "52 a forced push handed to a shell as text asks" "$(verdict "sh -c \"git push -f origin main\"")" "$ASKS"
+  expect "53 a hard reset handed to a login shell as text asks" "$(verdict "bash -lc 'git reset --hard'")" "$ASKS"
+  expect "54 a forced push inside eval asks" "$(verdict "eval \"git push --force origin main\"")" "$ASKS"
+  expect "55 a forced push inside backquotes asks" "$(verdict "echo \`git push -f origin main\`")" "$ASKS"
+  expect "56 a forced push built by xargs asks" "$(verdict "echo origin | xargs git push -f")" "$ASKS"
+  expect "57 a forced branch deletion handed to a shell as text asks, escape or not" "$(verdict "$ESCAPE sh -c 'git branch -D old'")" "$ASKS"
+  expect "58 a push that mirrors rewrites the remote, so it asks" "$(verdict "git push --mirror origin")" "$ASKS"
+  expect "59 a shell handed a harmless text passes" "$(verdict "sh -c 'git status' && bash -lc \"npm test\"")" "$PASSES"
+  expect "60 xargs with a harmless git command passes" "$(verdict "git ls-files | xargs git add")" "$PASSES"
+  expect "61 the real case, a page written from a heredoc that names a hard reset, passes" "$(verdict "cat > notes.md <<'PAGE'
+git reset --hard
+git push --force origin main
+PAGE")" "$PASSES"
+  expect "62 a forced push on the line after a heredoc still asks" "$(verdict "cat > notes.md <<'PAGE'
+some text
+PAGE
+git push --force origin main")" "$ASKS"
+}
+
 selftest_what_is_not_measured() {
   expect "35 a tool that is not the shell passes" "$(TOOL_FOR_TEST=Write verdict "git push --force")" "$PASSES"
   expect "36 without jq the gate lets the command go and says it did not measure" "$(JQ_FOR_TEST= verdict "git push --force origin main")" "0 none not-measured"
@@ -104,6 +140,8 @@ selftest() {
   selftest_forced_pushes
   selftest_hard_resets
   selftest_branch_deletions
+  selftest_trees_that_cannot_be_told
+  selftest_commands_inside_other_commands
   selftest_what_is_not_measured
   rm -rf "$repo" "$scratch"
   [ "$ok" = "1" ] && [ "$cases" = "$SELFTEST_CASES" ] && { printf 'SELFTEST OK: %s/%s\n' "$cases" "$SELFTEST_CASES"; return 0; }
