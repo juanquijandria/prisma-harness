@@ -1,6 +1,8 @@
 #!/bin/sh
 # Prisma Harness. Documented in README.md, section "What is inside". Loaded by destructive-git.sh, not run alone.
 
+skip_case() { cases=$((cases+1)); printf 'SKIP %s, %s\n' "$1" "$2"; }
+
 expect() {
   cases=$((cases+1))
   if [ "$2" = "$3" ]; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s, expected [%s] and got [%s]\n' "$1" "$3" "$2"; ok=0; fi
@@ -126,6 +128,49 @@ PAGE
 git push --force origin main")" "$ASKS"
 }
 
+selftest_commands_across_lines_and_short_flags() {
+  expect "63 the real case, a hard reset written across two lines, is seen" "$(verdict "git reset \\
+  --hard origin/main")" "$BLOCKS"
+  expect "64 a forced branch deletion across two lines is seen" "$(verdict "git branch \\
+  -D old")" "$BLOCKS"
+  expect "65 a forced push across two lines asks" "$(verdict "git push origin main \\
+  --force")" "$ASKS"
+  expect "66 a lease across two lines asks" "$(verdict "git push \\
+  --force-with-lease origin main")" "$ASKS"
+  expect "67 an ordinary push across two lines passes" "$(verdict "git push \\
+  origin main")" "$PASSES"
+  expect "68 a hard reset with its flag cut short, which git accepts, is seen" "$(verdict "git reset --har")|$(verdict "git reset --h HEAD~1")" "$BLOCKS|$BLOCKS"
+  expect "69 a lease and a mirror cut short ask" "$(verdict "git push --force-w origin main")|$(verdict "git push --mir origin")" "$ASKS|$ASKS"
+  expect "70 a deletion and its force cut short block" "$(verdict "git branch --del --forc old")" "$BLOCKS"
+  expect "71 a flag that only starts like one of them passes" "$(verdict "git reset --help")|$(verdict "git push --follow-tags origin main")" "$PASSES|$PASSES"
+}
+
+selftest_branches_moved_by_force() {
+  git -C "$repo" branch settled 2>/dev/null
+  expect "72 the real case, a branch that exists moved with branch -f, asks" "$(verdict "git branch -f settled HEAD~1")" "$ASKS"
+  expect "73 checkout -B over a branch that exists asks" "$(verdict "git checkout -B settled HEAD")" "$ASKS"
+  expect "74 switch -C over a branch that exists asks, escape or not" "$(verdict "$ESCAPE git switch -C settled HEAD")" "$ASKS"
+  expect "75 switch --force-create over a branch that exists asks" "$(verdict "git switch --force-create settled")" "$ASKS"
+  expect "76 the other side, the same flags over a branch that does not exist pass" "$(verdict "git switch -C brand-new HEAD")|$(verdict "git checkout -B brand-new-two")|$(verdict "git branch -f brand-new-three HEAD")" "$PASSES|$PASSES|$PASSES"
+  expect "77 a tree named before the subcommand is the folder, and -C after it is the flag" "$(CWD_FOR_TEST="$scratch" verdict "git -C $repo switch -C settled")" "$ASKS"
+  expect "78 a branch that cannot be looked up asks" "$(CWD_FOR_TEST="$scratch" verdict "git switch -C settled")" "$ASKS"
+  expect "82 a branch whose folder is written with a variable cannot be looked up, so it asks" "$(verdict "cd \$WORK/copy && git switch -C settled")" "$ASKS"
+  expect "79 switch and checkout without the flag pass" "$(verdict "git switch settled")|$(verdict "git checkout -b fresh")|$(verdict "git switch -c fresh-two")" "$PASSES|$PASSES|$PASSES"
+}
+
+selftest_drive_letter_paths() {
+  case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*)
+    skip_case "80 a folder written with a drive letter is not read as relative" "this system cannot hold a folder named C:"
+    skip_case "81 a folder written with a drive letter and backslashes is not read as relative" "this system cannot hold a folder named C:"
+    return ;;
+  esac
+  mkdir -p "$repo/C:/sub"; git -C "$repo/C:/sub" init -q
+  expect "80 a folder written with a drive letter is not read as relative, so it cannot be measured and asks" "$(verdict "git -C C:/sub reset --hard")" "$ASKS"
+  mkdir -p "$repo/C:\\sub"; git -C "$repo/C:\\sub" init -q
+  expect "81 a folder written with a drive letter and backslashes is not read as relative" "$(verdict "git -C 'C:\\sub' reset --hard")" "$ASKS"
+  rm -rf "$repo/C:" "$repo/C:\\sub"
+}
+
 selftest_what_is_not_measured() {
   expect "35 a tool that is not the shell passes" "$(TOOL_FOR_TEST=Write verdict "git push --force")" "$PASSES"
   expect "36 without jq the gate lets the command go and says it did not measure" "$(JQ_FOR_TEST= verdict "git push --force origin main")" "0 none not-measured"
@@ -142,6 +187,9 @@ selftest() {
   selftest_branch_deletions
   selftest_trees_that_cannot_be_told
   selftest_commands_inside_other_commands
+  selftest_commands_across_lines_and_short_flags
+  selftest_branches_moved_by_force
+  selftest_drive_letter_paths
   selftest_what_is_not_measured
   rm -rf "$repo" "$scratch"
   [ "$ok" = "1" ] && [ "$cases" = "$SELFTEST_CASES" ] && { printf 'SELFTEST OK: %s/%s\n' "$cases" "$SELFTEST_CASES"; return 0; }

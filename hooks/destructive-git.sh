@@ -11,10 +11,18 @@ GIT_LOOKING_COMMAND='(^|[^[:alnum:]_-])git([^[:alnum:]_-]|$)'
 TIMEOUT_WRAPPER='(^|[;&|({[:space:]])timeout[[:space:]]+(-[^[:space:]]+[[:space:]]+([0-9.]+[smhd]?[[:space:]]+)?)*[0-9.]+[smhd]?[[:space:]]+'
 PARSER_FAILED=3
 PARSER_WARNING="the command parser could not read the command"
-FORCE_FLAGS="--force --force-with-lease --force-if-includes --mirror"
+FORCE_FLAG="--force"
+FLAGS_GIT_TAKES_CUT_SHORT="--force-with-lease:--force-w --force-if-includes:--force-i --mirror:--m"
+HARD_CUT_SHORT="--hard:--h"
+DELETE_CUT_SHORT="--delete:--d"
+BRANCH_FORCE_CUT_SHORT="--force:--forc"
+FORCE_CREATE_CUT_SHORT="--force-create:--force-c"
+GIT_SUBCOMMANDS="push reset branch checkout switch"
+NAMES_A_READ_SUBCOMMAND='(^|[^[:alnum:]_-])(push|reset|branch|checkout|switch)([^[:alnum:]_-]|$)'
+FORCE_CREATE_OF_CHECKOUT="-B"
+FORCE_CREATE_OF_SWITCH="-C"
 SHORT_FORCE_CLUSTER='^-[A-Za-z]*f[A-Za-z]*$'
 FORCED_REFSPEC='^[+]'
-HARD_FLAG="--hard"
 FOLDER_FLAG="-C"
 FORCED_DELETE_CLUSTER='^-[A-Za-z]*D[A-Za-z]*$'
 SHORT_CLUSTER='^-[A-Za-z]+$'
@@ -23,15 +31,14 @@ HOOK_BLOCKS=2
 PYTHON="${PRISMA_PYTHON-$(command -v python3 || command -v python)}"
 SHELL_TEXT="$HOOKS_DIR/shell-text.sh"
 WITHOUT_HEREDOC_BODIES='import sys
-sys.stdout.write(without_comments(sys.stdin.read(), True))'
+LINE_CONTINUATION = chr(92) + chr(10)
+sys.stdout.write(without_comments(sys.stdin.read(), True).replace(LINE_CONTINUATION, " "))'
 TREE_FLAGS="--git-dir --work-tree"
 TREE_NAMED_ELSEWHERE='(^|[^[:alnum:]_])(pushd|popd)([^[:alnum:]_]|$)|GIT_DIR=|GIT_WORK_TREE='
 COMMAND_INSIDE_A_COMMAND='(^|[;&|({[:space:]])((sh|bash|zsh|dash|ksh)[[:space:]]+(-[A-Za-z]+[[:space:]]+)*-[A-Za-z]*c([[:space:]]|$)|eval[[:space:]]|xargs[[:space:]]|env[[:space:]]+([^;&|]*[[:space:]])?-C[[:space:]])|`'
 DESTRUCTIVE_TEXT='git([[:space:]]+[^;&|]*)?[[:space:]](push[[:space:]]([^;&|]*[[:space:]])?(--force|--mirror|-[A-Za-z]*f[A-Za-z]*|[+][^[:space:]])|reset[[:space:]]([^;&|]*[[:space:]])?--hard|branch[[:space:]]([^;&|]*[[:space:]])?(-[A-Za-z]*D|--delete[[:space:]]([^;&|]*[[:space:]])?--force|-d[[:space:]]+-f))'
 INSIDE_FINDING="- a command handed to another command as text, which this gate cannot read word by word"
-DELETE_FLAGS="-d --delete"
-BRANCH_FORCE_FLAGS="-f --force"
-SELFTEST_CASES=62
+SELFTEST_CASES=82
 PRISMA_RECEIPT_SOURCED=1
 . "$HOOKS_DIR/receipt.sh"
 PRISMA_ESCAPE_SOURCED=1
@@ -50,6 +57,7 @@ is_one_of() {
 }
 
 matching() {
+  printf '%s' "$scanned_text" | grep -qE "(^|[^[:alnum:]_-])$1([^[:alnum:]_-]|\$)" || return 0
   found=$(printf '%s' "$scanned_text" | sed -E "s/$TIMEOUT_WRAPPER/\\1/g" | "$INVOKES" git "$1" 2>/dev/null); rc=$?
   [ "$rc" = "$PARSER_FAILED" ] && return 1
   printf '%s\n' "$found" | while IFS= read -r segment; do
@@ -58,11 +66,18 @@ matching() {
   return 0
 }
 
+cut_short() {
+  written=${2%%=*}; whole=${1%%:*}; least=${1##*:}
+  case "$written" in "$least"*) ;; *) return 1 ;; esac
+  case "$whole" in "$written"*) return 0 ;; esac
+  return 1
+}
+
 is_forced_push() {
   set -f; set -- $1; set +f
   for token in "$@"; do
-    case "$token" in --*=*) token=${token%%=*} ;; esac
-    is_one_of "$token" $FORCE_FLAGS && return 0
+    [ "${token%%=*}" = "$FORCE_FLAG" ] && return 0
+    for flag in $FLAGS_GIT_TAKES_CUT_SHORT; do cut_short "$flag" "$token" && return 0; done
     printf '%s' "$token" | grep -qE "$SHORT_FORCE_CLUSTER|$FORCED_REFSPEC" && return 0
   done
   return 1
@@ -70,7 +85,8 @@ is_forced_push() {
 
 is_hard_reset() {
   set -f; set -- $1; set +f
-  is_one_of "$HARD_FLAG" "$@"
+  for token in "$@"; do cut_short "$HARD_CUT_SHORT" "$token" && return 0; done
+  return 1
 }
 
 is_forced_deletion() {
@@ -78,8 +94,8 @@ is_forced_deletion() {
   deletes=0; forces=0
   for token in "$@"; do
     printf '%s' "$token" | grep -qE "$FORCED_DELETE_CLUSTER" && return 0
-    is_one_of "$token" $DELETE_FLAGS && deletes=1
-    is_one_of "$token" $BRANCH_FORCE_FLAGS && forces=1
+    cut_short "$DELETE_CUT_SHORT" "$token" && deletes=1
+    cut_short "$BRANCH_FORCE_CUT_SHORT" "$token" && forces=1
     if printf '%s' "$token" | grep -qE "$SHORT_CLUSTER"; then
       case "$token" in *d*) deletes=1 ;; esac
       case "$token" in *f*) forces=1 ;; esac
@@ -88,9 +104,60 @@ is_forced_deletion() {
   [ "$deletes" = "1" ] && [ "$forces" = "1" ]
 }
 
+before_the_subcommand() {
+  set -f; set -- $1; set +f
+  for token in "$@"; do
+    is_one_of "$token" $GIT_SUBCOMMANDS && return 0
+    printf '%s ' "$token"
+  done
+}
+
+after_the_subcommand() {
+  set -f; set -- $1; set +f
+  while [ "$#" -gt 0 ]; do
+    token="$1"; shift
+    is_one_of "$token" $GIT_SUBCOMMANDS && { printf '%s' "$*"; return 0; }
+  done
+}
+
+branch_moved_by_force() {
+  kind="$1"
+  set -f; set -- $(after_the_subcommand "$2"); set +f
+  moved=""; forces=0; deletes=0
+  while [ "$#" -gt 0 ]; do
+    token="$1"; shift
+    case "$kind" in
+      checkout) [ "$token" = "$FORCE_CREATE_OF_CHECKOUT" ] && { printf '%s' "${1:-}"; return 0; } ;;
+      switch) { [ "$token" = "$FORCE_CREATE_OF_SWITCH" ] || cut_short "$FORCE_CREATE_CUT_SHORT" "$token"; } && { printf '%s' "${1:-}"; return 0; } ;;
+      branch)
+        cut_short "$BRANCH_FORCE_CUT_SHORT" "$token" && forces=1
+        cut_short "$DELETE_CUT_SHORT" "$token" && deletes=1
+        if printf '%s' "$token" | grep -qE "$SHORT_CLUSTER"; then
+          case "$token" in *f*) forces=1 ;; esac
+          case "$token" in *[dD]*) deletes=1 ;; esac
+        fi
+        case "$token" in -*) ;; *) [ -n "$moved" ] || moved="$token" ;; esac ;;
+    esac
+  done
+  [ "$forces" = "1" ] && [ "$deletes" = "0" ] && printf '%s' "$moved"
+}
+
+moves_a_branch_that_exists() {
+  moved=$(branch_moved_by_force "$1" "$2")
+  [ -n "$moved" ] || return 1
+  folder=$(folder_of "$2") || return 0
+  [ -n "$folder" ] || return 0
+  git -C "$folder" rev-parse --git-dir >/dev/null 2>&1 || return 0
+  git -C "$folder" show-ref --verify --quiet "refs/heads/$moved"
+}
+
+branch_is_moved() { moves_a_branch_that_exists branch "$1"; }
+checkout_is_forced() { moves_a_branch_that_exists checkout "$1"; }
+switch_is_forced() { moves_a_branch_that_exists switch "$1"; }
+
 folder_of() {
   printf '%s' "$scanned_text" | grep -qE "$TREE_NAMED_ELSEWHERE" && return 1
-  set -f; set -- $1; set +f
+  set -f; set -- $(before_the_subcommand "$1"); set +f
   named=""; folders_named=0
   for token in "$@"; do
     [ "$token" = "$FOLDER_FLAG" ] && folders_named=$((folders_named+1))
@@ -129,7 +196,7 @@ ask_the_person() {
   when_a_reset_asks=""
   [ -n "$2" ] && when_a_reset_asks=" A hard reset asks when its tree has uncommitted changes or cannot be measured, and naming the folder literally with git $FOLDER_FLAG lets it be measured."
   "$JQ" -n --arg reason "PRISMA destructive git gate: Enter accepts this command, so read it first.
-It rewrites a remote or discards work that no commit holds, and that is confirmed by the person every time.
+It rewrites a remote, moves a branch that exists, or discards work that no commit holds, and that is confirmed by the person every time.
 $1
 $ESCAPE does not skip this question.$when_a_reset_asks" \
     '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}'
@@ -144,6 +211,7 @@ run_gate() {
   command_text=$(printf '%s' "$payload" | "$JQ" -r '.tool_input.command // empty' 2>/dev/null)
   working_dir=$(printf '%s' "$payload" | "$JQ" -r '.cwd // empty' 2>/dev/null)
   printf '%s' "$command_text" | grep -qE "$GIT_LOOKING_COMMAND" || exit 0
+  printf '%s' "$command_text" | grep -qE "$NAMES_A_READ_SUBCOMMAND" || exit 0
   [ -x "$INVOKES" ] || [ -r "$INVOKES" ] || not_measured "command-invokes.sh is missing"
   [ -n "$PYTHON" ] && [ -r "$SHELL_TEXT" ] || not_measured "python or shell-text.sh is missing"
   . "$SHELL_TEXT"
@@ -152,7 +220,11 @@ $WITHOUT_HEREDOC_BODIES" 2>/dev/null) || not_measured "$PARSER_WARNING"
   forced_pushes=$(matching push is_forced_push) || not_measured "$PARSER_WARNING"
   hard_resets=$(matching reset is_hard_reset) || not_measured "$PARSER_WARNING"
   to_block=$(matching branch is_forced_deletion) || not_measured "$PARSER_WARNING"
-  to_ask="$forced_pushes"; resets_to_ask=""
+  for reader in branch:branch_is_moved checkout:checkout_is_forced switch:switch_is_forced; do
+    moved_branches=$(matching "${reader%%:*}" "${reader##*:}") || not_measured "$PARSER_WARNING"
+    [ -n "$moved_branches" ] && forced_pushes=$(printf '%s\n%s' "$forced_pushes" "$moved_branches")
+  done
+  to_ask=$(printf '%s\n' "$forced_pushes" | grep .); resets_to_ask=""
   if printf '%s' "$scanned_text" | grep -qE "$COMMAND_INSIDE_A_COMMAND" && printf '%s' "$scanned_text" | grep -qE "$DESTRUCTIVE_TEXT"; then
     to_ask=$(printf '%s\n%s' "$to_ask" "$INSIDE_FINDING")
   fi
